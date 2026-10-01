@@ -1,21 +1,21 @@
-# Base de datos inicial de Chambapp
+# Base de datos de Chambapp
 
-La migración `supabase/migrations/20261001181821_initial_chambapp.sql` implementa el modelo acumulado de los documentos v1, v2 y v3. Cuando hay cambios entre versiones, prevalece la v3 y las decisiones confirmadas en la conversación: redondeo de inicio y fin hacia arriba a límites del reloj de 5, 10 o 15 minutos.
+La migración `supabase/migrations/20261001181821_initial_chambapp.sql` implementa el modelo acumulado de los documentos v1, v2 y v3. La migración posterior `20261001213125_duration_rounding_and_preferences.sql` aplica la decisión más reciente: conservar el inicio y fin exactos y redondear únicamente la duración total hacia arriba. Añade también preferencias, finalización de onboarding, cliente y presupuesto de proyecto.
 
-Está preparada para un proyecto Supabase PostgreSQL nuevo. No borra ni adapta tablas de instalaciones anteriores. Antes de aplicarla a una base existente se debe revisar su esquema e historial de migraciones. Los modelos anteriores se conservan como documentación; no son migraciones que deban aplicarse por separado.
+La cadena de migraciones se puede aplicar a un proyecto nuevo. La segunda migración actualiza una instalación que ya tiene la inicial, conserva sus registros, permisos y tipos de las vistas. Los modelos anteriores se conservan como documentación; no son migraciones que deban aplicarse por separado.
 
 ## Tablas y lectura
 
-| Modelo | Tabla | Observaciones |
-|---|---|---|
-| PerfilUsuario | `public.perfiles` | Mismo UUID que `auth.users`; perfil creado al registrar una cuenta. |
-| Proyecto | `public.proyectos` | Propietario, archivado, eliminación lógica y versión. |
-| Tarea | `public.tareas` | Un proyecto; sus partes pueden pertenecer a distintas jornadas. |
-| ConfiguracionSemanal | `public.configuraciones_semanales` | Versiones por lunes de entrada en vigor. |
-| DiaConfiguracionSemanal | `public.dias_configuracion_semanal` | Reparto semanal, con suma validada al confirmar la transacción. |
-| Jornada | `public.jornadas` | Una por usuario y fecha; zona horaria y objetivo históricos. |
-| ParteHoras | `public.partes_horas` | Instantes reales, preferencias de redondeo copiadas, eliminación lógica y versión. |
-| OperacionCronometro | `chambapp_private.operaciones_cronometro` | Resultado de peticiones de inicio y parada; acceso mediante RPC. |
+| Modelo                  | Tabla                                     | Observaciones                                                                                                      |
+| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| PerfilUsuario           | `public.perfiles`                         | Mismo UUID que `auth.users`; perfil creado al registrar una cuenta, `onboarding_completado` y `preferencias` JSON. |
+| Proyecto                | `public.proyectos`                        | Propietario, cliente opcional, presupuesto opcional en minutos, archivado, eliminación lógica y versión.           |
+| Tarea                   | `public.tareas`                           | Un proyecto; sus partes pueden pertenecer a distintas jornadas.                                                    |
+| ConfiguracionSemanal    | `public.configuraciones_semanales`        | Versiones por lunes de entrada en vigor.                                                                           |
+| DiaConfiguracionSemanal | `public.dias_configuracion_semanal`       | Reparto semanal, con suma validada al confirmar la transacción.                                                    |
+| Jornada                 | `public.jornadas`                         | Una por usuario y fecha; zona horaria y objetivo históricos.                                                       |
+| ParteHoras              | `public.partes_horas`                     | Instantes reales, preferencias de redondeo copiadas, eliminación lógica y versión.                                 |
+| OperacionCronometro     | `chambapp_private.operaciones_cronometro` | Resultado de peticiones de inicio y parada; acceso mediante RPC.                                                   |
 
 Todas las tablas tienen RLS. En las tablas públicas, cada usuario autenticado solo puede leer sus datos. No hay acceso de lectura para `anon`. Las escrituras directas del cliente están revocadas: se realizan mediante RPC autenticada.
 
@@ -23,12 +23,20 @@ Las tablas de proyectos, tareas y partes permiten leer las marcas `eliminado_en`
 
 Vistas disponibles con `security_invoker = true`, respetando RLS:
 
-- `partes_detalle`: intervalos reales e imputados, duración real e imputada en segundos, fecha de jornada y proyecto.
+- `partes_detalle`: inicio y fin exactos, duración real e imputada en segundos, fecha de jornada y proyecto. Los alias de compatibilidad `inicio_imputado_en` y `fin_imputado_en` contienen los mismos instantes exactos; la duración imputada se calcula aparte.
 - `resumen_jornadas`: objetivos, totales reales e imputados, saldo en segundos y número de partes abiertos.
 - `resumen_tareas` y `resumen_proyectos`: totales reales e imputados de partes finalizados.
 - `resumen_semanas`: objetivos y totales por lunes. El objetivo incluye las jornadas existentes; se debe generar la semana completa para compararla con la planificación completa.
 
 Los totales persistidos de las vistas no incluyen tiempo provisional de cronómetros abiertos. El frontend lo calcula usando el inicio confirmado y la referencia de hora del servidor.
+
+## Redondeo de duración
+
+`inicio_en` y `fin_en` nunca se ajustan a una cuadrícula del reloj. El cálculo usa el tiempo transcurrido entre esos instantes, incluidos segundos y fracciones, y aplica `ceil(segundos_reales / (intervalo_minutos * 60)) * (intervalo_minutos * 60)` a cada parte finalizado. El intervalo `0` conserva la duración exacta. Se admiten `0`, `5`, `10`, `15`, `30` y `60` minutos.
+
+Un parte de 09:07 a 13:15 dura exactamente 4 h 8 min. Con intervalos de 15, 30 y 60 minutos, imputa respectivamente 4 h 15 min, 4 h 30 min y 5 h; las horas visibles siguen siendo 09:07 y 13:15. Una duración que ya coincide con un múltiplo no aumenta, pero un segundo adicional pasa al siguiente múltiplo. Los cambios de horario de verano se resuelven restando los instantes UTC reales, sin depender de los números del reloj local.
+
+El intervalo se copia del perfil al crear el parte. Cambiar ajustes afecta a partes futuros; los existentes conservan su intervalo, incluso al editar su inicio o fin. La actualización del criterio recalcula las vistas de los partes existentes con sus intervalos conservados, sin reescribir los instantes. Las duraciones de cronómetros abiertos son `null` en `partes_detalle`; los informes suman únicamente partes finalizados.
 
 ## Escrituras desde el frontend
 
@@ -37,32 +45,34 @@ Una sola función pública define la interfaz inicial:
 ```ts
 const { data, error } = await supabase.rpc('chambapp_operar', {
   p_accion: 'crear_proyecto',
-  p_datos: { nombre: 'Web corporativa', descripcion: 'Proyecto de ejemplo' }
+  p_datos: { nombre: 'Web corporativa', descripcion: 'Proyecto de ejemplo' },
 });
 ```
 
 No se envía `usuario_id`: se obtiene de la sesión. Si se incluye un propietario en el JSON, no se utiliza. Los UUID de proyectos, tareas y partes los genera el servidor; los UUID de operaciones del cronómetro los genera el cliente.
 
-| Acción | Campos de `p_datos` |
-|---|---|
-| `editar_perfil` | `version`; opcionales `nombre`, `zona_horaria`, `intervalo_redondeo_minutos`. |
-| `crear_proyecto` | `nombre`; opcional `descripcion`. |
-| `editar_proyecto` | `id`, `version`; opcionales `nombre`, `descripcion`, `archivado` booleano. |
-| `crear_tarea` | `proyecto_id`, `titulo`; opcionales `descripcion`, `estado`, `estimacion_minutos`. |
-| `editar_tarea` | `id`, `version`; opcionales `titulo`, `descripcion`, `estado`, `estimacion_minutos`, `proyecto_id`, `archivado`. |
-| `crear_configuracion_semanal` | `minutos_semanales`, `vigente_desde` (lunes), `dias` (lista de números 1–7); opcional `reparto` con minutos por día. |
-| `generar_semana` | `lunes`, como fecha `YYYY-MM-DD`. |
-| `editar_jornada` | `id`, `version`; opcionales `minutos_objetivo`, `notas`. |
-| `crear_parte` | `tarea_id`, `inicio_en`, `fin_en`; opcional `descripcion`. Ambos instantes deben incluir zona/desplazamiento UTC. |
-| `editar_parte` | `id`, `version`; opcionales `tarea_id`, `inicio_en`, `fin_en`, `descripcion`, `confirmar_zona`. |
-| `eliminar_proyecto` / `eliminar_tarea` | `id`, `version`, `confirmar_cascada: true`; opcional `descartar_activo: true`. |
-| `eliminar_parte` | `id`, `version`; opcional `descartar_activo: true`. |
-| `iniciar` | `operacion_id`, `tarea_id`; opcional `descripcion`. |
-| `detener` | `operacion_id`, `parte_id`. |
-| `consultar_operacion` | `operacion_id`. |
-| `consultar_cronometro` | Objeto vacío. |
+| Acción                                 | Campos de `p_datos`                                                                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `editar_perfil`                        | `version`; opcionales `nombre`, `zona_horaria`, `intervalo_redondeo_minutos`, `onboarding_completado` booleano, `preferencias` objeto JSON. |
+| `crear_proyecto`                       | `nombre`; opcionales `descripcion`, `cliente`, `presupuesto_minutos` entero no negativo.                                                    |
+| `editar_proyecto`                      | `id`, `version`; opcionales `nombre`, `descripcion`, `cliente`, `presupuesto_minutos`, `archivado` booleano.                                |
+| `crear_tarea`                          | `proyecto_id`, `titulo`; opcionales `descripcion`, `estado`, `estimacion_minutos`.                                                          |
+| `editar_tarea`                         | `id`, `version`; opcionales `titulo`, `descripcion`, `estado`, `estimacion_minutos`, `proyecto_id`, `archivado`.                            |
+| `crear_configuracion_semanal`          | `minutos_semanales`, `vigente_desde` (lunes), `dias` (lista de números 1–7); opcional `reparto` con minutos por día.                        |
+| `generar_semana`                       | `lunes`, como fecha `YYYY-MM-DD`.                                                                                                           |
+| `editar_jornada`                       | `id`, `version`; opcionales `minutos_objetivo`, `notas`.                                                                                    |
+| `crear_parte`                          | `tarea_id`, `inicio_en`, `fin_en`; opcional `descripcion`. Ambos instantes deben incluir zona/desplazamiento UTC.                           |
+| `editar_parte`                         | `id`, `version`; opcionales `tarea_id`, `inicio_en`, `fin_en`, `descripcion`, `confirmar_zona`.                                             |
+| `eliminar_proyecto` / `eliminar_tarea` | `id`, `version`, `confirmar_cascada: true`; opcional `descartar_activo: true`.                                                              |
+| `eliminar_parte`                       | `id`, `version`; opcional `descartar_activo: true`.                                                                                         |
+| `iniciar`                              | `operacion_id`, `tarea_id`; opcional `descripcion`.                                                                                         |
+| `detener`                              | `operacion_id`, `parte_id`.                                                                                                                 |
+| `consultar_operacion`                  | `operacion_id`.                                                                                                                             |
+| `consultar_cronometro`                 | Objeto vacío.                                                                                                                               |
 
 En las ediciones, omitir un campo mantiene su valor; enviar `null` borra los campos opcionales. Campos obligatorios no admiten `null`. La API no permite cambiar propietario, fechas de control, versión, preferencias históricas de un parte o marca de eliminación libremente. `archivado: false` permite desarchivar.
+
+`onboarding_completado` comienza en `false`. `preferencias` comienza en `{}`, debe ser un objeto y se reemplaza completo si se envía: el frontend debe combinar los valores actuales antes de guardar un subconjunto. Almacena preferencias de presentación, región, recordatorios y flexibilidad; no interviene en autorización ni concede acceso. `cliente` admite hasta 200 caracteres no vacíos, o `null`; `presupuesto_minutos` admite cero, un entero positivo o `null`.
 
 Ejemplo de reparto automático:
 
@@ -93,7 +103,8 @@ La intención debe persistirse en el cliente antes de enviar la petición, con u
 // Persistir esta petición localmente antes de enviarla.
 const peticion = { operacion_id: crypto.randomUUID(), tarea_id: tareaId };
 const { data, error } = await supabase.rpc('chambapp_operar', {
-  p_accion: 'iniciar', p_datos: peticion
+  p_accion: 'iniciar',
+  p_datos: peticion,
 });
 ```
 
@@ -121,7 +132,7 @@ Errores de validación se devuelven mediante `error` de Supabase RPC. Además de
 - `tareas.usuario_id` es una copia técnica del propietario del proyecto. Claves foráneas compuestas garantizan su coherencia y la de jornadas y partes, también en escrituras privilegiadas.
 - Las configuraciones semanales son de solo inserción: cambiar la planificación crea una versión. Se validan repartos dentro de la transacción; generar jornadas es repetible y conserva objetivos editados.
 - El UUID de una operación se identifica junto a su usuario (`usuario_id`, `id`) para evitar colisiones entre cuentas. No hay eliminación automática del registro de operaciones.
-- El historial de zona y redondeo se conserva. Se admite duración imputada cero. Se cuentan partes no solapados en tiempo real aunque sus intervalos redondeados coincidan.
+- El historial de zona y del intervalo de redondeo se conserva. Un parte válido tiene duración real positiva; con redondeo activo su duración imputada es al menos un intervalo. El helper admite cero para cálculos provisionales. Los solapamientos se validan sobre los instantes reales.
 - Un intervalo que cruza medianoche sigue imputado a la jornada de inicio, como en la v3. Trabajar en una tarea varios días se representa con distintos partes; la tarea no tiene una fecha única.
 - La baja definitiva de cuenta, equipos, festivos, aprobaciones y reparto automático por tareas quedan pendientes, como indican los modelos.
 
@@ -133,7 +144,7 @@ Referencias: [Supabase Auth y perfiles](https://supabase.com/docs/guides/auth/ma
 
 El flujo con los comandos instalados del proyecto se detalla en [ejecutar-migraciones.md](ejecutar-migraciones.md). `supabase/verify.sql` permite comprobar los objetos y permisos tras aplicar la migración.
 
-La configuración local usa PostgreSQL 17, expone solo `public` y `graphql_public` y exige permisos explícitos de API. La migración inicial está aplicada en el proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), organización Aitor, región París (`eu-west-3`). Su versión local coincide con la registrada remotamente: `20261001181821`.
+La configuración local usa PostgreSQL 17, expone solo `public` y `graphql_public` y exige permisos explícitos de API. Ambas migraciones están aplicadas en el proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), organización Aitor, región París (`eu-west-3`). Las versiones locales coinciden con las registradas remotamente: `20261001181821` y `20261001213125`.
 
 Con Docker funcionando, se puede iniciar el entorno Supabase local desde la raíz del repositorio:
 
@@ -159,8 +170,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-La suite usa PostgreSQL 17.10 real y recrea únicamente las tablas/roles mínimos de Auth para probar SQL, RLS y permisos. Comprueba 12 grupos de casos: migración, alta de perfil, aislamiento, validación de zona/versiones, propiedad, reparto semanal, redondeo y DST, partes y solapamientos, historial/edición, reintentos, concurrencia/borrado y catálogo de seguridad. Los directorios temporales contienen solo datos sintéticos y se conservan tras detener el servidor.
+La suite usa PostgreSQL 17.10 real y recrea únicamente las tablas/roles mínimos de Auth para probar SQL, RLS y permisos. Comprueba 15 grupos de casos: actualización con datos existentes y tipos de vistas, alta de perfil, aislamiento, validación de zona/versiones, onboarding/preferencias, cliente/presupuesto, propiedad, reparto semanal, todos los intervalos de duración, segundos y DST, partes y solapamientos, historial/edición, reintentos, concurrencia/borrado y catálogo de seguridad. Los directorios temporales contienen solo datos sintéticos y se conservan tras detener el servidor. No simula el servicio GoTrue, la validación JWT ni PostgREST.
 
-Resultado: todos los grupos pasan. Además, `supabase/verify.sql` se ha ejecutado correctamente en el proyecto alojado. Una prueba remota transaccional ha validado el trigger de perfil en `auth.users`, RLS bajo el rol `authenticated`, creación de proyecto y tarea, inicio idempotente, parada y lectura de partes. Se han comprobado las restricciones diferidas y revertido la transacción sin dejar datos de ejemplo. Los advisors remotos no muestran errores ni advertencias; hay avisos informativos por índices aún sin uso y por la tabla interna con RLS sin políticas (su acceso directo está revocado de forma intencionada). Docker está instalado, pero su motor no estaba activo durante la verificación local. La prueba completa de registro y login a través de la interfaz queda para la implementación del frontend.
+Resultado local de ambas migraciones: los 15 grupos pasan. La nueva migración conserva RLS, SECURITY INVOKER en las vistas y RPC pública, las restricciones de propiedad y la comprobación de versiones. La verificación remota documentada a continuación corresponde a la migración inicial. Además, `supabase/verify.sql` se ha ejecutado correctamente en el proyecto alojado. Una prueba remota transaccional ha validado el trigger de perfil en `auth.users`, RLS bajo el rol `authenticated`, creación de proyecto y tarea, inicio idempotente, parada y lectura de partes. Se han comprobado las restricciones diferidas y revertido la transacción sin dejar datos de ejemplo. Los advisors remotos no muestran errores ni advertencias; hay avisos informativos por índices aún sin uso y por la tabla interna con RLS sin políticas (su acceso directo está revocado de forma intencionada). Docker está instalado, pero su motor no estaba activo durante la verificación local. La verificación de registro y login a través de la interfaz se realiza aparte de las pruebas SQL.
 
 Referencias de esos avisos: [índices sin uso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) y [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).

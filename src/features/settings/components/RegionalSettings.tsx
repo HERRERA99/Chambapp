@@ -1,6 +1,81 @@
-import { Panel, Badge } from '../../../shared/ui/Panel';
-import { SelectField } from '../../../shared/ui/FormField';
+import { Panel, Badge, Notice } from '../../../shared/ui/Panel';
+import { InputField, SelectField } from '../../../shared/ui/FormField';
+import type { ProfileDraft } from '../settingsDraft';
 
-export function RegionalSettings() {
-  return <Panel id="regional" title="Zona Horaria & Preferencias Regionales" icon="globe" action={<Badge>Madrid · UTC+2</Badge>}><p className="muted section-intro">Formato horario, moneda e idioma de ejemplo para equipos remotos.</p><div className="form-grid form-grid--three"><SelectField label="Huso horario operativo" hint="Selección de vista previa. No modifica la hora de los registros."><option>Europe / Madrid (CET / CEST)</option><option>Europe / London (GMT / BST)</option><option>America / New_York (EST / EDT)</option><option>America / Mexico_City (CST)</option><option>Asia / Tokyo (JST)</option></SelectField><SelectField label="Formato de visualización"><option>24 horas (14:30)</option><option>12 horas (02:30 PM)</option></SelectField><SelectField label="Primer día de la semana"><option>Lunes (ISO)</option><option>Domingo (US)</option></SelectField><SelectField label="Idioma de la plataforma"><option>Español (España)</option><option>English (United States)</option><option>Català (Catalunya)</option><option>Français (France)</option></SelectField><SelectField label="Moneda de valoración"><option>EUR (€) · 1.250,50 €</option><option>USD ($) · 1,250.50 $</option><option>GBP (£)</option></SelectField><SelectField label="Notación de duración"><option>Mixto · 07h 30m / 7,50h</option><option>Decimal · 7.50 horas</option><option>Cronológico · 07:30:00</option></SelectField></div></Panel>;
+const zones = [
+  'Europe/Madrid',
+  'Europe/London',
+  'Europe/Paris',
+  'America/New_York',
+  'America/Mexico_City',
+  'America/Bogota',
+  'America/Argentina/Buenos_Aires',
+  'Asia/Tokyo',
+  'UTC',
+];
+
+export function RegionalSettings({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ProfileDraft;
+  onChange: (value: ProfileDraft) => void;
+  disabled: boolean;
+}) {
+  const options = zones.includes(value.zonaHoraria) ? zones : [value.zonaHoraria, ...zones];
+  return (
+    <Panel
+      id="regional"
+      title="Perfil & Zona Horaria"
+      icon="globe"
+      action={<Badge>{value.zonaHoraria.replaceAll('_', ' ')}</Badge>}
+    >
+      <p className="muted section-intro">
+        Personaliza tu perfil y la zona horaria de las próximas jornadas.
+      </p>
+      <div className="form-grid">
+        <InputField
+          label="Nombre completo"
+          value={value.nombre}
+          onChange={(event) => onChange({ ...value, nombre: event.target.value })}
+          autoComplete="name"
+          maxLength={200}
+          required
+          disabled={disabled}
+        />
+        <InputField
+          label="Nombre del Workspace"
+          value={value.workspace}
+          onChange={(event) => onChange({ ...value, workspace: event.target.value })}
+          maxLength={200}
+          required
+          disabled={disabled}
+        />
+        <InputField
+          label="Especialidad"
+          value={value.especialidad}
+          onChange={(event) => onChange({ ...value, especialidad: event.target.value })}
+          maxLength={200}
+          disabled={disabled}
+        />
+        <SelectField
+          label="Huso horario operativo"
+          value={value.zonaHoraria}
+          onChange={(event) => onChange({ ...value, zonaHoraria: event.target.value })}
+          disabled={disabled}
+        >
+          {options.map((zone) => (
+            <option key={zone} value={zone}>
+              {zone.replaceAll('_', ' ')}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+      <Notice title="Las jornadas conservan su zona" icon="clock">
+        Las horas exactas de los registros existentes se muestran en la zona guardada en cada
+        jornada. La nueva zona se aplica cuando se crean jornadas nuevas.
+      </Notice>
+    </Panel>
+  );
 }

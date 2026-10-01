@@ -1,10 +1,65 @@
-import { useState } from 'react';
-import { Panel, Badge } from '../../../shared/ui/Panel';
-import { Toggle, InputField } from '../../../shared/ui/FormField';
+import { Panel, Badge, Notice } from '../../../shared/ui/Panel';
 import { RoundingPreview } from '../../time-entries/components/RoundingPreview';
 
-export function RoundingSettings() {
-  const [interval, setInterval] = useState('15');
-  const [aligned, setAligned] = useState(true);
-  return <Panel id="redondeo" title="Motor y Algoritmo de Redondeo" icon="settings" action={<Badge>Simulación visual</Badge>}><p className="muted section-intro">Tiempo real e imputado por separado, con granularidad de ejemplo.</p><fieldset className="choice-fieldset"><legend>Intervalo de imputación oficial</legend><div className="choice-grid">{[{ value: '0', title: 'Minuto bruto', detail: 'Sin redondeo' }, { value: '5', title: '5 Minutos (R05)', detail: 'Granularidad fina' }, { value: '10', title: '10 Minutos (R10)', detail: 'Balance intermedio' }, { value: '15', title: '15 Minutos (R15)', detail: 'Estándar Chambapp' }].map(option => <label className={`choice-card ${interval === option.value ? 'choice-card--selected' : ''}`} key={option.value}><input type="radio" name="rounding-interval" value={option.value} checked={interval === option.value} onChange={() => setInterval(option.value)} /><strong>{option.title}</strong><span className="muted">{option.detail}</span></label>)}</div></fieldset><div className="two-columns"><div><Toggle checked={aligned} onChange={setAligned} label="Alineación a límites del reloj" description="Preferencia visual. La simulación muestra valores fijos de ejemplo." /><Toggle checked disabled label="Preservar intervalo real" description="El diseño mantiene ambas columnas independientes." /><InputField label="Umbral de gracia para tramos cortos" type="number" min="0" max="15" defaultValue="3" hint="Minutos · Valor de ejemplo, sin aplicación a los partes." /></div><RoundingPreview interval={interval} compact /></div></Panel>;
+const choices = [
+  { value: 0, title: 'Tiempo exacto', detail: 'Sin redondeo' },
+  { value: 5, title: '5 minutos (R05)', detail: 'Granularidad fina' },
+  { value: 10, title: '10 minutos (R10)', detail: 'Balance intermedio' },
+  { value: 15, title: '15 minutos (R15)', detail: 'Cuartos de hora' },
+  { value: 30, title: '30 minutos (R30)', detail: 'Medias horas' },
+  { value: 60, title: '60 minutos (R60)', detail: 'Horas completas' },
+] as const;
+
+export function RoundingSettings({
+  interval,
+  onChange,
+  disabled,
+}: {
+  interval: number;
+  onChange: (interval: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <Panel
+      id="redondeo"
+      title="Redondeo del Tiempo Total"
+      icon="settings"
+      action={
+        <Badge tone="accent">
+          {interval === 0 ? 'Tiempo exacto' : `R${String(interval).padStart(2, '0')}`}
+        </Badge>
+      }
+    >
+      <p className="muted section-intro">
+        Inicio y fin se registran con su hora exacta. Solo la duración total se redondea hacia
+        arriba al siguiente bloque.
+      </p>
+      <fieldset className="choice-fieldset" disabled={disabled}>
+        <legend>Intervalo de imputación</legend>
+        <div className="choice-grid choice-grid--three">
+          {choices.map((option) => (
+            <label
+              className={`choice-card ${interval === option.value ? 'choice-card--selected' : ''}`}
+              key={option.value}
+            >
+              <input
+                type="radio"
+                name="rounding-interval"
+                value={option.value}
+                checked={interval === option.value}
+                onChange={() => onChange(option.value)}
+              />
+              <strong>{option.title}</strong>
+              <span className="muted">{option.detail}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <RoundingPreview interval={String(interval)} />
+      <Notice title="El histórico conserva su regla" icon="shield">
+        El intervalo se guarda en cada parte al crearlo. Cambiar la preferencia afecta a los nuevos
+        registros y conserva las duraciones históricas.
+      </Notice>
+    </Panel>
+  );
 }

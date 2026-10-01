@@ -1,5 +1,75 @@
+import { formatDuration } from '../../../domain/time';
 import { weekDays } from '../data/week.fixtures';
 
-export function WeekChart() {
-  return <div className="week-chart" role="img" aria-label="Horas imputadas: lunes 8 horas 15 minutos; martes 8 horas; miércoles 8 horas 30 minutos; jueves 6 horas 45 minutos; viernes 0 horas. Objetivos: 8 horas de lunes a jueves y 5 horas 30 minutos el viernes.">{weekDays.map(day => <div className={`week-chart__day ${day.state === 'active' ? 'week-chart__day--active' : ''}`} key={day.name}>{day.state === 'active' ? <span className="week-chart__today">Hoy</span> : null}<div className="week-chart__bars"><span className="week-chart__target" style={{ height: `${day.target * 10}%` }} /><span className="week-chart__logged" style={{ height: `${day.logged * 10}%` }} /></div><strong className="mono">{day.short} {day.date}</strong><span className="week-chart__balance">{day.balance}</span><span className="mono muted">{day.duration}</span></div>)}</div>;
+export type WeekChartDay = {
+  date: string;
+  label: string;
+  loggedSeconds: number;
+  targetSeconds: number;
+  isToday?: boolean;
+};
+
+const previewDays: readonly WeekChartDay[] = weekDays.map((day) => ({
+  date: day.date,
+  label: `${day.short} ${day.date}`,
+  targetSeconds: day.target * 3600,
+  loggedSeconds: day.logged * 3600,
+  isToday: day.state === 'active',
+}));
+const emptyDays: readonly WeekChartDay[] = [];
+
+export function WeekChart({
+  days = emptyDays,
+  preview = false,
+}: {
+  days?: readonly WeekChartDay[];
+  preview?: boolean;
+}) {
+  const values = preview ? previewDays : days;
+  if (!values.length)
+    return <p className="muted empty-state">Todavía no hay jornadas para comparar.</p>;
+  const maximum = Math.max(
+    3600,
+    ...values.map((day) => Math.max(day.targetSeconds, day.loggedSeconds)),
+  );
+  const description = values
+    .map(
+      (day) =>
+        `${day.label}: ${formatDuration(day.loggedSeconds)} imputadas; objetivo ${formatDuration(day.targetSeconds)}`,
+    )
+    .join('; ');
+  return (
+    <div
+      className="week-chart"
+      style={{ gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` }}
+      role="img"
+      aria-label={description}
+    >
+      {values.map((day) => (
+        <div
+          className={`week-chart__day ${day.isToday ? 'week-chart__day--active' : ''}`}
+          key={day.date}
+        >
+          {day.isToday ? <span className="week-chart__today">Hoy</span> : null}
+          <div className="week-chart__bars">
+            <span
+              className="week-chart__target"
+              style={{ height: `${(day.targetSeconds / maximum) * 100}%` }}
+            />
+            <span
+              className="week-chart__logged"
+              style={{ height: `${(day.loggedSeconds / maximum) * 100}%` }}
+            />
+          </div>
+          <strong className="mono">{day.label}</strong>
+          <span className="week-chart__balance">
+            {day.targetSeconds > 0
+              ? `${day.loggedSeconds >= day.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(day.loggedSeconds - day.targetSeconds))}`
+              : 'Sin objetivo'}
+          </span>
+          <span className="mono muted">{formatDuration(day.loggedSeconds)}</span>
+        </div>
+      ))}
+    </div>
+  );
 }

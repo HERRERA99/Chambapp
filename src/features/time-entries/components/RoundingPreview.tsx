@@ -1,13 +1,45 @@
 import { Icon } from '../../../shared/ui/Icon';
 import { Badge, Notice } from '../../../shared/ui/Panel';
+import { formatDuration, roundDuration } from '../../../domain/time';
 
-export function RoundingPreview({ interval = '15', compact = false }: { interval?: string; compact?: boolean }) {
-  const examples: Record<string, { start: string; end: string; total: string; delta: string }> = {
-    '0': { start: '09:07', end: '09:38', total: '31 min', delta: '0 min' },
-    '5': { start: '09:10', end: '09:40', total: '30 min', delta: '−1 min' },
-    '10': { start: '09:10', end: '09:40', total: '30 min', delta: '−1 min' },
-    '15': { start: '09:15', end: '09:45', total: '30 min', delta: '−1 min' },
-  };
-  const example = examples[interval] ?? examples['15']!;
-  return <div className={`rounding-preview ${compact ? 'rounding-preview--compact' : ''}`}><div className="rounding-preview__heading"><span className="eyebrow">Ejemplo ilustrativo de cómputo</span><Badge tone="accent">{interval === '0' ? 'Sin redondeo' : `R${interval.padStart(2, '0')}`}</Badge></div><div className="rounding-flow"><div><span className="eyebrow">Intervalo real</span><strong className="mono">09:07 <span className="dim">→</span> 09:38</strong><span className="muted">31 minutos cronometrados</span></div><Icon name="arrow" /><div className="rounding-flow__result"><span className="eyebrow">Intervalo imputado</span><strong className="mono">{example.start} <span className="dim">→</span> {example.end}</strong><span className="accent">{example.total} · Diferencia: {example.delta}</span></div></div>{compact ? null : <Notice title="El tiempo real siempre se conserva" icon="lock">Ambos intervalos se muestran por separado. Esta simulación visual no aplica ningún cálculo a los partes.</Notice>}</div>;
+export function RoundingPreview({
+  interval = '15',
+  compact = false,
+}: {
+  interval?: string;
+  compact?: boolean;
+}) {
+  const realSeconds = (4 * 60 + 8) * 60;
+  const logged = roundDuration(realSeconds, Number(interval));
+  return (
+    <div className={`rounding-preview ${compact ? 'rounding-preview--compact' : ''}`}>
+      <div className="rounding-preview__heading">
+        <span className="eyebrow">Ejemplo de duración total</span>
+        <Badge tone="accent">
+          {interval === '0' ? 'Sin redondeo' : `R${interval.padStart(2, '0')}`}
+        </Badge>
+      </div>
+      <div className="rounding-flow">
+        <div>
+          <span className="eyebrow">Inicio y fin exactos</span>
+          <strong className="mono">
+            09:07:14 <span className="dim">→</span> 13:15:14
+          </strong>
+          <span className="muted">Tiempo real: {formatDuration(realSeconds)}</span>
+        </div>
+        <Icon name="arrow" />
+        <div className="rounding-flow__result">
+          <span className="eyebrow">Duración imputada</span>
+          <strong className="mono">{formatDuration(logged)}</strong>
+          <span className="accent">Diferencia: +{Math.round((logged - realSeconds) / 60)} min</span>
+        </div>
+      </div>
+      {compact ? null : (
+        <Notice title="Las horas de inicio y fin siempre se conservan" icon="lock">
+          Solo se redondea hacia arriba la duración total del parte. Cada parte conserva el
+          intervalo que tenía configurado al crearse.
+        </Notice>
+      )}
+    </div>
+  );
 }

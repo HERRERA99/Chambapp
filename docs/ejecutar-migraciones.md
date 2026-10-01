@@ -16,7 +16,7 @@ El último comando aplica la migración a PostgreSQL 17 aislado y verifica sus r
 
 ## Preparar el destino alojado
 
-`supabase/project.json` ya guarda la referencia pública `azylnnujzpqwpzedkoxv` del proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), creado en la organización Aitor, región París. La migración inicial ya está aplicada mediante el plugin y su versión local coincide con el historial remoto: `20261001181821`. `db:migrate` se reserva para futuras migraciones pendientes.
+`supabase/project.json` ya guarda la referencia pública `azylnnujzpqwpzedkoxv` del proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), creado en la organización Aitor, región París. Ambas migraciones están aplicadas mediante el plugin y sus versiones locales coinciden con el historial remoto: `20261001181821` y `20261001213125`. `db:migrate` se reserva para futuras migraciones pendientes.
 
 Como alternativa, establece `SUPABASE_PROJECT_REF` en el entorno o en `.env.local`. No es una contraseña. Para cambiar de destino en una ejecución, usa `--project-ref <ref>`.
 
@@ -46,7 +46,7 @@ La migración inicial debe aplicarse a un esquema nuevo. Si ya ejecutaste su SQL
 
 Si se aplica mediante el plugin, se sincronizará el nombre local con la versión que Supabase registre, para que CLI y plugin compartan el mismo historial.
 
-## Conexión del futuro frontend
+## Conexión del frontend
 
 La URL del proyecto, su clave publicable y la referencia de destino ya están guardadas en `.env.local`, que Git ignora. Para otra instalación, el formato es:
 
@@ -56,7 +56,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<clave-publicable>
 SUPABASE_PROJECT_REF=<ref>
 ```
 
-Estas variables preparan la conexión; la interfaz de la aplicación todavía no se ha implementado. Las claves administrativas no se incluyen en variables `VITE_`.
+Estas variables conectan la interfaz con Supabase Auth, las lecturas protegidas por RLS y las escrituras RPC. Las claves administrativas no se incluyen en variables `VITE_`. El acceso a la CLI requiere su propio `db:login`, aunque el plugin MCP ya esté conectado.
 
 ## Supabase local
 

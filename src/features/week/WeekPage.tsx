@@ -1,17 +1,331 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { DateTime } from 'luxon';
+import type { TimeEntry, Workday } from '../../domain/models';
+import { formatClock, formatDuration, mondayForDate, todayInZone } from '../../domain/time';
+import { downloadCsv } from '../../lib/export';
 import { PageHeader } from '../../shared/ui/PageHeader';
-import { Button, IconButton } from '../../shared/ui/Button';
+import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { StatGrid } from '../../shared/ui/StatGrid';
 import { Panel, Notice, Progress, Badge } from '../../shared/ui/Panel';
-import { weekDays } from './data/week.fixtures';
-import { SchedulePreview } from './components/SchedulePreview';
 import { DayCard } from './components/DayCard';
+import { DayGoalModal } from './components/DayGoalModal';
+import { WeekChart } from './components/WeekChart';
+import { WeekReport } from './components/WeekReport';
 import { EntryModal } from '../time-entries/components/EntryModal';
-import { usePreviewNotice } from '../../shared/preview/PreviewContext';
+import { useWorkspace } from '../workspace/useWorkspace';
+import { useCommand } from '../workspace/useCommand';
+import { useTracker } from '../tracker/useTracker';
+import { buildWeek, describeBalance } from './week.model';
+import './week.css';
+
+type EntryForm = { entry?: TimeEntry; date?: string };
 
 export default function WeekPage() {
-  const [entryOpen, setEntryOpen] = useState(false);
-  const [showSchedule, setShowSchedule] = useState(true);
-  const notify = usePreviewNotice();
-  return <div className="page-stack"><PageHeader eyebrow="Operaciones / Planificación / Mi semana" title="Mi Semana Laboral & Balances" description="Una jornada de 37,5 horas, objetivos diarios ajustables y un saldo que ayuda a encontrar tu ritmo." actions={<><Button icon="settings" onClick={() => setShowSchedule(value => !value)} aria-expanded={showSchedule} aria-controls="schedule-config">Configurar reparto</Button><Button variant="primary" icon="plus" onClick={() => setEntryOpen(true)}>Registrar bloque manual</Button></>} /><StatGrid stats={[{ label: 'Jornada comprometida', value: '37h 30m', detail: 'Convenio L–V · L–J 8h + V 5h30m', icon: 'calendar', progress: 84 }, { label: 'Tiempo imputado semanal', value: '31h 30m', detail: 'Valores de la semana de ejemplo', icon: 'timer', accent: true }, { label: 'Balance acumulado', value: '+45m', detail: 'Informativo y conciliador', icon: 'gauge', accent: true }, { label: 'Estado de la semana', value: 'Fase 4 / 5', detail: 'Viernes intensivo · 05h 30m', icon: 'flag' }]} />{showSchedule ? <Panel id="schedule-config" title="Configuración Dinámica de Reparto Semanal" icon="settings" eyebrow="Meta · 37,5 horas"><p className="muted section-intro">Ajusta la carga horaria de ejemplo. La simulación no altera los registros ni los objetivos del calendario.</p><SchedulePreview /></Panel> : null}<Panel title="Semana 19 · 05 May — 11 May 2025" icon="calendar" className="calendar-panel" action={<div className="actions"><IconButton icon="left" label="Previsualizar semana anterior" onClick={() => notify('La demo muestra únicamente la semana 19 de 2025.')} /><Badge>Semana de ejemplo</Badge><IconButton icon="right" label="Previsualizar semana siguiente" onClick={() => notify('La demo muestra únicamente la semana 19 de 2025.')} /></div>}><div className="calendar-grid">{weekDays.map(day => <DayCard key={day.name} day={day} onAdd={() => setEntryOpen(true)} onPreview={() => notify('Vista previa: no se inicia ni modifica ninguna sesión de trabajo.')} />)}</div><div className="weekend-note"><span>Sábado 10</span><span>Domingo 11</span><span className="dim">Descanso · Sin objetivo de jornada</span></div></Panel><div className="two-columns two-columns--wide"><Panel title="La Brújula de Ritmo frente al Control Punitivo" icon="shield"><p className="muted section-intro">El saldo semanal es un indicador para planificar tu trabajo y conciliar imprevistos. La interfaz presenta las horas con claridad y conserva la diferencia entre tiempo real e imputado.</p><div className="principles"><div><span className="eyebrow">Regla R15</span><h3>Tolerancia sin recortes</h3><p className="muted">Consulta ambos intervalos en cada parte.</p></div><div><span className="eyebrow">Salida anticipada</span><h3>Un viernes con margen</h3><p className="muted">+45m a favor en la semana de ejemplo.</p></div><div><span className="eyebrow">Transparencia</span><h3>Histórico visible</h3><p className="muted">Desglose por cliente, tarea y jornada.</p></div></div></Panel><Panel title="Exportación de Balance" eyebrow="Informe semanal · Vista previa"><p className="muted section-intro">Desglose por cliente, tarea y redondeos.</p><p className="export-progress mono">84%</p><Progress value={84} label="Progreso de la semana de ejemplo" /><p className="mono muted">31h 30m / 37h 30m</p><Button icon="download" variant="primary" className="full-width" onClick={() => notify('Vista previa: el informe PDF aún no está conectado.')}>Exportar informe PDF</Button><Button icon="file" variant="ghost" className="full-width" onClick={() => notify('Vista previa: la descarga CSV aún no está conectada.')}>Descargar CSV</Button></Panel></div><Notice title="Semana y fechas de demostración">Los datos reproducen la semana del diseño de Stitch, del 5 al 11 de mayo de 2025.</Notice><EntryModal open={entryOpen} onClose={() => setEntryOpen(false)} /></div>;
+  const { data, isLoading, error, reload } = useWorkspace();
+  const { run, pending } = useCommand();
+  const tracker = useTracker();
+  const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
+  const [entryForm, setEntryForm] = useState<EntryForm | null>(null);
+  const [goal, setGoal] = useState<Workday | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const today = todayInZone(data?.profile.zona_horaria ?? 'Europe/Madrid');
+  const monday = selectedMonday ?? mondayForDate(today);
+  const week = useMemo(() => (data ? buildWeek(data, monday, today) : null), [data, monday, today]);
+
+  async function generate() {
+    setCommandError(null);
+    try {
+      await run('generar_semana', { lunes: monday });
+    } catch (cause) {
+      setCommandError(cause instanceof Error ? cause.message : 'No se pudo generar la semana.');
+    }
+  }
+  async function stopTimer() {
+    setCommandError(null);
+    try {
+      await tracker.stop();
+    } catch (cause) {
+      setCommandError(cause instanceof Error ? cause.message : 'No se pudo detener el cronómetro.');
+    }
+  }
+  function moveWeek(weeks: number) {
+    setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
+  }
+  function exportWeek() {
+    if (!week) return;
+    downloadCsv(
+      `chambapp-semana-${monday}.csv`,
+      [
+        'Fecha',
+        'Proyecto',
+        'Cliente',
+        'Tarea',
+        'Inicio exacto',
+        'Fin exacto',
+        'Zona horaria',
+        'Real (s)',
+        'Imputado (s)',
+        'Redondeo (min)',
+        'Descripción',
+        'Estado',
+      ],
+      week.entries.map(({ entry, project, task }) => [
+        entry.fecha,
+        project?.nombre ?? '',
+        project?.cliente ?? null,
+        task?.titulo ?? '',
+        entry.inicio_en,
+        entry.fin_en,
+        entry.zona_horaria,
+        entry.duracion_real_segundos,
+        entry.duracion_imputada_segundos,
+        entry.intervalo_redondeo_minutos,
+        entry.descripcion,
+        entry.fin_en ? 'Finalizado' : 'En curso',
+      ]),
+    );
+  }
+
+  if (isLoading && !data)
+    return (
+      <div className="empty-state" role="status">
+        Cargando tu semana…
+      </div>
+    );
+  if (!data || !week)
+    return (
+      <Notice title="No se pudo cargar la semana">
+        {error?.message ?? 'La sesión está cargando.'}
+        <Button onClick={() => void reload()}>Reintentar</Button>
+      </Notice>
+    );
+  const startDate = DateTime.fromISO(monday, { zone: 'UTC' }).setLocale('es');
+  const endDate = startDate.plus({ days: 6 });
+  const progress = week.targetSeconds > 0 ? (week.loggedSeconds / week.targetSeconds) * 100 : 0;
+  const canAdd = week.canAdd;
+  const activeInWeek =
+    tracker.active && week.days.some((day) => day.date === tracker.active?.fecha);
+  return (
+    <div className="page-stack week-page">
+      <PageHeader
+        eyebrow="Operaciones / Planificación / Mi semana"
+        title="Mi Semana Laboral & Balances"
+        description="Objetivos diarios y tiempos reales e imputados de tus sesiones de trabajo."
+        actions={
+          <>
+            <ButtonLink to="/ajustes#jornada" icon="settings">
+              Configurar reparto
+            </ButtonLink>
+            <Button
+              variant="primary"
+              icon="plus"
+              disabled={!canAdd}
+              onClick={() => setEntryForm({})}
+            >
+              Registrar bloque manual
+            </Button>
+          </>
+        }
+      />
+      {error ? (
+        <Notice title="No se pudieron actualizar los datos">
+          {error.message}
+          <Button onClick={() => void reload()}>Reintentar</Button>
+        </Notice>
+      ) : null}
+      {commandError ? <Notice title="No se ha guardado">{commandError}</Notice> : null}
+      <StatGrid
+        stats={[
+          {
+            label: 'Objetivo de jornadas',
+            value: formatDuration(week.targetSeconds),
+            detail: `${week.workdays} días con objetivo registrado`,
+            icon: 'calendar',
+            progress,
+          },
+          {
+            label: 'Tiempo imputado semanal',
+            value: formatDuration(week.loggedSeconds),
+            detail: 'Partes finalizados de la semana',
+            icon: 'timer',
+            accent: true,
+          },
+          {
+            label: 'Tiempo real semanal',
+            value: formatDuration(week.realSeconds),
+            detail: 'Inicio y fin exactos',
+            icon: 'clock',
+          },
+          {
+            label: 'Balance semanal',
+            value: `${week.loggedSeconds >= week.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(week.loggedSeconds - week.targetSeconds))}`,
+            detail: `${week.completedDays} de ${week.workdays} objetivos cumplidos`,
+            icon: 'gauge',
+            accent: true,
+          },
+        ]}
+      />
+      {!canAdd ? (
+        <Notice title="Crea un proyecto y una tarea para registrar tiempo">
+          <ButtonLink to="/proyectos" icon="plus">
+            Abrir proyectos
+          </ButtonLink>
+        </Notice>
+      ) : null}
+      {!week.configuration ? (
+        <Notice title="Esta semana todavía no tiene reparto">
+          Guarda una configuración que entre en vigor este lunes o antes.
+          <ButtonLink to="/ajustes#jornada">Configurar jornada</ButtonLink>
+        </Notice>
+      ) : week.missingDays > 0 ? (
+        <Notice title={`${week.missingDays} jornadas pendientes de generar`}>
+          El reparto vigente suma {formatDuration(week.configuration.minutos_semanales * 60)}.
+          Generar la semana crea las jornadas que faltan y conserva los objetivos ya guardados.
+          <Button onClick={() => void generate()} disabled={pending} icon="calendar">
+            {pending ? 'Generando…' : 'Generar jornadas'}
+          </Button>
+        </Notice>
+      ) : null}
+      {activeInWeek ? (
+        <Notice title="Tramo activo · tiempo provisional">
+          {formatClock(tracker.elapsedSeconds)} transcurridos. Se incorporará al balance al detener
+          el cronómetro.
+        </Notice>
+      ) : null}
+      <Panel
+        title={`Semana ${startDate.weekNumber} · ${startDate.toFormat('dd LLL')} — ${endDate.toFormat('dd LLL yyyy')}`}
+        icon="calendar"
+        className="calendar-panel"
+        action={
+          <div className="actions week-navigation">
+            <IconButton
+              icon="left"
+              label="Semana anterior"
+              onClick={() => moveWeek(-1)}
+              disabled={pending}
+            />
+            <Button variant="ghost" onClick={() => setSelectedMonday(null)} disabled={pending}>
+              Hoy
+            </Button>
+            <Badge>{monday === mondayForDate(today) ? 'Esta semana' : startDate.weekYear}</Badge>
+            <IconButton
+              icon="right"
+              label="Semana siguiente"
+              onClick={() => moveWeek(1)}
+              disabled={pending}
+            />
+          </div>
+        }
+      >
+        <div className="calendar-grid calendar-grid--full-week">
+          {week.days.map((day) => (
+            <DayCard
+              key={day.date}
+              day={day}
+              canAdd={canAdd}
+              activeId={tracker.active?.id}
+              elapsedSeconds={tracker.elapsedSeconds}
+              timerBusy={tracker.busy || tracker.pending}
+              onAdd={() => setEntryForm({ date: day.date })}
+              onEdit={(entry) => setEntryForm({ entry })}
+              onEditGoal={() => {
+                if (day.jornada) setGoal(day.jornada);
+              }}
+              onStop={() => void stopTimer()}
+            />
+          ))}
+        </div>
+      </Panel>
+      <Panel
+        title="Horas imputadas frente al objetivo"
+        action={
+          <div className="chart-legend">
+            <span>
+              <i /> Imputado
+            </span>
+            <span>
+              <i className="chart-legend__target" /> Objetivo
+            </span>
+          </div>
+        }
+      >
+        <WeekChart days={week.days} />
+      </Panel>
+      <div className="two-columns two-columns--wide week-insights">
+        <Panel title="Un balance para organizar tu ritmo" icon="shield">
+          <p className="muted section-intro">
+            {describeBalance(week.loggedSeconds - week.targetSeconds)} en las jornadas registradas.
+            Los objetivos y los tiempos en curso se presentan por separado para revisar la semana
+            con claridad.
+          </p>
+          <div className="principles">
+            <div>
+              <span className="eyebrow">Precisión</span>
+              <h3>Inicio y fin exactos</h3>
+              <p className="muted">Cada sesión conserva los instantes registrados.</p>
+            </div>
+            <div>
+              <span className="eyebrow">Redondeo</span>
+              <h3>Solo sobre duración</h3>
+              <p className="muted">Cada parte utiliza el intervalo que tenía al crearse.</p>
+            </div>
+            <div>
+              <span className="eyebrow">Flexibilidad</span>
+              <h3>Objetivos por día</h3>
+              <p className="muted">
+                Edita una jornada para adaptar su objetivo sin cambiar el reparto semanal.
+              </p>
+            </div>
+          </div>
+        </Panel>
+        <Panel
+          title="Exportación de balance"
+          eyebrow="Informe de la semana seleccionada"
+          className="week-export"
+        >
+          <p className="muted section-intro">
+            Detalle por proyecto, tarea y duración, con las horas exactas de inicio y fin.
+          </p>
+          <p className="export-progress mono">{Math.round(progress)}%</p>
+          <Progress value={progress} label="Progreso respecto a las jornadas registradas" />
+          <p className="mono muted">
+            {formatDuration(week.loggedSeconds)} / {formatDuration(week.targetSeconds)}
+          </p>
+          <Button
+            icon="download"
+            variant="primary"
+            className="full-width"
+            onClick={() => window.print()}
+          >
+            Imprimir / Guardar PDF
+          </Button>
+          <Button
+            icon="file"
+            variant="ghost"
+            className="full-width"
+            onClick={exportWeek}
+            disabled={!week.entries.length}
+          >
+            Descargar CSV
+          </Button>
+        </Panel>
+      </div>
+      <WeekReport days={week.days} entries={week.entries} />
+      {entryForm ? (
+        <EntryModal
+          open
+          onClose={() => setEntryForm(null)}
+          entry={entryForm.entry}
+          date={entryForm.date}
+        />
+      ) : null}
+      {goal ? (
+        <DayGoalModal
+          key={`${goal.id}:${goal.version}`}
+          jornada={goal}
+          onClose={() => setGoal(null)}
+        />
+      ) : null}
+    </div>
+  );
 }

@@ -1,44 +1,239 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import type { Task } from '../../domain/models';
+import { downloadCsv } from '../../lib/export';
+import { formatDuration } from '../../domain/time';
 import { PageHeader } from '../../shared/ui/PageHeader';
-import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
-import { Panel, Badge, Progress, Notice } from '../../shared/ui/Panel';
-import { Icon } from '../../shared/ui/Icon';
+import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Panel, Progress, Notice } from '../../shared/ui/Panel';
 import { InputField, SelectField } from '../../shared/ui/FormField';
-import { Modal } from '../../shared/ui/Modal';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
-import { PreviewForm } from '../../shared/preview/PreviewForm';
-import { usePreviewNotice } from '../../shared/preview/PreviewContext';
-import { EntryModal } from '../time-entries/components/EntryModal';
-import { WeekChart } from '../week/components/WeekChart';
-import { tasks, taskStatusLabels, taskDayGroups } from './data/tasks.fixtures';
-import type { TaskPreview } from './data/tasks.fixtures';
-import { paths } from '../../app/paths';
+import { useWorkspace } from '../workspace/useWorkspace';
+import { entryTotalsBy } from '../time-entries/entryTotals';
+import { TaskForm } from './components/TaskForm';
+import { TaskDetail } from './components/TaskDetail';
+import { taskStatusLabels } from './taskLabels';
 
-type Filter = 'all' | 'active' | 'pending' | 'completed';
+type Filter = 'all' | Task['estado'];
 
 export default function TasksPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get('proyecto');
-  const initialTask = tasks.find(task => !projectId || task.projectId === projectId);
-
-  if (!initialTask) {
-    return <div className="page-stack"><PageHeader eyebrow="Operaciones / Proyectos / Tareas" title="Sin tareas de ejemplo" description="No hay tareas de demostración para este proyecto." /><ButtonLink to={paths.tasks}>Ver todas las tareas</ButtonLink></div>;
-  }
-
-  return <TasksWorkspace key={projectId ?? 'all'} projectId={projectId} initialTask={initialTask} />;
-}
-
-function TasksWorkspace({ projectId, initialTask }: { projectId: string | null; initialTask: TaskPreview }) {
-  const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState(initialTask.id);
+  const { data, isLoading, error, reload } = useWorkspace();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [query, setQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [entryMode, setEntryMode] = useState<'create' | 'edit' | null>(null);
-  const notify = usePreviewNotice();
-  const selected = tasks.find(task => task.id === selectedId) ?? initialTask;
-  const visibleTasks = tasks.filter(task => (!projectId || task.projectId === projectId) && (filter === 'all' || task.status === filter) && task.title.toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es')));
-  const selectedEntries = selected.id === '8492' ? taskDayGroups : [];
-  return <div className="page-stack"><PageHeader eyebrow="Operaciones / Proyectos / Tareas & entregables" title="Tareas & Imputaciones por Jornada" description="Planificación de entregables, estimaciones y desglose de partes trabajados a lo largo de múltiples días." actions={<><Button icon="download" onClick={() => notify('Vista previa: la exportación de tiempos aún no está conectada.')}>Exportar tiempos</Button><Button variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>Nueva tarea</Button></>} /><SegmentedControl<Filter> label="Estado de tareas" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Todas' }, { value: 'active', label: 'En curso' }, { value: 'pending', label: 'Pendientes' }, { value: 'completed', label: 'Cerradas' }]} /><div className="task-workspace"><div className="page-stack"><Panel className="task-detail"><div className="actions"><Badge tone="accent">{taskStatusLabels[selected.status]}</Badge>{selected.warning ? <Badge tone="warning">Revisar presupuesto</Badge> : <Badge>Alta prioridad</Badge>}<span className="mono dim">#TSK-{selected.id}</span></div><h2 className="task-detail__title">{selected.title}</h2><p className="muted"><Icon name="folder" size={16} />{selected.project}</p><div className="task-detail__actions"><Button icon="check" onClick={() => notify('Vista previa: el estado de la tarea no se ha modificado.')}>Completar</Button><Button icon="arrow" onClick={() => notify('Vista previa: la tarea conserva su proyecto de ejemplo.')}>Mover</Button><span className="field__hint">Los partes históricos se conservan al mover una tarea.</span></div><div className="task-metrics"><div><span className="eyebrow">Estimación</span><strong>{selected.budget}</strong><span className="dim">Sprint budget</span></div><div><span className="eyebrow">Tiempo real</span><strong>{selected.real}</strong><span className="dim">Cronómetro neto</span></div><div><span className="eyebrow">Imputado (R15)</span><strong className="accent">{selected.logged}</strong><span className="dim">Base de facturación</span></div><div><span className="eyebrow">Presupuesto consumido</span><strong>{selected.progress}%</strong><span className="dim">Valores de ejemplo</span></div></div><div className="split-label"><span>Progreso imputado</span><span className="mono">{selected.progress}% consumido</span></div><Progress value={selected.progress} label={`Presupuesto de ${selected.title}`} />{selected.id === '8492' ? <div className="task-live"><span className="status-dot" /><div><strong>Sesión de ejemplo en esta tarea</strong><p className="muted">Inicio ilustrativo: hoy a las 14:15</p></div><strong className="mono accent">02:44:19</strong></div> : null}</Panel><Panel title="Partes Imputados por Jornada" icon="calendar" action={<Button icon="plus" onClick={() => setEntryMode('create')}>Añadir parte manual</Button>}>{selectedEntries.length ? selectedEntries.map(group => <div className="day-group" key={group.date}><div className="day-group__header"><div><strong>{group.date}</strong>{group.today ? <Badge tone="accent">Hoy</Badge> : null}<span className="cell-detail">{group.subtitle}</span></div><span className="mono">{group.total}</span></div>{group.sessions.map(session => <div className={`session-row ${session.active ? 'session-row--active' : ''}`} key={session.id}><Icon name={session.active ? 'timer' : 'verified'} /><div><div className="actions"><strong>Parte #{session.id}</strong><span className="mono dim">{session.interval}</span></div><p className="muted">{session.note}</p></div><div className="session-row__duration"><span className="eyebrow">{session.active ? 'En vivo · Ejemplo' : 'Imputado R15'}</span><strong className="mono">{session.duration}</strong></div>{session.active ? null : <IconButton icon="edit" label={`Previsualizar edición del parte ${session.id}`} onClick={() => setEntryMode('edit')} />}</div>)}</div>) : <div className="empty-state"><Icon name="file" size={32} /><h3>Sin desglose de ejemplo</h3><p className="muted">La maqueta de partes por jornada está disponible en la tarea de Middleware JWT.</p><Button onClick={() => { setSelectedId('8492'); navigate(paths.tasks); }}>Ver desglose de demostración</Button></div>}</Panel><Panel title="Curva de Esfuerzo e Imputación Diaria" eyebrow="Comparativa temporal · Datos ilustrativos"><WeekChart /></Panel></div><aside className="task-aside"><Panel title="Tareas del Proyecto" icon="tasks"><InputField label="Buscar tarea" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar entregable…" /><div className="backlog">{visibleTasks.map(task => <button key={task.id} className={`backlog__item ${selectedId === task.id ? 'backlog__item--selected' : ''}`} aria-pressed={selectedId === task.id} onClick={() => setSelectedId(task.id)}><span className={`eyebrow ${task.warning ? 'warning' : 'accent'}`}>{taskStatusLabels[task.status]}</span><strong>{task.title}</strong><span className="muted">{task.project}</span><span className="mono dim">{task.logged} / {task.budget}</span><Progress value={task.progress} label={`Progreso de ${task.title}`} /></button>)}</div>{visibleTasks.length === 0 ? <p className="muted">No hay tareas con estos filtros.</p> : null}<Button icon="plus" className="full-width" onClick={() => setCreateOpen(true)}>Crear subtarea vinculada</Button></Panel><Notice title="Criterio de redondeo R15" icon="settings">Intervalos de 15 minutos y una vista independiente del tiempo real. Los valores son ejemplos estáticos.</Notice></aside></div><Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva tarea"><PreviewForm onClose={() => setCreateOpen(false)}><InputField label="Nombre del entregable" required placeholder="Ej. Integración del portal de clientes" /><SelectField label="Proyecto"><option>{selected.project}</option><option>Neobank Mobile</option><option>Aero Logistics</option></SelectField><div className="form-grid"><InputField label="Estimación (horas)" type="number" min="0" step="0.5" placeholder="14" /><SelectField label="Prioridad"><option>Normal</option><option>Alta</option><option>Urgente</option></SelectField></div></PreviewForm></Modal><EntryModal open={entryMode !== null} onClose={() => setEntryMode(null)} editing={entryMode === 'edit'} /></div>;
+  const projects = data?.projects.filter((project) => !project.eliminado_en) ?? [];
+  const tasks = data?.tasks.filter((task) => !task.eliminado_en) ?? [];
+  const entries = data?.entries.filter((entry) => !entry.eliminado_en) ?? [];
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const visible = tasks.filter(
+    (task) =>
+      (!projectId || task.proyecto_id === projectId) &&
+      (includeArchived ||
+        (!task.archivado_en && !projectById.get(task.proyecto_id)?.archivado_en)) &&
+      (filter === 'all' || task.estado === filter) &&
+      `${task.titulo} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`
+        .toLocaleLowerCase('es')
+        .includes(query.toLocaleLowerCase('es')),
+  );
+  const selected = visible.find((task) => task.id === selectedId) ?? visible[0];
+  const canCreate = projects.some((project) => !project.archivado_en);
+  const taskTotals = entryTotalsBy(entries, 'tarea_id');
+  const totals = (id: string) => taskTotals.get(id) ?? { real: 0, logged: 0, count: 0 };
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Operaciones / Proyectos / Tareas & entregables"
+        title="Tareas & Imputaciones por Jornada"
+        description="Planifica tareas y consulta el tiempo real e imputado de sus sesiones de trabajo."
+        actions={
+          <>
+            <Button
+              icon="download"
+              disabled={!visible.length}
+              onClick={() =>
+                downloadCsv(
+                  'tareas.csv',
+                  [
+                    'Tarea',
+                    'Proyecto',
+                    'Estado',
+                    'Archivada',
+                    'Estimación (min)',
+                    'Real (s)',
+                    'Imputado (s)',
+                  ],
+                  visible.map((task) => [
+                    task.titulo,
+                    projectById.get(task.proyecto_id)?.nombre ?? '',
+                    taskStatusLabels[task.estado],
+                    task.archivado_en ? 'Sí' : 'No',
+                    task.estimacion_minutos,
+                    totals(task.id).real,
+                    totals(task.id).logged,
+                  ]),
+                )
+              }
+            >
+              Exportar CSV
+            </Button>
+            <Button
+              variant="primary"
+              icon="plus"
+              disabled={!canCreate}
+              onClick={() => setCreateOpen(true)}
+            >
+              Nueva tarea
+            </Button>
+          </>
+        }
+      />
+      {error ? (
+        <Notice title="No se pudieron cargar las tareas">
+          <p role="alert">{error.message}</p>
+          <Button onClick={() => void reload()}>Reintentar</Button>
+        </Notice>
+      ) : null}
+      <div className="toolbar">
+        <SegmentedControl<Filter>
+          label="Estado de tareas"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'Todas' },
+            { value: 'en_curso', label: 'En curso' },
+            { value: 'pendiente', label: 'Pendientes' },
+            { value: 'completada', label: 'Completadas' },
+          ]}
+        />
+        <SelectField
+          label="Proyecto"
+          value={projectId ?? ''}
+          onChange={(event) => {
+            const next = new URLSearchParams(searchParams);
+            if (event.target.value) next.set('proyecto', event.target.value);
+            else next.delete('proyecto');
+            setSearchParams(next);
+          }}
+        >
+          <option value="">Todos los proyectos</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.nombre}
+              {project.archivado_en ? ' (archivado)' : ''}
+            </option>
+          ))}
+        </SelectField>
+        <label className="muted">
+          <input
+            type="checkbox"
+            checked={includeArchived}
+            onChange={(event) => setIncludeArchived(event.target.checked)}
+          />{' '}
+          Incluir archivadas
+        </label>
+      </div>
+      {isLoading && !data ? (
+        <p role="status">Cargando tareas…</p>
+      ) : (
+        <div className="task-workspace">
+          {selected ? (
+            <TaskDetail
+              key={selected.id}
+              task={selected}
+              projects={projects}
+              entries={entries.filter((entry) => entry.tarea_id === selected.id)}
+            />
+          ) : (
+            <div className="empty-state">
+              <h2>{tasks.length ? 'No hay tareas con estos filtros' : 'Crea tu primera tarea'}</h2>
+              <p className="muted">
+                {canCreate
+                  ? 'Organiza el trabajo de un proyecto y empieza a registrar tus horas.'
+                  : 'Crea un proyecto activo para añadir tareas.'}
+              </p>
+              {canCreate ? (
+                <Button onClick={() => setCreateOpen(true)}>Nueva tarea</Button>
+              ) : (
+                <ButtonLink to="/proyectos">Ir a proyectos</ButtonLink>
+              )}
+              {tasks.length ? (
+                <Button
+                  onClick={() => {
+                    setQuery('');
+                    setFilter('all');
+                    setIncludeArchived(true);
+                    setSearchParams({});
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              ) : null}
+            </div>
+          )}
+          <aside className="task-aside">
+            <Panel title="Tareas del proyecto" icon="tasks">
+              <InputField
+                label="Buscar tarea"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar entregable…"
+              />
+              <div className="backlog">
+                {visible.map((task) => {
+                  const logged = totals(task.id).logged;
+                  return (
+                    <button
+                      key={task.id}
+                      className={`backlog__item ${selected?.id === task.id ? 'backlog__item--selected' : ''}`}
+                      aria-pressed={selected?.id === task.id}
+                      onClick={() => setSelectedId(task.id)}
+                    >
+                      <span className="eyebrow accent">
+                        {taskStatusLabels[task.estado]}
+                        {task.archivado_en ? ' · Archivada' : ''}
+                      </span>
+                      <strong>{task.titulo}</strong>
+                      <span className="muted">{projectById.get(task.proyecto_id)?.nombre}</span>
+                      <span className="mono dim">
+                        {formatDuration(logged)} /{' '}
+                        {task.estimacion_minutos !== null
+                          ? formatDuration(task.estimacion_minutos * 60)
+                          : 'Sin estimar'}
+                      </span>
+                      {task.estimacion_minutos && task.estimacion_minutos > 0 ? (
+                        <Progress
+                          value={(logged / (task.estimacion_minutos * 60)) * 100}
+                          label={`Estimación de ${task.titulo}`}
+                        />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {!visible.length ? <p className="muted">No hay tareas con estos filtros.</p> : null}
+              <Button
+                icon="plus"
+                className="full-width"
+                disabled={!canCreate}
+                onClick={() => setCreateOpen(true)}
+              >
+                Crear tarea
+              </Button>
+            </Panel>
+            <Notice title="Inicio y fin exactos" icon="settings">
+              El redondeo se aplica únicamente a la duración total de cada parte finalizado.
+            </Notice>
+          </aside>
+        </div>
+      )}
+      {createOpen ? (
+        <TaskForm projects={projects} projectId={projectId} onClose={() => setCreateOpen(false)} />
+      ) : null}
+    </div>
+  );
 }

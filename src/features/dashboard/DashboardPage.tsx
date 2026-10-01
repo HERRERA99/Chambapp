@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DateTime } from 'luxon';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { StatGrid } from '../../shared/ui/StatGrid';
@@ -6,13 +7,257 @@ import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { Panel, Badge } from '../../shared/ui/Panel';
 import { Icon } from '../../shared/ui/Icon';
 import { TimerDisplay } from '../tracker/TimerDisplay';
+import { useTracker } from '../tracker/useTracker';
 import { WeekChart } from '../week/components/WeekChart';
 import { EntryModal } from '../time-entries/components/EntryModal';
-import { dashboardStats, priorityTasks } from './data/dashboard.fixtures';
-import { usePreviewNotice } from '../../shared/preview/PreviewContext';
+import { useWorkspace } from '../workspace/useWorkspace';
+import { useFeedback } from '../../shared/feedback/FeedbackContext';
+import { dashboardSummary } from './dashboardSelectors';
+import { formatDate, formatDuration, formatTime, todayInZone } from '../../domain/time';
+import { readableError } from '../../lib/supabase/errors';
+import type { TimeEntry } from '../../domain/models';
 
 export default function DashboardPage() {
-  const [entryOpen, setEntryOpen] = useState(false);
-  const notify = usePreviewNotice();
-  return <div className="page-stack"><PageHeader eyebrow="Jornada activa · Sesión 04 de 05" title="Hola, Alexandre" description="Jueves, 8 de mayo de 2025 · Así está tu jornada de ejemplo." actions={<><ButtonLink to="/ajustes#redondeo" icon="settings">Redondeo R15</ButtonLink><Button icon="plus" onClick={() => setEntryOpen(true)}>Nuevo registro</Button></>} /><StatGrid stats={dashboardStats} /><section className="tracker-hero"><div className="tracker-hero__details"><Badge tone="accent"><span className="status-dot" /> En curso · Vista previa</Badge><p className="eyebrow">Mercury FinTech / Core v2 Platform</p><h2>Integración de pasarela de pago Stripe & Webhooks</h2><p className="mono muted"><Icon name="clock" size={13} /> Inicio de ejemplo: 14:15:00 · #TSK-8488</p></div><TimerDisplay /></section><Panel eyebrow="Comparativa semanal" title="Horas imputadas vs. objetivo proyectado" action={<div className="chart-legend"><span><i /> Imputado (R15)</span><span><i className="chart-legend__target" /> Objetivo base</span><strong className="mono">31h 30m / 37h 30m</strong></div>}><WeekChart /></Panel><div className="two-columns"><Panel title="Tareas prioritarias" icon="tasks" action={<span className="mono dim">4 entregables</span>}><div className="task-list">{priorityTasks.map(task => <div className="task-row" key={task.id}><IconButton icon={task.active ? 'stop' : 'play'} label={`Previsualizar ${task.active ? 'parada' : 'inicio'}: ${task.title}`} onClick={() => notify('Vista previa del cronómetro. No se registra tiempo.')} className={task.active ? 'icon-button--accent' : ''} /><Link to="/tareas" className="task-row__text">{task.active ? <span className="eyebrow accent">En curso</span> : null}<strong>{task.title}</strong><span className="muted mono">{task.project}</span></Link><span className="mono">{task.duration}</span></div>)}</div><Link className="text-link" to="/tareas">Ver todas las tareas pendientes <Icon name="arrow" size={14} /></Link></Panel><Panel title="Partes registrados hoy" icon="clock" action={<span className="mono accent">Total: 03h 45m</span>}><div className="entry-summary"><div><strong className="mono">09:07 — 12:45</strong><span className="muted">Mercury FinTech</span><p>Refactor middleware y logs</p><span className="mono dim">Real: 3h 38m <span className="accent">→ Imputado: 3h 45m (+7m)</span></span></div><IconButton icon="edit" label="Previsualizar edición del parte" onClick={() => setEntryOpen(true)} /></div><div className="entry-summary entry-summary--live"><span className="status-dot" /><div><strong>Tramo en curso</strong><p className="muted">Ejemplo visual pendiente de consolidación</p></div><Badge tone="accent">02:44:19</Badge></div><Link className="text-link" to="/partes-de-horas">Abrir hoja completa de partes <Icon name="arrow" size={14} /></Link></Panel></div><EntryModal open={entryOpen} onClose={() => setEntryOpen(false)} /></div>;
+  const { data } = useWorkspace();
+  const tracker = useTracker();
+  const notify = useFeedback();
+  const [editor, setEditor] = useState<TimeEntry | 'new' | null>(null);
+  if (!data) return null;
+  const { profile, entries, tasks, projects } = data;
+  const today = todayInZone(profile.zona_horaria);
+  const { week, day, total, missingDays } = dashboardSummary(data, today);
+  const activeTask = tasks.find((task) => task.id === tracker.active?.tarea_id);
+  const activeProject = projects.find((project) => project.id === activeTask?.proyecto_id);
+  const available = tasks.filter(
+    (task) =>
+      !task.archivado_en &&
+      task.estado !== 'completada' &&
+      projects.some((project) => project.id === task.proyecto_id && !project.archivado_en),
+  );
+  const priority = [...available]
+    .sort((a, b) => Number(b.id === activeTask?.id) - Number(a.id === activeTask?.id))
+    .slice(0, 4);
+  const taskTotals = new Map<string, number>();
+  for (const entry of entries)
+    if (entry.fin_en)
+      taskTotals.set(
+        entry.tarea_id,
+        (taskTotals.get(entry.tarea_id) ?? 0) + (entry.duracion_imputada_segundos ?? 0),
+      );
+  const todayEntries = entries.filter((entry) => entry.fecha === today && entry.fin_en);
+  const balance = total.logged - total.due;
+  async function toggleTask(id: string) {
+    try {
+      if (tracker.active?.tarea_id === id) await tracker.stop();
+      else await tracker.start(id);
+    } catch (cause) {
+      notify(readableError(cause));
+    }
+  }
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Tu jornada"
+        title={`Hola, ${profile.nombre.split(' ')[0] || 'de nuevo'}`}
+        description={formatDate(today, profile.zona_horaria)}
+        actions={
+          <>
+            <ButtonLink to="/ajustes#redondeo" icon="settings">
+              {profile.intervalo_redondeo_minutos
+                ? `Redondeo R${profile.intervalo_redondeo_minutos}`
+                : 'Tiempo exacto'}
+            </ButtonLink>
+            <Button icon="plus" onClick={() => setEditor('new')}>
+              Nuevo registro
+            </Button>
+          </>
+        }
+      />
+      <StatGrid
+        stats={[
+          {
+            label: 'Objetivo de hoy',
+            value: formatDuration(day.targetSeconds),
+            detail: 'Según tu jornada planificada',
+            icon: 'calendar',
+          },
+          {
+            label: 'Tiempo imputado hoy',
+            value: formatDuration(day.logged),
+            detail: `Real: ${formatDuration(day.real)} · ${day.count} partes cerrados`,
+            icon: 'timer',
+            accent: true,
+            progress: day.targetSeconds ? (day.logged / day.targetSeconds) * 100 : 0,
+          },
+          {
+            label: 'Saldo hasta hoy',
+            value: `${balance >= 0 ? '+' : '−'}${formatDuration(Math.abs(balance))}`,
+            detail: 'Tiempo imputado frente al objetivo acumulado',
+            icon: 'gauge',
+            accent: balance >= 0,
+          },
+          {
+            label: 'Tareas pendientes',
+            value: String(available.length),
+            detail: `${projects.filter((project) => !project.archivado_en).length} proyectos activos`,
+            icon: 'tasks',
+          },
+        ]}
+      />
+      {missingDays ? (
+        <p className="muted">
+          Hay jornadas pendientes de generar esta semana.{' '}
+          <Link className="text-link" to="/mi-semana">
+            Abrir calendario
+          </Link>
+        </p>
+      ) : null}
+      <section className="tracker-hero">
+        <div className="tracker-hero__details">
+          <Badge tone={tracker.active ? 'accent' : 'neutral'}>
+            {tracker.active ? (
+              <>
+                <span className="status-dot" /> En curso
+              </>
+            ) : tracker.pausedTaskId ? (
+              'Pausado'
+            ) : (
+              'Listo para empezar'
+            )}
+          </Badge>
+          <p className="eyebrow">{activeProject?.nombre ?? 'Tu espacio de trabajo'}</p>
+          <h2>{activeTask?.titulo ?? 'Selecciona una tarea y registra tu tiempo'}</h2>
+          <p className="mono muted">
+            <Icon name="clock" size={13} />{' '}
+            {tracker.active
+              ? `Inicio exacto: ${formatTime(tracker.active.inicio_en, tracker.active.zona_horaria)}`
+              : 'Cada sesión conserva su inicio y fin exactos.'}
+          </p>
+        </div>
+        <TimerDisplay />
+      </section>
+      <Panel
+        eyebrow="Comparativa semanal"
+        title="Horas imputadas y objetivo"
+        action={
+          <div className="chart-legend">
+            <span>
+              <i /> Imputado
+            </span>
+            <span>
+              <i className="chart-legend__target" /> Objetivo
+            </span>
+            <strong className="mono">
+              {formatDuration(total.logged)} / {formatDuration(total.target)}
+            </strong>
+          </div>
+        }
+      >
+        <WeekChart
+          days={week.map((item) => ({
+            date: item.date,
+            label: DateTime.fromISO(item.date).setLocale('es').toFormat('ccc dd'),
+            loggedSeconds: item.logged,
+            targetSeconds: item.targetSeconds,
+            isToday: item.date === today,
+          }))}
+        />
+      </Panel>
+      <div className="two-columns">
+        <Panel
+          title="Tareas pendientes"
+          icon="tasks"
+          action={<span className="mono dim">{available.length} tareas</span>}
+        >
+          <div className="task-list">
+            {priority.length ? (
+              priority.map((task) => (
+                <div className="task-row" key={task.id}>
+                  <IconButton
+                    icon={task.id === activeTask?.id ? 'stop' : 'play'}
+                    label={`${task.id === activeTask?.id ? 'Detener' : 'Iniciar'}: ${task.titulo}`}
+                    disabled={
+                      tracker.busy ||
+                      tracker.pending ||
+                      (!!tracker.active && task.id !== activeTask?.id)
+                    }
+                    onClick={() => void toggleTask(task.id)}
+                    className={task.id === activeTask?.id ? 'icon-button--accent' : ''}
+                  />
+                  <Link to="/tareas" className="task-row__text">
+                    {task.id === activeTask?.id ? (
+                      <span className="eyebrow accent">En curso</span>
+                    ) : null}
+                    <strong>{task.titulo}</strong>
+                    <span className="muted mono">
+                      {projects.find((project) => project.id === task.proyecto_id)?.nombre}
+                    </span>
+                  </Link>
+                  <span className="mono">{formatDuration(taskTotals.get(task.id) ?? 0)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty-state">
+                <Icon name="tasks" size={30} />
+                <p className="muted">Crea un proyecto y una tarea para empezar.</p>
+                <ButtonLink to="/tareas">Abrir tareas</ButtonLink>
+              </div>
+            )}
+          </div>
+          <Link className="text-link" to="/tareas">
+            Ver todas las tareas <Icon name="arrow" size={14} />
+          </Link>
+        </Panel>
+        <Panel
+          title="Partes registrados hoy"
+          icon="clock"
+          action={<span className="mono accent">Total: {formatDuration(day.logged)}</span>}
+        >
+          {todayEntries.length ? (
+            todayEntries.slice(0, 4).map((entry) => (
+              <div className="entry-summary" key={entry.id}>
+                <div>
+                  <strong className="mono">
+                    {formatTime(entry.inicio_en, entry.zona_horaria)} —{' '}
+                    {formatTime(entry.fin_en!, entry.zona_horaria)}
+                  </strong>
+                  <span className="muted">
+                    {projects.find((project) => project.id === entry.proyecto_id)?.nombre}
+                  </span>
+                  <p>{tasks.find((task) => task.id === entry.tarea_id)?.titulo}</p>
+                  <span className="mono dim">
+                    Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
+                    <span className="accent">
+                      → Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
+                    </span>
+                  </span>
+                </div>
+                <IconButton icon="edit" label="Editar parte" onClick={() => setEditor(entry)} />
+              </div>
+            ))
+          ) : (
+            <p className="muted section-intro">Todavía no hay partes cerrados hoy.</p>
+          )}
+          {tracker.active ? (
+            <div className="entry-summary entry-summary--live">
+              <span className="status-dot" />
+              <div>
+                <strong>Tramo en curso</strong>
+                <p className="muted">Duración provisional; se consolida al detener.</p>
+              </div>
+              <Badge tone="accent">{formatDuration(tracker.elapsedSeconds)}</Badge>
+            </div>
+          ) : null}
+          <Link className="text-link" to="/partes-de-horas">
+            Abrir partes de horas <Icon name="arrow" size={14} />
+          </Link>
+        </Panel>
+      </div>
+      <EntryModal
+        open={editor !== null}
+        entry={editor && editor !== 'new' ? editor : null}
+        onClose={() => setEditor(null)}
+      />
+    </div>
+  );
 }

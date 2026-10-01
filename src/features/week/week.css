@@ -1,0 +1,150 @@
+.week-day-target {
+  margin-top: 12px;
+  font-size: 10px;
+  gap: 4px;
+}
+.week-day-target .icon-button {
+  flex-shrink: 0;
+}
+.week-day-real {
+  font-size: 10px;
+  margin-bottom: 12px;
+}
+.week-day-empty {
+  padding: 12px 0;
+  font-size: 11px;
+}
+.week-page .day-block h3,
+.week-page .day-block .eyebrow,
+.week-page .week-day-target > span {
+  overflow-wrap: anywhere;
+}
+.week-block-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.week-block-footer > .mono {
+  font-size: 9px;
+}
+.week-page .calendar-grid--full-week {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.week-page .day-card {
+  border-bottom: 1px solid var(--border);
+}
+.week-page .day-card:nth-child(4) {
+  border-right: 0;
+}
+.week-print-report {
+  display: none;
+}
+
+@media (min-width: 1800px) {
+  .week-page .calendar-grid--full-week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .week-page .day-card:nth-child(4) {
+    border-right: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 1000px) {
+  .week-page .calendar-grid--full-week {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .week-page .day-card:nth-child(2n) {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 650px) {
+  .week-page .calendar-grid--full-week {
+    grid-template-columns: 1fr;
+  }
+  .week-navigation {
+    flex-wrap: wrap;
+  }
+  .week-page .day-card {
+    border-right: 0;
+  }
+  .week-page .day-blocks {
+    display: flex;
+  }
+}
+
+@media print {
+  body:has(.week-page) {
+    --text: #111;
+    --muted: #444;
+    --dim: #555;
+    --surface: #fff;
+    --surface-low: #fff;
+    --border: #ccc;
+    --border-subtle: #ccc;
+    --accent-soft: #900;
+    --accent: #900;
+    color-scheme: light;
+    background: white;
+    color: black;
+  }
+  body:has(.week-page) .sidebar,
+  body:has(.week-page) .workspace-header,
+  body:has(.week-page) .workspace-footer,
+  .week-page .page-actions,
+  .week-page .week-navigation,
+  .week-page .week-insights,
+  .week-page .calendar-panel,
+  .week-page .notice,
+  .week-page button,
+  .week-page .button,
+  .week-page dialog {
+    display: none !important;
+  }
+  body:has(.week-page) .workspace__body {
+    margin-left: 0;
+  }
+  body:has(.week-page) .workspace-content {
+    padding: 0;
+  }
+  .week-page .week-print-report {
+    display: block;
+  }
+  .week-page .panel,
+  .week-page .stat {
+    background: white;
+    color: black;
+    border: 1px solid #ccc;
+    box-shadow: none;
+  }
+  .week-page .muted,
+  .week-page .dim,
+  .week-page .accent {
+    color: #333;
+  }
+  .week-page .stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .week-page .panel,
+  .week-page tr {
+    break-inside: avoid;
+  }
+  .week-page .table-scroll {
+    overflow: visible;
+  }
+  .week-page .data-table {
+    min-width: 0;
+    font-size: 9px;
+  }
+  .week-page .data-table th,
+  .week-page .data-table td {
+    color: black;
+    background: white;
+    white-space: normal;
+    padding: 8px;
+  }
+  .week-page .week-chart {
+    print-color-adjust: exact;
+  }
+}

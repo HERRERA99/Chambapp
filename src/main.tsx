@@ -15,4 +15,8 @@ import './styles/components.css';
 const root = document.getElementById('root');
 if (!root) throw new Error('No se ha encontrado el contenedor de la aplicación.');
 
-ReactDOM.createRoot(root).render(<React.StrictMode><App /></React.StrictMode>);
+ReactDOM.createRoot(root).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

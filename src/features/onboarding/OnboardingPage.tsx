@@ -1,21 +1,491 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Brand } from '../../shared/brand/Brand';
-import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Button } from '../../shared/ui/Button';
 import { Badge, Panel, Notice, Progress } from '../../shared/ui/Panel';
-import { InputField, SelectField, Toggle } from '../../shared/ui/FormField';
+import { InputField, SelectField } from '../../shared/ui/FormField';
 import { Icon } from '../../shared/ui/Icon';
 import { RoundingPreview } from '../time-entries/components/RoundingPreview';
-import { usePreviewNotice } from '../../shared/preview/PreviewContext';
+import { useWorkspace } from '../workspace/useWorkspace';
+import { useCommand } from '../workspace/useCommand';
+import { getSupabase } from '../../lib/supabase/client';
+import { paths } from '../../app/paths';
+import { mondayForDate, todayInZone } from '../../domain/time';
+import type { Profile, WorkspaceData } from '../../domain/models';
+import { safeReturnTo } from '../auth/returnTo';
 import './onboarding.css';
 
-const steps = ['Perfil & Workspace', 'Jornada & Convenio', 'Motor de Redondeo', 'Zona Horaria & Proyecto'] as const;
-const titles = ['Dale un lugar a tu trabajo', 'Define tu modelo de jornada y balance laboral', 'Cada minuto, con total transparencia', 'Tu consola, a tu medida'] as const;
+const steps = [
+  'Perfil & Workspace',
+  'Jornada semanal',
+  'Motor de Redondeo',
+  'Zona Horaria & Proyecto',
+] as const;
+const titles = [
+  'Dale un lugar a tu trabajo',
+  'Define tu jornada semanal',
+  'Cada minuto, con total transparencia',
+  'Tu consola, a tu medida',
+] as const;
+const workdayChoices = [
+  {
+    value: '37.5',
+    title: '37,5h / semana',
+    name: 'Convenio flexible',
+    text: 'Lunes a jueves 8h + viernes 5h30m. Un reparto con fin de semana anticipado.',
+    detail: 'L–J: 32h · Viernes: 05h 30m',
+  },
+  {
+    value: '40',
+    title: '40h / semana',
+    name: 'Estándar',
+    text: '8 horas de lunes a viernes. La misma dedicación cada día.',
+    detail: 'L–V: 40h · Diario: 08h 00m',
+  },
+  {
+    value: 'partial',
+    title: 'Jornada personalizada',
+    name: 'A tu medida',
+    text: 'Introduce tus horas semanales. Las repartiremos de lunes a viernes.',
+    detail: 'Reparto uniforme en minutos',
+  },
+] as const;
+
+function preference(data: WorkspaceData, key: string, fallback = '') {
+  const value = data.profile.preferencias[key];
+  return typeof value === 'string' ? value : fallback;
+}
+
+function OnboardingForm({ data }: { data: WorkspaceData }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { run } = useCommand();
+  const initialMonday = mondayForDate(todayInZone(data.profile.zona_horaria));
+  const initialConfiguration = data.configurations.find(
+    (config) => config.vigente_desde === initialMonday,
+  );
+  const initialMinutes = initialConfiguration?.minutos_semanales ?? 2250;
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState(data.profile.nombre);
+  const [workspace, setWorkspace] = useState(preference(data, 'workspace', 'Mi Workspace'));
+  const [specialty, setSpecialty] = useState(preference(data, 'especialidad'));
+  const [organization, setOrganization] = useState(
+    preference(data, 'organizacion', 'independiente'),
+  );
+  const [workday, setWorkday] = useState(
+    initialMinutes === 2250 ? '37.5' : initialMinutes === 2400 ? '40' : 'partial',
+  );
+  const [customHours, setCustomHours] = useState(String(initialMinutes / 60));
+  const [rounding, setRounding] = useState(String(data.profile.intervalo_redondeo_minutos));
+  const [zone, setZone] = useState(data.profile.zona_horaria);
+  const [currency, setCurrency] = useState(preference(data, 'moneda', 'EUR'));
+  const [project, setProject] = useState('');
+  const [client, setClient] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const monday = mondayForDate(todayInZone(zone));
+  const existingConfiguration = data.configurations.find(
+    (config) => config.vigente_desde === monday,
+  );
+
+  async function finish(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    if (step !== 3) {
+      continueStep();
+      return;
+    }
+    setError(null);
+    if (!name.trim() || !workspace.trim()) {
+      setStep(0);
+      setError('Completa tu nombre y el nombre del Workspace.');
+      return;
+    }
+    const weeklyMinutes =
+      workday === 'partial'
+        ? Math.round(Number(customHours) * 60)
+        : Math.round(Number(workday) * 60);
+    if (
+      !existingConfiguration &&
+      (!Number.isFinite(weeklyMinutes) || weeklyMinutes < 60 || weeklyMinutes > 7200)
+    ) {
+      setStep(1);
+      setError('Introduce una jornada entre 1 y 120 horas semanales.');
+      return;
+    }
+    setSaving(true);
+    try {
+      // Save the time zone before creating days: every day retains its own zone.
+      const profile = await run<Profile>('editar_perfil', {
+        version: data.profile.version,
+        nombre: name.trim(),
+        zona_horaria: zone,
+        intervalo_redondeo_minutos: Number(rounding),
+        preferencias: {
+          ...data.profile.preferencias,
+          workspace: workspace.trim(),
+          especialidad: specialty.trim(),
+          organizacion: organization,
+          moneda: currency,
+        },
+      });
+
+      // A previous successful step may remain after a later request fails.
+      // Reusing the Monday configuration makes finishing the wizard safe to retry.
+      if (!existingConfiguration) {
+        await run('crear_configuracion_semanal', {
+          minutos_semanales: weeklyMinutes,
+          vigente_desde: monday,
+          dias: [1, 2, 3, 4, 5],
+          ...(workday === '37.5'
+            ? { reparto: { '1': 480, '2': 480, '3': 480, '4': 480, '5': 330 } }
+            : {}),
+        });
+      }
+      await run('generar_semana', { lunes: monday });
+      const projectName = project.trim();
+      const clientName = client.trim();
+      if (
+        projectName &&
+        !data.projects.some(
+          (item) => item.nombre === projectName && (item.cliente ?? '') === clientName,
+        )
+      ) {
+        await run('crear_proyecto', { nombre: projectName, cliente: clientName || null });
+      }
+      // Completing onboarding is the final persisted step.
+      await run('editar_perfil', { version: profile.version, onboarding_completado: true });
+      const destination = safeReturnTo(searchParams.get('returnTo'));
+      navigate(destination === paths.onboarding ? paths.dashboard : destination, { replace: true });
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'No se pudo guardar la configuración. Puedes volver a intentarlo.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function signOut() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const { error: authError } = await getSupabase().auth.signOut();
+      if (authError) throw authError;
+      navigate(paths.login, { replace: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo cerrar la sesión.');
+      setSaving(false);
+    }
+  }
+
+  function continueStep() {
+    setError(null);
+    if (step === 0 && (!name.trim() || !workspace.trim())) {
+      setError('Completa tu nombre y el nombre del Workspace.');
+      return;
+    }
+    if (
+      step === 1 &&
+      !existingConfiguration &&
+      workday === 'partial' &&
+      (!Number.isFinite(Number(customHours)) ||
+        Number(customHours) < 1 ||
+        Number(customHours) > 120)
+    ) {
+      setError('Introduce una jornada entre 1 y 120 horas semanales.');
+      return;
+    }
+    setStep((current) => Math.min(3, current + 1));
+  }
+
+  return (
+    <div className="onboarding-page">
+      <header className="onboarding-header">
+        <Brand />
+        <Badge>Configuración inicial</Badge>
+        <Button variant="ghost" disabled={saving} onClick={() => void signOut()}>
+          Cerrar sesión
+        </Button>
+      </header>
+      <main className="onboarding-container">
+        <div className="onboarding-status">
+          <div>
+            <p className="eyebrow">Configuración de tu espacio de trabajo</p>
+            <h2>Tu espacio. Tus reglas.</h2>
+          </div>
+          <span className="mono accent">{(step + 1) * 25}% del recorrido</span>
+        </div>
+        <Progress value={(step + 1) * 25} label="Progreso de configuración" />
+        <nav className="onboarding-steps" aria-label="Pasos de configuración">
+          {steps.map((label, index) => (
+            <button
+              type="button"
+              key={label}
+              disabled={saving || index > step}
+              className={step === index ? 'active' : step > index ? 'completed' : ''}
+              aria-current={step === index ? 'step' : undefined}
+              onClick={() => setStep(index)}
+            >
+              <span>
+                {step > index ? (
+                  <Icon name="check" size={16} />
+                ) : (
+                  String(index + 1).padStart(2, '0')
+                )}
+              </span>
+              <div>
+                <small>
+                  {step === index ? 'En curso' : step > index ? 'Revisado' : 'Pendiente'}
+                </small>
+                <strong>{label}</strong>
+              </div>
+            </button>
+          ))}
+        </nav>
+        <header className="onboarding-title">
+          <p className="eyebrow">
+            Configuración inicial / Paso {String(step + 1).padStart(2, '0')}
+          </p>
+          <h1>{titles[step]}</h1>
+          <p className="muted">Define los parámetros de tus jornadas. Se guardarán al finalizar.</p>
+        </header>
+        {error ? (
+          <p className="accent" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <form onSubmit={finish} aria-busy={saving}>
+          <div className="page-stack">
+            {step === 0 ? (
+              <Panel title="Perfil & Workspace" eyebrow="Bloque 01">
+                <div className="form-grid">
+                  <InputField
+                    label="Tu nombre"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={200}
+                    required
+                    disabled={saving}
+                    autoComplete="name"
+                  />
+                  <InputField
+                    label="Nombre del Workspace"
+                    value={workspace}
+                    onChange={(event) => setWorkspace(event.target.value)}
+                    maxLength={200}
+                    required
+                    disabled={saving}
+                  />
+                  <InputField
+                    label="Especialidad"
+                    placeholder="Product Engineering"
+                    value={specialty}
+                    onChange={(event) => setSpecialty(event.target.value)}
+                    maxLength={200}
+                    disabled={saving}
+                  />
+                  <SelectField
+                    label="Tipo de organización"
+                    value={organization}
+                    onChange={(event) => setOrganization(event.target.value)}
+                    disabled={saving}
+                  >
+                    <option value="independiente">Profesional independiente</option>
+                    <option value="empresa">Equipo / Empresa</option>
+                    <option value="estudio">Estudio / Agencia</option>
+                  </SelectField>
+                </div>
+                <Notice title="Un espacio preparado para crecer">
+                  Organiza tus proyectos, tareas y registros desde un único lugar.
+                </Notice>
+              </Panel>
+            ) : null}
+            {step === 1 ? (
+              <Panel eyebrow="Bloque 02" title="Meta semanal de dedicación">
+                {existingConfiguration ? (
+                  <Notice title="Jornada inicial guardada">
+                    Ya existe una configuración para esta semana:{' '}
+                    {existingConfiguration.minutos_semanales / 60} horas. La conservaremos al
+                    terminar. Puedes configurar semanas futuras desde Ajustes.
+                  </Notice>
+                ) : (
+                  <>
+                    <fieldset className="choice-fieldset">
+                      <legend>Selecciona tu jornada</legend>
+                      <div className="choice-grid choice-grid--three">
+                        {workdayChoices.map((option) => (
+                          <label
+                            key={option.value}
+                            className={`choice-card choice-card--large ${workday === option.value ? 'choice-card--selected' : ''}`}
+                          >
+                            <input
+                              type="radio"
+                              name="onboarding-workday"
+                              checked={workday === option.value}
+                              disabled={saving}
+                              onChange={() => setWorkday(option.value)}
+                            />
+                            <strong>{option.title}</strong>
+                            <span className="eyebrow">{option.name}</span>
+                            <p className="muted">{option.text}</p>
+                            <span className="mono accent">{option.detail}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    {workday === 'partial' ? (
+                      <InputField
+                        label="Horas semanales"
+                        type="number"
+                        value={customHours}
+                        onChange={(event) => setCustomHours(event.target.value)}
+                        min={1}
+                        max={120}
+                        step={0.25}
+                        disabled={saving}
+                        required
+                        hint="Se distribuirán de lunes a viernes."
+                      />
+                    ) : null}
+                  </>
+                )}
+              </Panel>
+            ) : null}
+            {step === 2 ? (
+              <Panel eyebrow="Bloque 03" title="Redondeo de la duración">
+                <div className="form-grid">
+                  <SelectField
+                    label="Intervalo"
+                    value={rounding}
+                    onChange={(event) => setRounding(event.target.value)}
+                    disabled={saving}
+                  >
+                    <option value="0">Sin redondeo</option>
+                    <option value="5">5 minutos</option>
+                    <option value="10">10 minutos</option>
+                    <option value="15">15 minutos</option>
+                    <option value="30">30 minutos</option>
+                    <option value="60">60 minutos</option>
+                  </SelectField>
+                </div>
+                <RoundingPreview interval={rounding} />
+                <Notice title="Inicio y fin exactos">
+                  Redondeamos hacia arriba únicamente el tiempo total. Por ejemplo, 4h 8min se
+                  imputan como 4h 15min, 4h 30min o 5h según el intervalo.
+                </Notice>
+              </Panel>
+            ) : null}
+            {step === 3 ? (
+              <>
+                <Panel eyebrow="Bloque 04" title="Zona Horaria & Primer Proyecto">
+                  <div className="form-grid">
+                    <SelectField
+                      label="Zona horaria"
+                      value={zone}
+                      onChange={(event) => setZone(event.target.value)}
+                      disabled={saving}
+                    >
+                      {![
+                        'Europe/Madrid',
+                        'Europe/London',
+                        'America/Mexico_City',
+                        'America/Bogota',
+                        'America/Argentina/Buenos_Aires',
+                        'UTC',
+                      ].includes(zone) ? (
+                        <option value={zone}>{zone}</option>
+                      ) : null}
+                      <option value="Europe/Madrid">Europe / Madrid</option>
+                      <option value="Europe/London">Europe / London</option>
+                      <option value="America/Mexico_City">America / Mexico City</option>
+                      <option value="America/Bogota">America / Bogotá</option>
+                      <option value="America/Argentina/Buenos_Aires">America / Buenos Aires</option>
+                      <option value="UTC">UTC</option>
+                    </SelectField>
+                    <SelectField
+                      label="Moneda de referencia"
+                      value={currency}
+                      onChange={(event) => setCurrency(event.target.value)}
+                      disabled={saving}
+                    >
+                      <option value="EUR">EUR (€)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="GBP">GBP (£)</option>
+                    </SelectField>
+                    <InputField
+                      label="Primer proyecto (opcional)"
+                      value={project}
+                      onChange={(event) => setProject(event.target.value)}
+                      maxLength={200}
+                      placeholder="Mi primer proyecto"
+                      disabled={saving}
+                    />
+                    <InputField
+                      label="Cliente (opcional)"
+                      value={client}
+                      onChange={(event) => setClient(event.target.value)}
+                      maxLength={200}
+                      placeholder="Nombre del cliente"
+                      disabled={saving}
+                    />
+                  </div>
+                </Panel>
+                <Notice title="Todo preparado" icon="verified">
+                  Al finalizar guardaremos tu perfil, la jornada semanal y el proyecto que hayas
+                  indicado.
+                </Notice>
+              </>
+            ) : null}
+          </div>
+          <footer className="onboarding-actions">
+            <Button
+              icon="left"
+              variant="ghost"
+              disabled={step === 0 || saving}
+              onClick={() => setStep((current) => Math.max(0, current - 1))}
+            >
+              Volver al paso anterior
+            </Button>
+            <span className="mono dim">
+              {saving ? 'Guardando configuración…' : 'Se guarda al finalizar'}
+            </span>
+            {step === 3 ? (
+              <Button key="finish" type="submit" variant="primary" icon="arrow" disabled={saving}>
+                {saving ? 'Guardando…' : 'Guardar y abrir Workspace'}
+              </Button>
+            ) : (
+              <Button
+                key="continue"
+                type="button"
+                variant="primary"
+                icon="arrow"
+                disabled={saving}
+                onClick={(event) => {
+                  event.preventDefault();
+                  continueStep();
+                }}
+              >
+                Continuar
+              </Button>
+            )}
+          </footer>
+        </form>
+      </main>
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState(1);
-  const [workday, setWorkday] = useState('37.5');
-  const [rounding, setRounding] = useState('15');
-  const [flexible, setFlexible] = useState(true);
-  const notify = usePreviewNotice();
-  return <div className="onboarding-page"><header className="onboarding-header"><Brand /><Badge>Configuración · Vista previa</Badge><ButtonLink to="/resumen" variant="ghost">Omitir por ahora</ButtonLink></header><main className="onboarding-container"><div className="onboarding-status"><div><p className="eyebrow">Secuencia de despliegue operativo</p><h2>Tu espacio. Tus reglas.</h2></div><span className="mono accent">{(step + 1) * 25}% del recorrido</span></div><Progress value={(step + 1) * 25} label="Progreso visual de configuración" /><nav className="onboarding-steps" aria-label="Pasos de configuración">{steps.map((label, index) => <button type="button" key={label} className={step === index ? 'active' : step > index ? 'completed' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{step > index ? <Icon name="check" size={16} /> : String(index + 1).padStart(2, '0')}</span><div><small>{step === index ? 'En curso' : step > index ? 'Revisado' : 'Pendiente'}</small><strong>{label}</strong></div></button>)}</nav><header className="onboarding-title"><p className="eyebrow">Configuración operativa inicial / Paso {String(step + 1).padStart(2, '0')}</p><h1>{titles[step]}</h1><p className="muted">Previsualiza los parámetros que organizarán tus jornadas. Estos ajustes aún no se guardan.</p></header><div className="page-stack">{step === 0 ? <Panel title="Perfil & Workspace" eyebrow="Bloque 01"><div className="form-grid"><InputField label="Tu nombre" placeholder="Alexandre Martínez" defaultValue="Alexandre Martínez" /><InputField label="Nombre del Workspace" placeholder="Mi estudio" defaultValue="Chambapp Operative" /><InputField label="Especialidad" placeholder="Product Engineering" /><SelectField label="Tipo de organización"><option>Profesional independiente</option><option>Equipo / Empresa</option><option>Estudio / Agencia</option></SelectField></div><Notice title="Un espacio preparado para crecer">La estructura de la UI separa proyectos, tareas, registros y preferencias.</Notice></Panel> : null}{step === 1 ? <><Panel eyebrow="Bloque 01" title="Convenio / Meta Semanal de Dedicación"><fieldset className="choice-fieldset"><legend>Selecciona una arquitectura base</legend><div className="choice-grid choice-grid--three">{[{ value: '37.5', title: '37,5h / semana', name: 'Convenio flexible', text: 'Lunes a jueves 8h + viernes 5h30m intensivo. Un reparto con fin de semana anticipado.', detail: 'L–J: 32h · Viernes: 05h 30m' }, { value: '40', title: '40,0h / semana', name: 'Estándar', text: '8 horas uniformes de lunes a viernes. Un esquema contractual sin modulación diaria.', detail: 'L–V: 40h · Diario: 08h 00m' }, { value: 'partial', title: '20h–35h / adaptable', name: 'Jornada reducida / Parcial', text: 'Distribución asimétrica para acuerdos de conciliación y dedicación parcial.', detail: 'Configuración modular' }].map(option => <label key={option.value} className={`choice-card choice-card--large ${workday === option.value ? 'choice-card--selected' : ''}`}><input type="radio" name="onboarding-workday" checked={workday === option.value} onChange={() => setWorkday(option.value)} /><strong>{option.title}</strong><span className="eyebrow">{option.name}</span><p className="muted">{option.text}</p><span className="mono accent">{option.detail}</span></label>)}</div></fieldset></Panel><Panel eyebrow="Bloque 02" title="Regla de Imputación y Redondeo"><p className="muted section-intro">Define la granularidad de los intervalos de ejemplo.</p><div className="choice-grid choice-grid--three">{[{ value: '0', title: 'Minuto a minuto', text: 'Sin redondeo (R00)' }, { value: '15', title: 'Bloques 15m (R15)', text: 'Cuartos de hora naturales' }, { value: '5', title: 'Bloques 5m (R05)', text: 'Ajustes ligeros' }].map(option => <label key={option.value} className={`choice-card ${rounding === option.value ? 'choice-card--selected' : ''}`}><input type="radio" name="onboarding-rounding" checked={rounding === option.value} onChange={() => setRounding(option.value)} /><strong>{option.title}</strong><span className="muted">{option.text}</span></label>)}</div><RoundingPreview interval={rounding} compact /></Panel><Panel eyebrow="Bloque 03" title="Colchón Horario de Flexibilidad"><Toggle checked={flexible} onChange={setFlexible} label="Bolsa de amortiguación" description="Margen flotante de ±3 horas semanales. Estado visual sin persistencia." /><div className="form-grid"><InputField label="Tolerancia matutina (minutos)" type="number" min="0" defaultValue="15" /><InputField label="Límite mensual (horas)" type="number" min="0" defaultValue="12" /></div></Panel></> : null}{step === 2 ? <Panel eyebrow="Bloque 03" title="Motor de Redondeo"><div className="form-grid"><SelectField label="Intervalo" value={rounding} onChange={event => setRounding(event.target.value)}><option value="0">Sin redondeo</option><option value="5">R05 · 5 minutos</option><option value="10">R10 · 10 minutos</option><option value="15">R15 · 15 minutos</option></SelectField><InputField label="Umbral de gracia (minutos)" type="number" min="0" max="15" defaultValue="3" /></div><RoundingPreview interval={rounding} /></Panel> : null}{step === 3 ? <><Panel eyebrow="Bloque 04" title="Zona Horaria & Primer Proyecto"><div className="form-grid"><SelectField label="Zona horaria"><option>Europe / Madrid</option><option>Europe / London</option><option>America / Mexico_City</option></SelectField><SelectField label="Moneda"><option>EUR (€)</option><option>USD ($)</option><option>GBP (£)</option></SelectField><InputField label="Primer proyecto" placeholder="Mi primer proyecto" /><InputField label="Cliente" placeholder="Nombre del cliente" /></div></Panel><Notice title="Recorrido completado" icon="verified">Ya puedes explorar el Workspace de demostración. No se ha creado ninguna cuenta ni proyecto.</Notice></> : null}</div><footer className="onboarding-actions"><Button icon="left" variant="ghost" disabled={step === 0} onClick={() => setStep(current => Math.max(0, current - 1))}>Volver al paso anterior</Button><span className="mono dim">Vista previa · Sin autoguardado</span>{step === 3 ? <ButtonLink to="/resumen" variant="primary" icon="arrow">Explorar Workspace</ButtonLink> : <Button variant="primary" icon="arrow" onClick={() => { setStep(current => Math.min(3, current + 1)); notify('Paso de vista previa. Los ajustes no se guardan.'); }}>Continuar</Button>}</footer></main></div>;
+  const { data } = useWorkspace();
+  if (!data)
+    return (
+      <div className="route-loading" role="status">
+        Cargando tu perfil…
+      </div>
+    );
+  return <OnboardingForm data={data} />;
 }
