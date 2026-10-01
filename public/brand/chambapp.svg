@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none">
+  <g>
+    <rect x="2" y="4" width="32" height="32" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1.5"/>
+    <circle cx="18" cy="20" r="10" stroke="#ff2e56" stroke-width="2.5" stroke-dasharray="45 15"/>
+    <circle cx="18" cy="20" r="4" fill="#ff2e56"/>
+    <path d="M18 13V20L22 22" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <text x="44" y="26" fill="#ffffff" font-family="Space Grotesk, sans-serif" font-size="20" font-weight="700" letter-spacing="-0.5px">Chambapp</text>
+</svg>

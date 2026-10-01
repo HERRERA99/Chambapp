@@ -1,0 +1,6 @@
+import { Panel, Notice } from '../../../shared/ui/Panel';
+import { InputField, SelectField } from '../../../shared/ui/FormField';
+
+export function BillingSettings() {
+  return <Panel id="facturacion" title="Datos de Facturación & Perfil Fiscal" icon="wallet"><p className="muted section-intro">Metadatos del profesional o empresa para los futuros informes.</p><div className="form-grid"><InputField label="Razón social / Titular legal" defaultValue="Alexandre Martínez · Product Engineering" /><InputField label="NIF / CIF / VAT Number" placeholder="ES B00000000" /><InputField label="Dirección fiscal de registro" className="field--wide" placeholder="Calle, número, código postal y ciudad" /><InputField label="Tarifa horaria base (€ / hora)" type="number" min="0" step="0.5" defaultValue="65" hint="Ejemplo de tarifa. No se aplican importes." /><SelectField label="Régimen fiscal & Retenciones"><option>21% IVA + 15% IRPF · Profesional autónomo</option><option>21% IVA · Sociedad limitada</option><option>0% IVA · Intracomunitario</option></SelectField><InputField label="Email de facturación" type="email" className="field--wide" placeholder="facturacion@empresa.com" /></div><Notice title="Certificados y firma digital pendientes" icon="shield">La generación de documentos, los certificados y las firmas se conectarán en una fase posterior.</Notice></Panel>;
+}

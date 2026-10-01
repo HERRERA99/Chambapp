@@ -1,0 +1,18 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { PageHeader } from '../../shared/ui/PageHeader';
+import { StatGrid } from '../../shared/ui/StatGrid';
+import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
+import { Panel, Badge } from '../../shared/ui/Panel';
+import { Icon } from '../../shared/ui/Icon';
+import { TimerDisplay } from '../tracker/TimerDisplay';
+import { WeekChart } from '../week/components/WeekChart';
+import { EntryModal } from '../time-entries/components/EntryModal';
+import { dashboardStats, priorityTasks } from './data/dashboard.fixtures';
+import { usePreviewNotice } from '../../shared/preview/PreviewContext';
+
+export default function DashboardPage() {
+  const [entryOpen, setEntryOpen] = useState(false);
+  const notify = usePreviewNotice();
+  return <div className="page-stack"><PageHeader eyebrow="Jornada activa · Sesión 04 de 05" title="Hola, Alexandre" description="Jueves, 8 de mayo de 2025 · Así está tu jornada de ejemplo." actions={<><ButtonLink to="/ajustes#redondeo" icon="settings">Redondeo R15</ButtonLink><Button icon="plus" onClick={() => setEntryOpen(true)}>Nuevo registro</Button></>} /><StatGrid stats={dashboardStats} /><section className="tracker-hero"><div className="tracker-hero__details"><Badge tone="accent"><span className="status-dot" /> En curso · Vista previa</Badge><p className="eyebrow">Mercury FinTech / Core v2 Platform</p><h2>Integración de pasarela de pago Stripe & Webhooks</h2><p className="mono muted"><Icon name="clock" size={13} /> Inicio de ejemplo: 14:15:00 · #TSK-8488</p></div><TimerDisplay /></section><Panel eyebrow="Comparativa semanal" title="Horas imputadas vs. objetivo proyectado" action={<div className="chart-legend"><span><i /> Imputado (R15)</span><span><i className="chart-legend__target" /> Objetivo base</span><strong className="mono">31h 30m / 37h 30m</strong></div>}><WeekChart /></Panel><div className="two-columns"><Panel title="Tareas prioritarias" icon="tasks" action={<span className="mono dim">4 entregables</span>}><div className="task-list">{priorityTasks.map(task => <div className="task-row" key={task.id}><IconButton icon={task.active ? 'stop' : 'play'} label={`Previsualizar ${task.active ? 'parada' : 'inicio'}: ${task.title}`} onClick={() => notify('Vista previa del cronómetro. No se registra tiempo.')} className={task.active ? 'icon-button--accent' : ''} /><Link to="/tareas" className="task-row__text">{task.active ? <span className="eyebrow accent">En curso</span> : null}<strong>{task.title}</strong><span className="muted mono">{task.project}</span></Link><span className="mono">{task.duration}</span></div>)}</div><Link className="text-link" to="/tareas">Ver todas las tareas pendientes <Icon name="arrow" size={14} /></Link></Panel><Panel title="Partes registrados hoy" icon="clock" action={<span className="mono accent">Total: 03h 45m</span>}><div className="entry-summary"><div><strong className="mono">09:07 — 12:45</strong><span className="muted">Mercury FinTech</span><p>Refactor middleware y logs</p><span className="mono dim">Real: 3h 38m <span className="accent">→ Imputado: 3h 45m (+7m)</span></span></div><IconButton icon="edit" label="Previsualizar edición del parte" onClick={() => setEntryOpen(true)} /></div><div className="entry-summary entry-summary--live"><span className="status-dot" /><div><strong>Tramo en curso</strong><p className="muted">Ejemplo visual pendiente de consolidación</p></div><Badge tone="accent">02:44:19</Badge></div><Link className="text-link" to="/partes-de-horas">Abrir hoja completa de partes <Icon name="arrow" size={14} /></Link></Panel></div><EntryModal open={entryOpen} onClose={() => setEntryOpen(false)} /></div>;
+}

@@ -1,0 +1,7 @@
+import { Modal } from '../../../shared/ui/Modal';
+import { InputField, SelectField } from '../../../shared/ui/FormField';
+import { PreviewForm } from '../../../shared/preview/PreviewForm';
+
+export function EntryModal({ open, onClose, editing = false }: { open: boolean; onClose: () => void; editing?: boolean }) {
+  return <Modal open={open} onClose={onClose} title={editing ? 'Editar parte de horas' : 'Nuevo parte manual'} description="Define el proyecto, el intervalo y la descripción de la sesión."><PreviewForm onClose={onClose}><SelectField label="Proyecto"><option>Mercury FinTech — Refactor API</option><option>Neobank Mobile — Onboarding</option><option>Aero Logistics — Portal Operativo</option></SelectField><InputField label="Tarea" defaultValue={editing ? 'Refactor de Middleware JWT' : ''} placeholder="Nombre del entregable" required /><div className="form-grid"><InputField label="Fecha" type="date" defaultValue="2025-05-08" required /><SelectField label="Redondeo"><option>R15 · 15 minutos</option><option>R10 · 10 minutos</option><option>R05 · 5 minutos</option><option>Sin redondeo</option></SelectField><InputField label="Hora de inicio" type="time" defaultValue="09:07" required /><InputField label="Hora de fin" type="time" defaultValue="12:45" required /></div><InputField label="Descripción" placeholder="¿En qué has trabajado?" defaultValue={editing ? 'Refactor middleware y gestión de retries.' : ''} /></PreviewForm></Modal>;
+}

@@ -1,0 +1,63 @@
+.onboarding-page { min-height: 100vh; background: var(--bg); }
+.onboarding-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 88px; padding: 20px max(32px, calc((100vw - 1400px) / 2)); border-bottom: 1px solid var(--border); background: var(--surface-low); }
+.onboarding-container { width: min(1120px, calc(100% - 64px)); margin: 48px auto 0; padding-bottom: 44px; }
+.onboarding-status { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; }
+.onboarding-status h2 { margin: 7px 0 0; font: 600 22px/1.25 var(--font-heading); letter-spacing: -.03em; }
+.onboarding-status > .mono { font-size: 11px; }
+.onboarding-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 25px 0 55px; }
+.onboarding-steps button { display: flex; gap: 12px; align-items: center; text-align: left; padding: 12px 0; border: 0; background: transparent; color: var(--dim); cursor: pointer; }
+.onboarding-steps button > span { flex-shrink: 0; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 4px; font: 11px var(--font-mono); background: var(--surface); }
+.onboarding-steps button > div { min-width: 0; }
+.onboarding-steps small { display: block; margin-bottom: 5px; text-transform: uppercase; font: 8px var(--font-mono); letter-spacing: .1em; }
+.onboarding-steps strong { display: block; font-size: 11px; font-weight: 500; line-height: 1.5; }
+.onboarding-steps button.active { color: var(--text); }
+.onboarding-steps .active > span { color: var(--accent); border-color: var(--accent); background: rgb(255 46 86 / 8%); }
+.onboarding-steps .active small { color: var(--accent-soft); }
+.onboarding-steps .completed > span { color: var(--accent-soft); border-color: rgb(255 179 182 / 30%); background: rgb(255 179 182 / 5%); }
+.onboarding-steps button:hover strong { color: var(--text); }
+.onboarding-title { max-width: 780px; margin-bottom: 36px; }
+.onboarding-title h1 { margin: 12px 0 16px; font: 600 clamp(28px, 3vw, 36px)/1.2 var(--font-heading); letter-spacing: -.04em; }
+.onboarding-title > .muted { font-size: 13px; line-height: 1.8; }
+.onboarding-container > .page-stack { gap: 24px; }
+.onboarding-container .panel { padding: 28px; }
+.onboarding-container .panel__header { margin-bottom: 25px; }
+.onboarding-container .panel__header h2 { font-size: 16px; }
+.onboarding-container .choice-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.onboarding-container .choice-fieldset legend { padding: 0; margin: 0 0 18px; font-size: 12px; color: var(--muted); }
+.onboarding-container .choice-card--large { min-height: 192px; }
+.onboarding-container .choice-card--large > strong { font: 600 20px/1.3 var(--font-heading); letter-spacing: -.025em; }
+.onboarding-container .choice-card--large > .eyebrow { font-size: 9px; }
+.onboarding-container .choice-card--large > p { margin: 8px 0 16px; font-size: 12px; line-height: 1.8; }
+.onboarding-container .choice-card--large > .mono { margin-top: auto; font-size: 9px; }
+.onboarding-container .section-intro { margin-bottom: 20px; font-size: 12px; }
+.onboarding-container .notice { margin-top: 24px; }
+.onboarding-container .rounding-preview { margin-top: 24px; }
+.onboarding-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-top: 32px; padding-top: 26px; border-top: 1px solid var(--border); }
+.onboarding-actions > .mono { font-size: 10px; }
+
+@media (max-width: 800px) {
+  .onboarding-header { padding-inline: 24px; }
+  .onboarding-header > .badge { display: none; }
+  .onboarding-container { width: calc(100% - 40px); margin-top: 32px; }
+  .onboarding-steps { gap: 10px; margin-bottom: 36px; }
+  .onboarding-steps button { align-items: flex-start; gap: 8px; }
+  .onboarding-steps button > span { width: 27px; height: 27px; }
+  .onboarding-steps strong { font-size: 10px; }
+  .onboarding-container .choice-grid--three { grid-template-columns: minmax(0, 1fr); }
+  .onboarding-container .choice-card--large { min-height: 0; }
+  .onboarding-container .panel { padding: 22px; }
+  .onboarding-actions > .mono { order: 3; width: 100%; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .onboarding-header { padding: 18px 20px; gap: 12px; min-height: 76px; }
+  .onboarding-header .brand img { width: 135px; }
+  .onboarding-header .button { font-size: 11px; padding-inline: 4px; }
+  .onboarding-status { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .onboarding-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-top: 16px; }
+  .onboarding-steps button { align-items: center; }
+  .onboarding-title h1 { font-size: 28px; }
+  .onboarding-container .panel { padding: 18px; }
+  .onboarding-actions { gap: 14px 6px; }
+  .onboarding-actions .button { font-size: 10px; padding-inline: 9px; }
+}
