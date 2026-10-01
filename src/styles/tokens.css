@@ -1,0 +1,25 @@
+:root {
+  color-scheme: dark;
+  --bg: #131316;
+  --surface: #1b1b1e;
+  --surface-raised: #252529;
+  --surface-low: #0e0e11;
+  --text: #e4e1e6;
+  --muted: #aaa3aa;
+  --dim: #8b858e;
+  --border: #353038;
+  --border-subtle: #28252c;
+  --accent: #ff2e56;
+  --accent-soft: #ffb3b6;
+  --accent-deep: #cc003c;
+  --success: #88cbb2;
+  --danger: #ef6464;
+  --warning: #ecb67c;
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Geist', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 6px;
+  --sidebar-width: 244px;
+  --header-height: 68px;
+  --content-width: 1600px;
+}
