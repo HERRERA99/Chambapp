@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import type { Project, Task, TimeEntry, Workday, WorkspaceData } from '../../domain/models';
-import { formatDuration, weekDates } from '../../domain/time';
+import { formatDuration, weekDates } from '../../domain/time.ts';
 
 export type WeekBlock = {
   entry: TimeEntry;

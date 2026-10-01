@@ -66,6 +66,7 @@ export function WorkspaceLayout() {
         />
       ) : null}
       <aside
+        id="workspace-navigation"
         className={`sidebar ${menuOpen ? 'sidebar--open' : ''}`}
         aria-label="Panel de navegación"
       >
@@ -134,6 +135,8 @@ export function WorkspaceLayout() {
               className="mobile-menu"
               icon="menu"
               label="Abrir navegación"
+              aria-expanded={menuOpen}
+              aria-controls="workspace-navigation"
               onClick={() => setMenuOpen(true)}
             />
             <span className="eyebrow">Mi espacio</span>

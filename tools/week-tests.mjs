@@ -1,24 +1,5 @@
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
-
-// Node strips TypeScript; resolve the same extensionless local imports as Vite.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context);
-    } catch (error) {
-      if (
-        error.code === 'ERR_MODULE_NOT_FOUND' &&
-        specifier.startsWith('.') &&
-        context.parentURL?.includes('/src/')
-      ) {
-        return nextResolve(`${specifier}.ts`, context);
-      }
-      throw error;
-    }
-  },
-});
-const { buildWeek, describeBalance } = await import('../src/features/week/week.model.ts');
+import { buildWeek, describeBalance } from '../src/features/week/week.model.ts';
 
 const monday = '2026-09-28';
 const data = {
