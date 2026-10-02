@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
 import type { Attendance, WorkspaceData } from '../../domain/models';
-import { formatClock, localDateTimeToIso } from '../../domain/time';
+import { localDateTimeToIso } from '../../domain/time';
 import { DataError, readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { Modal } from '../../shared/ui/Modal';
@@ -10,16 +10,19 @@ import { Button } from '../../shared/ui/Button';
 import { InputField } from '../../shared/ui/FormField';
 import { Notice } from '../../shared/ui/Panel';
 import { useAttendance } from './useAttendance';
+import { formatAttendanceDuration } from './attendanceLabels';
 
 export function AttendanceEditor({
   data,
   record,
   date,
+  mode = record ? 'edit' : 'interval',
   onClose,
 }: {
   data: WorkspaceData;
   record?: Attendance;
   date: string;
+  mode?: 'entry' | 'exit' | 'edit' | 'interval';
   onClose: () => void;
 }) {
   const attendance = useAttendance();
@@ -30,10 +33,14 @@ export function AttendanceEditor({
   const today = DateTime.fromISO(attendance.now, { zone });
   const [id] = useState(() => record?.id ?? crypto.randomUUID());
   const [startDate, setStartDate] = useState(initialStart?.toISODate() ?? date);
-  const [endDate, setEndDate] = useState(initialEnd?.toISODate() ?? date);
+  const [endDate, setEndDate] = useState(
+    initialEnd?.toISODate() ?? (mode === 'exit' ? today.toISODate()! : date),
+  );
   const [startTime, setStartTime] = useState(initialStart?.toFormat('HH:mm:ss') ?? '');
   const [endTime, setEndTime] = useState(initialEnd?.toFormat('HH:mm:ss') ?? '');
-  const [openEntry, setOpenEntry] = useState(record ? !record.fin_en : false);
+  const [openEntry, setOpenEntry] = useState(
+    mode === 'entry' || (mode === 'edit' && !!record && !record.fin_en),
+  );
   const [error, setError] = useState('');
   const [targetZone, setTargetZone] = useState<string | null>(null);
   const [acceptZone, setAcceptZone] = useState(false);
@@ -63,7 +70,9 @@ export function AttendanceEditor({
       const end = exactEnd();
       if (Date.parse(start) > Date.parse(attendance.now))
         throw new Error('La entrada no puede estar en el futuro.');
-      if (end && Date.parse(end) <= Date.parse(start))
+      const unchangedInterval = record && start === record.inicio_en && end === record.fin_en;
+      // An existing valid interval may contain microseconds beyond Date.parse precision.
+      if (end && !unchangedInterval && Date.parse(end) <= Date.parse(start))
         throw new Error('La salida debe ser posterior a la entrada.');
       if (end && Date.parse(end) > Date.parse(attendance.now))
         throw new Error('La salida no puede estar en el futuro.');
@@ -78,7 +87,15 @@ export function AttendanceEditor({
           ...(targetZone && acceptZone ? { confirmar_zona: targetZone } : {}),
         },
       });
-      notify(record ? 'Fichaje actualizado.' : 'Fichaje creado.');
+      notify(
+        mode === 'entry'
+          ? 'Entrada guardada. Puedes fichar la salida más tarde.'
+          : mode === 'exit'
+            ? 'Salida guardada.'
+            : record
+              ? 'Fichaje actualizado.'
+              : 'Fichaje creado.',
+      );
       onClose();
     } catch (cause) {
       const raw = cause instanceof DataError ? (cause.rawMessage ?? cause.message) : '';
@@ -102,46 +119,70 @@ export function AttendanceEditor({
   return (
     <Modal
       open
-      title={record ? 'Editar entrada y salida' : 'Entrada y salida manual'}
-      description={`Introduce los instantes exactos en ${zone}. Puedes registrar varias sesiones al día.`}
+      title={
+        mode === 'entry'
+          ? 'Entrada manual'
+          : mode === 'exit'
+            ? 'Salida manual'
+            : record
+              ? 'Editar entrada y salida'
+              : 'Registrar tramo completo'
+      }
+      description={
+        mode === 'entry'
+          ? `Introduce tu hora de entrada en ${zone}. La salida queda pendiente hasta que la fiches.`
+          : mode === 'exit'
+            ? `Introduce tu hora de salida en ${zone} para cerrar la entrada guardada.`
+            : `Introduce los instantes exactos en ${zone}. Puedes registrar varias sesiones al día.`
+      }
       onClose={() => {
         if (!attendance.busy) onClose();
       }}
     >
       <form className="page-stack" onSubmit={submit}>
-        <div className="form-grid">
-          <InputField
-            label="Fecha de entrada"
-            type="date"
-            required
-            max={today.toISODate()!}
-            value={startDate}
-            disabled={blocked}
-            onChange={(event) => {
-              setStartDate(event.target.value);
-              setTargetZone(null);
-              setAcceptZone(false);
-            }}
-          />
-          <InputField
-            label="Hora de entrada"
-            type="time"
-            step="1"
-            required
-            value={startTime}
-            disabled={blocked}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-        </div>
-        <label className="attendance-editor__open">
-          <input
-            type="checkbox"
-            checked={openEntry}
-            disabled={blocked}
-            onChange={(event) => setOpenEntry(event.target.checked)}
-          />
-          Salida pendiente: seguir dentro hasta fichar la salida
-        </label>
+        {mode === 'exit' ? (
+          <Notice title="Entrada guardada">
+            <span className="mono">{initialStart?.toFormat('dd/MM/yyyy · HH:mm:ss')}</span>
+            {' · '}
+            {zone}
+          </Notice>
+        ) : (
+          <div className="form-grid">
+            <InputField
+              label="Fecha de entrada"
+              type="date"
+              required
+              max={today.toISODate()!}
+              value={startDate}
+              disabled={blocked}
+              onChange={(event) => {
+                setStartDate(event.target.value);
+                setTargetZone(null);
+                setAcceptZone(false);
+              }}
+            />
+            <InputField
+              label="Hora de entrada"
+              type="time"
+              step="1"
+              required
+              value={startTime}
+              disabled={blocked}
+              onChange={(event) => setStartTime(event.target.value)}
+            />
+          </div>
+        )}
+        {mode === 'edit' || mode === 'interval' ? (
+          <label className="attendance-editor__open">
+            <input
+              type="checkbox"
+              checked={openEntry}
+              disabled={blocked}
+              onChange={(event) => setOpenEntry(event.target.checked)}
+            />
+            Salida pendiente: seguir dentro hasta fichar la salida
+          </label>
+        ) : null}
         {!openEntry ? (
           <div className="form-grid">
             <InputField
@@ -170,9 +211,13 @@ export function AttendanceEditor({
         )}
         <Notice title={openEntry ? 'Duración provisional' : 'Duración exacta, sin redondeo'}>
           {duration === null ? (
-            'Completa la entrada y la salida.'
+            openEntry ? (
+              'Completa la hora de entrada.'
+            ) : (
+              'Completa la entrada y la salida.'
+            )
           ) : (
-            <span className="mono">{formatClock(duration)}</span>
+            <span className="mono">{formatAttendanceDuration(duration)}</span>
           )}
         </Notice>
         {targetZone ? (
@@ -218,7 +263,13 @@ export function AttendanceEditor({
             variant="primary"
             disabled={blocked || (!!targetZone && !acceptZone)}
           >
-            {attendance.busy ? 'Guardando…' : 'Guardar fichaje'}
+            {attendance.busy
+              ? 'Guardando…'
+              : mode === 'entry'
+                ? 'Guardar entrada'
+                : mode === 'exit'
+                  ? 'Guardar salida'
+                  : 'Guardar fichaje'}
           </Button>
         </div>
       </form>

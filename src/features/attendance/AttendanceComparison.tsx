@@ -8,7 +8,7 @@ import { ButtonLink } from '../../shared/ui/Button';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useAttendance } from './useAttendance';
 import { AttendanceChart } from './AttendanceChart';
-import { formatImputedPercent } from './attendanceLabels';
+import { formatAttendanceDuration, formatImputedPercent } from './attendanceLabels';
 
 export function AttendanceComparison({
   monday,
@@ -34,6 +34,7 @@ export function AttendanceComparison({
   const current = days.find((day) => day.date === today);
   return (
     <Panel
+      className="attendance-comparison"
       title="Jornada fichada y horas imputadas"
       eyebrow="Entradas y salidas"
       action={
@@ -46,7 +47,9 @@ export function AttendanceComparison({
         stats={[
           {
             label: compact ? 'Fichado hoy' : 'Fichajes cerrados',
-            value: formatDuration(compact && current ? current.workedSeconds : total.closedSeconds),
+            value: formatAttendanceDuration(
+              compact && current ? current.workedSeconds : total.closedSeconds,
+            ),
             icon: 'clock',
             detail:
               compact && current?.provisionalSeconds
@@ -55,7 +58,7 @@ export function AttendanceComparison({
           },
           {
             label: 'Fichado esta semana',
-            value: formatDuration(total.workedSeconds),
+            value: formatAttendanceDuration(total.workedSeconds),
             icon: 'calendar',
             detail: 'Suma de sesiones, sin contar pausas',
           },
@@ -98,9 +101,9 @@ export function AttendanceComparison({
           {days.map((day) => (
             <tr key={day.date}>
               <td>{day.date}</td>
-              <td className="mono">{formatDuration(day.workedSeconds)}</td>
+              <td className="mono">{formatAttendanceDuration(day.workedSeconds)}</td>
               <td className="mono">
-                {day.provisionalSeconds ? formatDuration(day.provisionalSeconds) : '—'}
+                {day.provisionalSeconds ? formatAttendanceDuration(day.provisionalSeconds) : '—'}
               </td>
               <td className="mono">{formatDuration(day.imputedSeconds)}</td>
               <td>{formatImputedPercent(day.imputedPercent)}</td>

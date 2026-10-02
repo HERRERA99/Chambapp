@@ -446,4 +446,71 @@ export async function verifyAttendance({ admin, ca, cb, anonymous, client, rpc, 
   ok(
     'competing attendance starts create one session and competing edits enforce optimistic concurrency',
   );
+
+  // A manual entry may be saved now and completed later without adopting the
+  // profile's rounding preference, even when the same interval is a task part.
+  const exactUser = randomUUID();
+  await admin.query('insert into auth.users(id) values($1)', [exactUser]);
+  const exactClient = await client(exactUser);
+  const exactRpc = (action, data) => rpc(exactClient, action, data);
+  const exactProfile = (await exactClient.query('select * from public.perfiles')).rows[0];
+  const roundedProfile = await exactRpc('editar_perfil', {
+    version: exactProfile.version,
+    intervalo_redondeo_minutos: 60,
+  });
+  const manualEntry = {
+    id: randomUUID(),
+    inicio_en: '2026-09-01T09:07:12.125+02:00',
+    fin_en: null,
+  };
+  const openManual = await exactRpc('crear_fichaje', manualEntry);
+  assert.equal(openManual.fin_en, null);
+  assert.equal(openManual.version, 1);
+  assert.equal(
+    (
+      await exactClient.query('select duracion_segundos from public.fichajes_detalle where id=$1', [
+        openManual.id,
+      ])
+    ).rows[0].duracion_segundos,
+    null,
+  );
+  const manualExit = {
+    id: openManual.id,
+    version: openManual.version,
+    fin_en: '2026-09-01T10:08:13.375+02:00',
+  };
+  const closedManual = await exactRpc('editar_fichaje', manualExit);
+  assert.equal(closedManual.inicio_en, openManual.inicio_en);
+  assert.equal(closedManual.version, 2);
+  assert.deepEqual(await exactRpc('editar_fichaje', manualExit), closedManual);
+  const readExact = async () =>
+    (await exactClient.query('select * from public.fichajes_detalle where id=$1', [openManual.id]))
+      .rows[0];
+  const exactDetail = await readExact();
+  assert.equal(exactDetail.inicio_en.toISOString(), '2026-09-01T07:07:12.125Z');
+  assert.equal(exactDetail.fin_en.toISOString(), '2026-09-01T08:08:13.375Z');
+  assert.equal(Number(exactDetail.duracion_segundos), 3661.25);
+  const exactProject = await exactRpc('crear_proyecto', { nombre: 'Rounding independence' });
+  const exactTask = await exactRpc('crear_tarea', {
+    proyecto_id: exactProject.id,
+    titulo: 'Rounded task',
+  });
+  const roundedPart = await exactRpc('crear_parte', {
+    tarea_id: exactTask.id,
+    inicio_en: manualEntry.inicio_en,
+    fin_en: manualExit.fin_en,
+  });
+  const roundedDetail = (
+    await exactClient.query('select * from public.partes_detalle where id=$1', [roundedPart.id])
+  ).rows[0];
+  assert.equal(Number(roundedDetail.duracion_real_segundos), 3661.25);
+  assert.equal(Number(roundedDetail.duracion_imputada_segundos), 7200);
+  await exactRpc('editar_perfil', {
+    version: roundedProfile.version,
+    intervalo_redondeo_minutos: 15,
+  });
+  assert.equal(Number((await readExact()).duracion_segundos), 3661.25);
+  ok(
+    'manual open entry can be closed later with exact seconds/fractions; attendance ignores all task rounding preferences',
+  );
 }

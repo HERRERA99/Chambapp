@@ -19,7 +19,7 @@ import { useAttendance } from './useAttendance';
 import { AttendanceControls } from './AttendanceControls';
 import { AttendanceEditor } from './AttendanceEditor';
 import { AttendanceChart } from './AttendanceChart';
-import { formatImputedPercent } from './attendanceLabels';
+import { formatAttendanceDuration, formatImputedPercent } from './attendanceLabels';
 import './attendance.css';
 
 function validDate(value: string | null): string | null {
@@ -122,7 +122,7 @@ export default function AttendancePage() {
         description="Ficha ahora o registra las horas manualmente. Compara tu jornada con los partes imputados a tareas."
         actions={
           <Button icon="plus" variant="primary" disabled={blocked} onClick={() => setEditor('new')}>
-            Entrada / salida manual
+            Registrar tramo completo
           </Button>
         }
       />
@@ -183,10 +183,10 @@ export default function AttendancePage() {
           stats={[
             {
               label: 'Horas fichadas',
-              value: formatDuration(total.workedSeconds),
+              value: formatAttendanceDuration(total.workedSeconds),
               icon: 'clock',
               detail: total.provisionalSeconds
-                ? `Incluye ${formatDuration(total.provisionalSeconds)} en curso`
+                ? `Incluye ${formatAttendanceDuration(total.provisionalSeconds)} en curso`
                 : 'Duración exacta entre entrada y salida',
             },
             {
@@ -207,7 +207,7 @@ export default function AttendancePage() {
                 total.imputedSeconds > total.workedSeconds
                   ? 'Imputado por encima del fichaje'
                   : 'Horas sin imputar',
-              value: formatDuration(Math.abs(total.workedSeconds - total.imputedSeconds)),
+              value: formatAttendanceDuration(Math.abs(total.workedSeconds - total.imputedSeconds)),
               icon: 'activity',
               detail: total.workedSeconds
                 ? 'Diferencia entre jornada y partes'
@@ -246,9 +246,9 @@ export default function AttendancePage() {
                   {day.date}
                 </button>
               </td>
-              <td className="mono">{formatDuration(day.workedSeconds)}</td>
+              <td className="mono">{formatAttendanceDuration(day.workedSeconds)}</td>
               <td className="mono">
-                {day.provisionalSeconds ? formatDuration(day.provisionalSeconds) : '—'}
+                {day.provisionalSeconds ? formatAttendanceDuration(day.provisionalSeconds) : '—'}
               </td>
               <td className="mono">{formatDuration(day.imputedSeconds)}</td>
               <td>{formatImputedPercent(day.imputedPercent)}</td>
@@ -283,7 +283,7 @@ export default function AttendancePage() {
                     {record.fin_en ? timestamp(record.fin_en) : 'Salida pendiente'}
                   </td>
                   <td className="mono">
-                    {formatDuration(seconds)}
+                    {formatAttendanceDuration(seconds)}
                     {!record.fin_en ? <span className="muted"> · provisional</span> : null}
                   </td>
                   <td>

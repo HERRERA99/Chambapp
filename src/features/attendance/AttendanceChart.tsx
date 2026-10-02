@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import type { AttendanceDay } from '../../domain/attendance';
-import { formatDuration } from '../../domain/time';
+import { formatAttendanceDuration } from './attendanceLabels';
 import './attendance.css';
 
 export function AttendanceChart({ days }: { days: readonly AttendanceDay[] }) {
@@ -8,25 +8,34 @@ export function AttendanceChart({ days }: { days: readonly AttendanceDay[] }) {
   const description = days
     .map(
       (day) =>
-        `${day.date}: fichado ${formatDuration(day.workedSeconds)}, imputado ${formatDuration(day.imputedSeconds)}${day.provisionalSeconds ? `, con ${formatDuration(day.provisionalSeconds)} de fichaje provisional` : ''}`,
+        `${day.date}: fichado exacto ${formatAttendanceDuration(day.workedSeconds)}, imputado ${formatAttendanceDuration(day.imputedSeconds)}${day.provisionalSeconds ? `, con ${formatAttendanceDuration(day.provisionalSeconds)} de fichaje provisional` : ''}`,
     )
     .join('. ');
   return (
     <div
       className="attendance-chart"
       role="img"
+      tabIndex={0}
       aria-label={`Horas fichadas e imputadas por día. ${description}`}
     >
       {days.map((day) => (
         <div key={day.date} className="attendance-chart__day">
+          <div className="attendance-chart__values mono" aria-hidden="true">
+            <span className="attendance-chart__value--worked" title="Fichado exacto">
+              F {formatAttendanceDuration(day.workedSeconds)}
+            </span>
+            <span
+              className="attendance-chart__value--imputed"
+              title="Imputado en partes finalizados"
+            >
+              I {formatAttendanceDuration(day.imputedSeconds)}
+            </span>
+          </div>
           <div
             className="attendance-chart__bars"
-            title={`${day.date}: fichado ${formatDuration(day.workedSeconds)}, imputado ${formatDuration(day.imputedSeconds)}`}
+            title={`${day.date}: fichado exacto ${formatAttendanceDuration(day.workedSeconds)}, imputado ${formatAttendanceDuration(day.imputedSeconds)}${day.provisionalSeconds ? `; fichaje provisional ${formatAttendanceDuration(day.provisionalSeconds)}` : ''}`}
           >
             <div className="attendance-chart__column">
-              <span className="attendance-chart__value mono">
-                {(day.workedSeconds / 3600).toFixed(1)}h
-              </span>
               <div
                 className="attendance-chart__bar attendance-chart__bar--worked"
                 style={{ height: `${(day.closedSeconds / maximum) * 100}%` }}
@@ -39,9 +48,6 @@ export function AttendanceChart({ days }: { days: readonly AttendanceDay[] }) {
               ) : null}
             </div>
             <div className="attendance-chart__column">
-              <span className="attendance-chart__value mono">
-                {(day.imputedSeconds / 3600).toFixed(1)}h
-              </span>
               <div
                 className="attendance-chart__bar attendance-chart__bar--imputed"
                 style={{ height: `${(day.imputedSeconds / maximum) * 100}%` }}

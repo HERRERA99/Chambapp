@@ -1,8 +1,9 @@
-import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Button } from '../../shared/ui/Button';
 import { Badge } from '../../shared/ui/Panel';
 import { formatClock, formatTime } from '../../domain/time';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useAttendance } from './useAttendance';
+import { ManualAttendanceButton } from './ManualAttendanceButton';
 import './attendance.css';
 
 export function AttendanceControls({ compact = false }: { compact?: boolean }) {
@@ -68,11 +69,7 @@ export function AttendanceControls({ compact = false }: { compact?: boolean }) {
                 : 'Fichar entrada'}
           </Button>
         )}
-        {!compact ? (
-          <ButtonLink to="/fichajes" icon="edit">
-            Entrada / salida manual
-          </ButtonLink>
-        ) : null}
+        {!compact ? <ManualAttendanceButton /> : null}
       </div>
       {!compact && attendance.pending ? (
         <p className="muted attendance-controls__message" role="status">

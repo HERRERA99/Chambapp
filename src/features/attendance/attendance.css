@@ -44,19 +44,42 @@
 .attendance-period-controls .field {
   max-width: 220px;
 }
+.attendance-page .stat,
+.attendance-comparison .stat {
+  container-type: inline-size;
+}
+.attendance-page .stat__value,
+.attendance-comparison .stat__value {
+  font-size: clamp(12px, 12cqi, 29px);
+}
 .attendance-chart {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   gap: 14px;
   border-bottom: 1px solid var(--border);
-  padding: 36px 12px 12px;
+  padding: 12px;
   margin: 12px 0 20px;
+  overflow-x: auto;
 }
 .attendance-chart__day {
-  flex: 1;
+  flex: 1 0 100px;
   max-width: 170px;
   text-align: center;
   font-size: 11px;
+}
+.attendance-chart__values {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.attendance-chart__value--worked {
+  color: var(--success);
+}
+.attendance-chart__value--imputed {
+  color: var(--accent);
 }
 .attendance-chart__bars {
   display: flex;
@@ -93,14 +116,6 @@
     var(--surface-raised) 6px
   );
   border-radius: 3px 3px 0 0;
-}
-.attendance-chart__value {
-  position: absolute;
-  top: -22px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  white-space: nowrap;
 }
 .attendance-chart-legend {
   display: flex;
@@ -158,17 +173,8 @@
     padding-right: 0;
     gap: 5px;
   }
-  .attendance-chart__bars {
-    gap: 3px;
-  }
-  .attendance-chart__column {
-    width: 17px;
-  }
-  .attendance-chart__value {
-    font-size: 8px;
-  }
   .attendance-chart__day {
-    font-size: 9px;
+    flex-basis: 100px;
   }
   .attendance-navigation {
     gap: 5px;

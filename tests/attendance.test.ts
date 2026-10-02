@@ -52,6 +52,23 @@ test('sums multiple sessions without breaks and compares only closed imputed par
   assert.equal(day!.imputedPercent, 57.1);
 });
 
+test('keeps exact seconds and fractions when rounded task time is compared with manual attendance', () => {
+  const start = '2026-09-01T09:07:12.125+02:00';
+  const end = '2026-09-01T10:08:13.375+02:00';
+  const [day] = attendanceDays(
+    [session(start, end)],
+    [entry(start, end, 7200)],
+    ['2026-09-01'],
+    zone,
+    '2026-09-01T12:00:00+02:00',
+  );
+  assert.equal(day!.closedSeconds, 3661.25);
+  assert.equal(day!.provisionalSeconds, 0);
+  assert.equal(day!.workedSeconds, 3661.25);
+  assert.equal(day!.imputedSeconds, 7200);
+  assert.equal(attendanceTotal([day!]).workedSeconds, 3661.25);
+});
+
 test('allocates overnight sessions and rounded imputation by actual overlap, conserving totals', () => {
   const days = attendanceDays(
     [session('2026-10-01T21:00:00Z', '2026-10-02T01:00:00Z')],
