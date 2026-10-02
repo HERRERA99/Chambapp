@@ -5,6 +5,7 @@ const protectedPaths: readonly string[] = [
   paths.projects,
   paths.tasks,
   paths.entries,
+  paths.attendance,
   paths.week,
   paths.settings,
   paths.onboarding,

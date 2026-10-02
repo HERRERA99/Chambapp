@@ -36,6 +36,8 @@ export type Task = OwnedRecord & {
   descripcion: string | null;
   estado: 'pendiente' | 'en_curso' | 'completada';
   estimacion_minutos: number | null;
+  odoo_id: string | null;
+  odoo_url: string | null;
   archivado_en: string | null;
   eliminado_en: string | null;
 };
@@ -53,6 +55,8 @@ export type TimeRecord = OwnedRecord & {
 
 export type TimeEntry = TimeRecord & {
   proyecto_id: string;
+  odoo_id: string | null;
+  odoo_url: string | null;
   fecha: string;
   zona_horaria: string;
   inicio_imputado_en: string;
@@ -67,6 +71,16 @@ export type WeeklyConfiguration = {
   minutos_semanales: number;
   vigente_desde: string;
   creado_en: string;
+};
+
+export type Attendance = OwnedRecord & {
+  jornada_id: string;
+  inicio_en: string;
+  fin_en: string | null;
+  eliminado_en: string | null;
+  fecha: string;
+  zona_horaria: string;
+  duracion_segundos: number | null;
 };
 
 export type ScheduleDay = {
@@ -91,6 +105,7 @@ export type WorkspaceData = {
   configurations: WeeklyConfiguration[];
   days: ScheduleDay[];
   jornadas: Workday[];
+  fichajes: Attendance[];
   serverTime: string;
   receivedAt: number;
 };
@@ -109,6 +124,11 @@ export type CommandAction =
   | 'eliminar_proyecto'
   | 'eliminar_tarea'
   | 'eliminar_parte'
+  | 'fichar_entrada'
+  | 'fichar_salida'
+  | 'crear_fichaje'
+  | 'editar_fichaje'
+  | 'eliminar_fichaje'
   | 'iniciar'
   | 'detener'
   | 'consultar_operacion'

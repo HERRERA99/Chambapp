@@ -1,6 +1,6 @@
 import { getSupabase } from './client';
 import { DataError, readableError } from './errors';
-import { assertEntry, assertProfile, assertTask } from './rowValidation';
+import { assertAttendance, assertEntry, assertProfile, assertTask } from './rowValidation';
 import { isRetryableStatus, isValidCommandResponse } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
 
@@ -132,6 +132,15 @@ export async function loadWorkspace(
         .range(from, to)
         .abortSignal(signal),
     ),
+    readAll((from, to) =>
+      db
+        .from('fichajes_detalle')
+        .select('*')
+        .order('inicio_en', { ascending: false })
+        .order('id')
+        .range(from, to)
+        .abortSignal(signal),
+    ),
     executeCommand<{ hora_servidor: string }>('consultar_cronometro', {}, signal, userId).then(
       (clock) => ({
         ...clock,
@@ -139,12 +148,13 @@ export async function loadWorkspace(
       }),
     ),
   ]);
-  const [profile, projects, tasks, entries, configurations, days, jornadas, clock] = results;
+  const [profile, projects, tasks, entries, configurations, days, jornadas, fichajes, clock] =
+    results;
   if (profile.error) throw new DataError(readableError(profile.error));
   assertProfile(profile.data);
   if (
     profile.data.id !== userId ||
-    [...projects, ...tasks, ...entries, ...configurations, ...jornadas].some(
+    [...projects, ...tasks, ...entries, ...configurations, ...jornadas, ...fichajes].some(
       (row) => row.usuario_id !== userId,
     )
   )
@@ -167,6 +177,10 @@ export async function loadWorkspace(
     configurations,
     days,
     jornadas,
+    fichajes: fichajes.map((row) => {
+      assertAttendance(row);
+      return row;
+    }),
     serverTime: clock.hora_servidor,
     receivedAt: clock.receivedAt,
   };

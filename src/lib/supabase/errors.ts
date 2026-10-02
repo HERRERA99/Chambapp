@@ -10,19 +10,33 @@ const messages: Record<string, string> = {
   CONFIGURACION_SEMANAL_REQUERIDA: 'Completa tu configuración de jornada para crear esta semana.',
   REPARTO_SEMANAL_INVALIDO: 'La suma de los días debe coincidir con el objetivo semanal.',
   FECHA_INICIO_INVALIDA: 'Revisa las fechas del registro.',
+  FICHAJE_ID_REQUERIDO: 'No se ha podido identificar el fichaje. Actualiza la página.',
+  FICHAJE_ID_REUTILIZADO:
+    'Este fichaje ya se ha guardado con otros datos. Actualiza la página para revisarlo.',
+  FICHAJE_NO_DISPONIBLE: 'El fichaje ya no está disponible. Actualiza los datos.',
+  ENTRADA_REQUERIDA: 'Indica la fecha y hora de entrada.',
+  INTERVALO_REAL_FUTURO: 'La entrada y la salida no pueden estar en el futuro.',
+  ZONA_HORARIA_REQUERIDA: 'La fecha y hora deben incluir una zona horaria válida.',
+  fichajes_intervalo_valido: 'La salida debe ser posterior a la entrada.',
+  un_fichaje_abierto_por_usuario:
+    'Ya tienes una entrada sin salida. Registra su salida antes de volver a entrar.',
+  tareas_odoo_id_formato: 'El ID de Odoo debe ser T seguido de números, por ejemplo T443212.',
+  tareas_odoo_url_formato:
+    'El enlace de Odoo debe ser una dirección válida con http:// o https://.',
   CONFIRMAR_CAMBIO_ZONA:
     'El registro cambia a una jornada con otra zona horaria. Revisa la zona antes de guardarlo.',
 };
 
 export class DataError extends Error {
-  constructor(
-    message: string,
-    readonly retryable = false,
-    readonly code?: string,
-    readonly rawMessage?: string,
-  ) {
+  readonly retryable: boolean;
+  readonly code?: string;
+  readonly rawMessage?: string;
+  constructor(message: string, retryable = false, code?: string, rawMessage?: string) {
     super(message);
     this.name = 'DataError';
+    this.retryable = retryable;
+    this.code = code;
+    this.rawMessage = rawMessage;
   }
 }
 
@@ -34,6 +48,8 @@ export function readableError(error: unknown): string {
         ? String(error.message)
         : String(error);
   for (const [code, text] of Object.entries(messages)) if (message.includes(code)) return text;
+  if (/fichajes.*excl|excl.*fichajes/.test(message))
+    return 'Este fichaje se solapa con otro. Revisa la fecha y hora de entrada y salida.';
   if (/exclusion constraint|23P01/.test(message))
     return 'Este intervalo se solapa con otro parte. Revisa la hora exacta de inicio y fin.';
   if (/duplicate key|23505/.test(message)) return 'Ya existe una configuración para esa semana.';

@@ -6,6 +6,7 @@ import { InputField, SelectField } from '../../../shared/ui/FormField';
 import { Notice } from '../../../shared/ui/Panel';
 import { useWorkspace } from '../../workspace/useWorkspace';
 import { useEntryEditor } from './useEntryEditor';
+import { OdooLink } from '../../tasks/components/OdooLink';
 
 export type EntryModalProps = {
   open: boolean;
@@ -85,10 +86,12 @@ function EntryEditor({
               .map((task) => (
                 <option key={task.id} value={task.id}>
                   {task.titulo}
+                  {task.odoo_id ? ` · ${task.odoo_id}` : ''}
                   {task.archivado_en ? ' (archivada)' : ''}
                 </option>
               ))}
           </SelectField>
+          <OdooLink task={editor.availableTasks.find((task) => task.id === editor.selectedTask)} />
           <div className="form-grid">
             <InputField
               label="Fecha de inicio"

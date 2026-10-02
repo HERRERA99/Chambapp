@@ -1,6 +1,6 @@
 # Chambapp
 
-Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Incluye autenticación, configuración inicial, proyectos, tareas, cronómetro, partes de horas, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
+Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
 
 ## Arrancar en local
 
@@ -55,6 +55,16 @@ El entorno Supabase local configura las redirecciones del puerto 5173 en `supaba
 
 Los providers de Auth, Workspace y Tracker coordinan la sesión, la caché de consultas y el cronómetro. Los componentes presentan datos y envían comandos a través de esa capa; los cálculos se mantienen en utilidades y selectores verificables.
 
+## Odoo y fichajes
+
+Cada tarea admite un **ID de Odoo** opcional (`T` seguida de números, por ejemplo `T443212`) y un enlace HTTP(S) opcional. Se pueden guardar y borrar por separado. El formulario normaliza el ID a mayúsculas y el enlace a una URL válida. Los enlaces aparecen en tareas, partes y calendario; las búsquedas admiten el ID y los CSV incluyen ambos campos. Estos datos permiten navegar a Odoo; la sincronización con su API queda para una integración posterior.
+
+En **Fichajes** (`/fichajes`) puedes registrar entrada y salida con la hora del servidor, introducirlas manualmente o corregir un registro. Se admiten varias sesiones al día, una entrada abierta por usuario y tramos que cruzan medianoche. Los fichajes no se redondean y sus solapamientos se rechazan; los partes de tareas siguen siendo independientes. El tiempo de descanso se excluye cerrando un fichaje y abriendo otro al volver.
+
+El resumen, la semana y Fichajes comparan horas fichadas e imputadas. El porcentaje es `horas imputadas de partes finalizados / horas fichadas × 100`; sin horas fichadas aparece **Sin fichajes** y el redondeo puede producir valores superiores al 100 %. Las entradas abiertas aportan tiempo provisional claramente indicado. La comparativa reparte los tramos entre días según la zona horaria del perfil, respetando los cambios de horario; distribuye el tiempo imputado proporcionalmente a la duración real de cada parte. Los informes originales de partes mantienen su atribución a la jornada de inicio.
+
+El provider de fichajes conserva las operaciones pendientes por usuario en el navegador y coordina pestañas con Web Locks. **Reintentar fichaje** reutiliza los parámetros originales; el servidor devuelve el mismo resultado para evitar duplicados, también después de una edición o eliminación. El usuario de la RPC queda fijado a la sesión que inició la operación.
+
 Las lecturas se paginan en bloques de 500 para recuperar todos los registros sin truncarlos con el límite de respuesta de Supabase. La caché se actualiza después de escribir, al recuperar el foco y periódicamente. Si crece el volumen de datos, la siguiente optimización consiste en consultas filtradas y agregaciones en el servidor por pantalla y periodo.
 
 ## Reglas de tiempo y persistencia
@@ -71,7 +81,9 @@ Web Locks coordina las operaciones entre pestañas del mismo origen y `storage` 
 
 Las tablas tienen RLS y cada cuenta lee únicamente sus registros. Las escrituras pasan por `chambapp_operar`, con propietario derivado de la sesión, validación de relaciones y versiones para detectar cambios concurrentes. Las vistas utilizan `security_invoker`; el cliente no tiene permisos directos de escritura. [Modelo y payloads RPC](docs/base-de-datos.md).
 
-El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821` y `20261001213125`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
+El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821`, `20261001213125` y `20261002190139`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
+
+La migración [Odoo y fichajes](supabase/migrations/20261002190139_odoo_and_attendance.sql) está aplicada al proyecto alojado y verificada tanto en PostgreSQL aislado como con los controles remotos de catálogo y permisos. Añade los campos Odoo, las tablas y vistas de fichajes y amplía la RPC existente. Los tipos TypeScript se han generado desde la base actualizada; la versión del archivo coincide con el historial remoto.
 
 ```powershell
 npm run db:login
@@ -102,4 +114,4 @@ npm run db:test:install
 npm run db:test
 ```
 
-La suite levanta PostgreSQL 17 aislado con datos sintéticos, aplica ambas migraciones y verifica RLS, propiedad, versiones, redondeo, DST, cronómetro, reintentos y concurrencia. No modifica la base alojada. `supabase/verify.sql` comprueba catálogo y permisos después de aplicar una migración; las pruebas de SQL no sustituyen la verificación de registro, confirmación por correo y login en el navegador.
+La suite levanta PostgreSQL 17 aislado con datos sintéticos, aplica todas las migraciones y verifica RLS, propiedad, versiones, redondeo, DST, cronómetro, referencias Odoo, fichajes, reintentos y concurrencia. No modifica la base alojada. `supabase/verify.sql` comprueba catálogo y permisos después de aplicar una migración; las pruebas de SQL no sustituyen la verificación de registro, confirmación por correo y login en el navegador.

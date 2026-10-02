@@ -11,6 +11,7 @@ import { entryTotals } from '../../time-entries/entryTotals';
 import { EntryModal } from '../../time-entries/components/EntryModal';
 import { TaskForm } from './TaskForm';
 import { TaskEntries } from './TaskEntries';
+import { OdooLink } from './OdooLink';
 import { taskStatusLabels } from '../taskLabels';
 
 export function TaskDetail({
@@ -95,6 +96,7 @@ export function TaskDetail({
         </div>
         <h2 className="task-detail__title">{task.titulo}</h2>
         <p className="muted">{project?.nombre ?? 'Proyecto no disponible'}</p>
+        <OdooLink task={task} />
         {task.descripcion ? <p className="muted section-intro">{task.descripcion}</p> : null}
         <div className="task-detail__actions">
           <Button
@@ -192,6 +194,7 @@ export function TaskDetail({
         ) : null}
       </Panel>
       <TaskEntries
+        task={task}
         entries={entries}
         elapsedSeconds={tracker.elapsedSeconds}
         canCreate={!blocked && !busy}

@@ -9,6 +9,8 @@ import { paths } from '../paths';
 import { TimerDisplay } from '../../features/tracker/TimerDisplay';
 import { useWorkspace } from '../../features/workspace/useWorkspace';
 import { useTracker } from '../../features/tracker/useTracker';
+import { AttendanceControls } from '../../features/attendance/AttendanceControls';
+import { useAttendance } from '../../features/attendance/useAttendance';
 import { useAuth } from '../../features/auth/useAuth';
 import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
@@ -19,6 +21,7 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
   { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
   { to: paths.entries, label: 'Partes de horas', icon: 'clock' },
+  { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
   { to: paths.week, label: 'Mi semana', icon: 'calendar' },
   { to: paths.settings, label: 'Ajustes', icon: 'settings' },
 ];
@@ -30,6 +33,7 @@ export function WorkspaceLayout() {
   const { data, error, reload } = useWorkspace();
   const { user } = useAuth();
   const tracker = useTracker();
+  const attendance = useAttendance();
   const notify = useFeedback();
   const title = navigation.find((item) => item.to === pathname)?.label ?? 'Mi espacio';
   const profile = data?.profile;
@@ -144,6 +148,7 @@ export function WorkspaceLayout() {
             <strong>{title}</strong>
           </div>
           <div className="workspace-header__actions">
+            <AttendanceControls compact />
             <div className="header-tracker">
               <TimerDisplay compact />
             </div>
@@ -173,6 +178,20 @@ export function WorkspaceLayout() {
                 ? ' Usa Reintentar en el cronómetro para confirmar la operación.'
                 : ''}
             </div>
+          ) : null}
+          {attendance.error ? (
+            <div role="alert" className="form-error">
+              {attendance.error}
+              {attendance.pending
+                ? ' Reintenta el fichaje pendiente para confirmar el resultado.'
+                : ''}
+            </div>
+          ) : null}
+          {attendance.pending && !attendance.error ? (
+            <Notice title="Fichaje pendiente de confirmar">
+              Usa Reintentar fichaje para comprobar el resultado. Se conservan los instantes del
+              intento original.
+            </Notice>
           ) : null}
           <Outlet />
         </main>

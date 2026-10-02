@@ -8,6 +8,7 @@ export const paths = {
   projects: '/proyectos',
   tasks: '/tareas',
   entries: '/partes-de-horas',
+  attendance: '/fichajes',
   week: '/mi-semana',
   settings: '/ajustes',
 } as const;

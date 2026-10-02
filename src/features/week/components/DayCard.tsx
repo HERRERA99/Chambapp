@@ -4,6 +4,7 @@ import { Badge, Progress } from '../../../shared/ui/Panel';
 import { Button, IconButton } from '../../../shared/ui/Button';
 import { describeBalance } from '../week.model';
 import type { CalendarDay } from '../week.model';
+import { OdooLink } from '../../tasks/components/OdooLink';
 
 type DayCardProps = {
   day: CalendarDay;
@@ -86,6 +87,7 @@ export function DayCard({
               </span>
             </div>
             <h3>{task?.titulo ?? 'Tarea'}</h3>
+            <OdooLink task={task} />
             <span className="mono dim">
               {formatTime(entry.inicio_en, entry.zona_horaria)} –{' '}
               {entry.fin_en ? formatTime(entry.fin_en, entry.zona_horaria) : 'Ahora'}

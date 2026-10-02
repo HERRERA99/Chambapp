@@ -13,6 +13,7 @@ import { entryTotalsBy } from '../time-entries/entryTotals';
 import { TaskForm } from './components/TaskForm';
 import { TaskDetail } from './components/TaskDetail';
 import { taskStatusLabels } from './taskLabels';
+import { OdooLink } from './components/OdooLink';
 
 type Filter = 'all' | Task['estado'];
 
@@ -35,7 +36,7 @@ export default function TasksPage() {
       (includeArchived ||
         (!task.archivado_en && !projectById.get(task.proyecto_id)?.archivado_en)) &&
       (filter === 'all' || task.estado === filter) &&
-      `${task.titulo} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`
+      `${task.titulo} ${task.odoo_id ?? ''} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`
         .toLocaleLowerCase('es')
         .includes(query.toLocaleLowerCase('es')),
   );
@@ -61,6 +62,8 @@ export default function TasksPage() {
                   [
                     'Tarea',
                     'Proyecto',
+                    'ID de Odoo',
+                    'Enlace de Odoo',
                     'Estado',
                     'Archivada',
                     'Estimación (min)',
@@ -70,6 +73,8 @@ export default function TasksPage() {
                   visible.map((task) => [
                     task.titulo,
                     projectById.get(task.proyecto_id)?.nombre ?? '',
+                    task.odoo_id,
+                    task.odoo_url,
                     taskStatusLabels[task.estado],
                     task.archivado_en ? 'Sí' : 'No',
                     task.estimacion_minutos,
@@ -181,37 +186,43 @@ export default function TasksPage() {
                 label="Buscar tarea"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar entregable…"
+                placeholder="Buscar tarea, proyecto o ID de Odoo…"
               />
               <div className="backlog">
                 {visible.map((task) => {
                   const logged = totals(task.id).logged;
                   return (
-                    <button
+                    <div
                       key={task.id}
                       className={`backlog__item ${selected?.id === task.id ? 'backlog__item--selected' : ''}`}
-                      aria-pressed={selected?.id === task.id}
-                      onClick={() => setSelectedId(task.id)}
                     >
-                      <span className="eyebrow accent">
-                        {taskStatusLabels[task.estado]}
-                        {task.archivado_en ? ' · Archivada' : ''}
-                      </span>
-                      <strong>{task.titulo}</strong>
-                      <span className="muted">{projectById.get(task.proyecto_id)?.nombre}</span>
-                      <span className="mono dim">
-                        {formatDuration(logged)} /{' '}
-                        {task.estimacion_minutos !== null
-                          ? formatDuration(task.estimacion_minutos * 60)
-                          : 'Sin estimar'}
-                      </span>
-                      {task.estimacion_minutos && task.estimacion_minutos > 0 ? (
-                        <Progress
-                          value={(logged / (task.estimacion_minutos * 60)) * 100}
-                          label={`Estimación de ${task.titulo}`}
-                        />
-                      ) : null}
-                    </button>
+                      <button
+                        type="button"
+                        className="backlog__select"
+                        aria-pressed={selected?.id === task.id}
+                        onClick={() => setSelectedId(task.id)}
+                      >
+                        <span className="eyebrow accent">
+                          {taskStatusLabels[task.estado]}
+                          {task.archivado_en ? ' · Archivada' : ''}
+                        </span>
+                        <strong>{task.titulo}</strong>
+                        <span className="muted">{projectById.get(task.proyecto_id)?.nombre}</span>
+                        <span className="mono dim">
+                          {formatDuration(logged)} /{' '}
+                          {task.estimacion_minutos !== null
+                            ? formatDuration(task.estimacion_minutos * 60)
+                            : 'Sin estimar'}
+                        </span>
+                        {task.estimacion_minutos && task.estimacion_minutos > 0 ? (
+                          <Progress
+                            value={(logged / (task.estimacion_minutos * 60)) * 100}
+                            label={`Estimación de ${task.titulo}`}
+                          />
+                        ) : null}
+                      </button>
+                      <OdooLink task={task} />
+                    </div>
                   );
                 })}
               </div>

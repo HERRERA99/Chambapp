@@ -66,6 +66,64 @@ export type Database = {
           },
         ];
       };
+      fichajes: {
+        Row: {
+          actualizado_en: string;
+          creado_en: string;
+          eliminado_en: string | null;
+          fin_en: string | null;
+          id: string;
+          inicio_en: string;
+          jornada_id: string;
+          usuario_id: string;
+          version: number;
+        };
+        Insert: {
+          actualizado_en?: string;
+          creado_en?: string;
+          eliminado_en?: string | null;
+          fin_en?: string | null;
+          id: string;
+          inicio_en: string;
+          jornada_id: string;
+          usuario_id: string;
+          version?: number;
+        };
+        Update: {
+          actualizado_en?: string;
+          creado_en?: string;
+          eliminado_en?: string | null;
+          fin_en?: string | null;
+          id?: string;
+          inicio_en?: string;
+          jornada_id?: string;
+          usuario_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'fichajes_jornada_id_usuario_id_fkey';
+            columns: ['jornada_id', 'usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'jornadas';
+            referencedColumns: ['id', 'usuario_id'];
+          },
+          {
+            foreignKeyName: 'fichajes_jornada_id_usuario_id_fkey';
+            columns: ['jornada_id', 'usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'resumen_jornadas';
+            referencedColumns: ['jornada_id', 'usuario_id'];
+          },
+          {
+            foreignKeyName: 'fichajes_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'perfiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       jornadas: {
         Row: {
           actualizado_en: string;
@@ -303,6 +361,8 @@ export type Database = {
           estado: string;
           estimacion_minutos: number | null;
           id: string;
+          odoo_id: string | null;
+          odoo_url: string | null;
           proyecto_id: string;
           titulo: string;
           usuario_id: string;
@@ -317,6 +377,8 @@ export type Database = {
           estado?: string;
           estimacion_minutos?: number | null;
           id?: string;
+          odoo_id?: string | null;
+          odoo_url?: string | null;
           proyecto_id: string;
           titulo: string;
           usuario_id: string;
@@ -331,6 +393,8 @@ export type Database = {
           estado?: string;
           estimacion_minutos?: number | null;
           id?: string;
+          odoo_id?: string | null;
+          odoo_url?: string | null;
           proyecto_id?: string;
           titulo?: string;
           usuario_id?: string;
@@ -362,6 +426,45 @@ export type Database = {
       };
     };
     Views: {
+      fichajes_detalle: {
+        Row: {
+          actualizado_en: string | null;
+          creado_en: string | null;
+          duracion_segundos: number | null;
+          eliminado_en: string | null;
+          fecha: string | null;
+          fin_en: string | null;
+          id: string | null;
+          inicio_en: string | null;
+          jornada_id: string | null;
+          usuario_id: string | null;
+          version: number | null;
+          zona_horaria: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'fichajes_jornada_id_usuario_id_fkey';
+            columns: ['jornada_id', 'usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'jornadas';
+            referencedColumns: ['id', 'usuario_id'];
+          },
+          {
+            foreignKeyName: 'fichajes_jornada_id_usuario_id_fkey';
+            columns: ['jornada_id', 'usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'resumen_jornadas';
+            referencedColumns: ['jornada_id', 'usuario_id'];
+          },
+          {
+            foreignKeyName: 'fichajes_usuario_id_fkey';
+            columns: ['usuario_id'];
+            isOneToOne: false;
+            referencedRelation: 'perfiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       partes_detalle: {
         Row: {
           actualizado_en: string | null;
@@ -379,6 +482,8 @@ export type Database = {
           intervalo_redondeo_minutos: number | null;
           jornada_id: string | null;
           modo_redondeo: string | null;
+          odoo_id: string | null;
+          odoo_url: string | null;
           proyecto_id: string | null;
           tarea_id: string | null;
           usuario_id: string | null;

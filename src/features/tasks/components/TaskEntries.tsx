@@ -1,17 +1,20 @@
-import type { TimeEntry } from '../../../domain/models';
+import type { Task, TimeEntry } from '../../../domain/models';
 import { formatDate, formatDuration, formatTime } from '../../../domain/time';
 import { Panel, Badge } from '../../../shared/ui/Panel';
 import { Icon } from '../../../shared/ui/Icon';
 import { Button, IconButton } from '../../../shared/ui/Button';
 import { entryTotals } from '../../time-entries/entryTotals';
+import { OdooLink } from './OdooLink';
 
 export function TaskEntries({
+  task,
   entries,
   elapsedSeconds,
   canCreate,
   onCreate,
   onEdit,
 }: {
+  task: Task;
   entries: TimeEntry[];
   elapsedSeconds: number;
   canCreate: boolean;
@@ -67,6 +70,7 @@ export function TaskEntries({
                       </span>
                     </div>
                     <p className="muted">{entry.descripcion || 'Sin descripción'}</p>
+                    <OdooLink task={task} className="odoo-entry-reference" />
                     {entry.fin_en ? (
                       <span className="field__hint">
                         Real: {formatDuration(entry.duracion_real_segundos ?? 0)} ·{' '}

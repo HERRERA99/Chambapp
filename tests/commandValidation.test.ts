@@ -63,3 +63,42 @@ test('business conflicts are confirmed outcomes; empty or malformed responses re
   assert.equal(isValidCommandResponse('generar_semana', {}, { jornadas: [] }), true);
   assert.equal(isValidCommandResponse('generar_semana', {}, { jornadas: null }), false);
 });
+
+test('attendance confirms only complete responses matching the durable intent', () => {
+  const row = {
+    id: partId,
+    usuario_id: userId,
+    jornada_id: taskId,
+    inicio_en: time,
+    fin_en: null,
+    eliminado_en: null,
+    version: 1,
+  };
+  const payload = { id: partId };
+  assert.equal(isValidCommandResponse('fichar_entrada', payload, row), true);
+  assert.equal(isValidCommandResponse('crear_fichaje', payload, row), true);
+  assert.equal(isValidCommandResponse('fichar_entrada', payload, { ...row, id: taskId }), false);
+  assert.equal(isValidCommandResponse('fichar_entrada', payload, { ...row, version: 0 }), false);
+  assert.equal(
+    isValidCommandResponse('fichar_entrada', payload, { ...row, jornada_id: null }),
+    false,
+  );
+  assert.equal(isValidCommandResponse('fichar_salida', payload, row), false);
+  assert.equal(
+    isValidCommandResponse('fichar_salida', payload, { ...row, fin_en: time, version: 2 }),
+    true,
+  );
+  assert.equal(
+    isValidCommandResponse('editar_fichaje', payload, { ...row, fin_en: 'invalid' }),
+    false,
+  );
+  assert.equal(isValidCommandResponse('eliminar_fichaje', payload, row), false);
+  assert.equal(
+    isValidCommandResponse('eliminar_fichaje', payload, { ...row, eliminado_en: time, version: 2 }),
+    true,
+  );
+  assert.equal(
+    isValidCommandResponse('fichar_entrada', payload, { ...row, fin_en: time, version: 2 }),
+    true,
+  );
+});

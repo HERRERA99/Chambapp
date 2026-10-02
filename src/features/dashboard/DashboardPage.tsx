@@ -7,24 +7,29 @@ import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { Panel, Badge } from '../../shared/ui/Panel';
 import { Icon } from '../../shared/ui/Icon';
 import { TimerDisplay } from '../tracker/TimerDisplay';
+import { AttendanceControls } from '../attendance/AttendanceControls';
+import { AttendanceComparison } from '../attendance/AttendanceComparison';
+import { useAttendance } from '../attendance/useAttendance';
+import { OdooLink } from '../tasks/components/OdooLink';
 import { useTracker } from '../tracker/useTracker';
 import { WeekChart } from '../week/components/WeekChart';
 import { EntryModal } from '../time-entries/components/EntryModal';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { dashboardSummary } from './dashboardSelectors';
-import { formatDate, formatDuration, formatTime, todayInZone } from '../../domain/time';
+import { formatDate, formatDuration, formatTime, mondayForDate } from '../../domain/time';
 import { readableError } from '../../lib/supabase/errors';
 import type { TimeEntry } from '../../domain/models';
 
 export default function DashboardPage() {
   const { data } = useWorkspace();
   const tracker = useTracker();
+  const attendance = useAttendance();
   const notify = useFeedback();
   const [editor, setEditor] = useState<TimeEntry | 'new' | null>(null);
   if (!data) return null;
   const { profile, entries, tasks, projects } = data;
-  const today = todayInZone(profile.zona_horaria);
+  const today = DateTime.fromISO(attendance.now, { zone: profile.zona_horaria }).toISODate()!;
   const { week, day, total, missingDays } = dashboardSummary(data, today);
   const activeTask = tasks.find((task) => task.id === tracker.active?.tarea_id);
   const activeProject = projects.find((project) => project.id === activeTask?.proyecto_id);
@@ -73,6 +78,9 @@ export default function DashboardPage() {
           </>
         }
       />
+      <Panel title="Entrada y salida de jornada" icon="clock">
+        <AttendanceControls />
+      </Panel>
       <StatGrid
         stats={[
           {
@@ -127,6 +135,7 @@ export default function DashboardPage() {
           </Badge>
           <p className="eyebrow">{activeProject?.nombre ?? 'Tu espacio de trabajo'}</p>
           <h2>{activeTask?.titulo ?? 'Selecciona una tarea y registra tu tiempo'}</h2>
+          <OdooLink task={activeTask} />
           <p className="mono muted">
             <Icon name="clock" size={13} />{' '}
             {tracker.active
@@ -136,6 +145,7 @@ export default function DashboardPage() {
         </div>
         <TimerDisplay />
       </section>
+      <AttendanceComparison monday={mondayForDate(today)} today={today} compact />
       <Panel
         eyebrow="Comparativa semanal"
         title="Horas imputadas y objetivo"
@@ -184,15 +194,18 @@ export default function DashboardPage() {
                     onClick={() => void toggleTask(task.id)}
                     className={task.id === activeTask?.id ? 'icon-button--accent' : ''}
                   />
-                  <Link to="/tareas" className="task-row__text">
+                  <div className="task-row__text">
                     {task.id === activeTask?.id ? (
                       <span className="eyebrow accent">En curso</span>
                     ) : null}
-                    <strong>{task.titulo}</strong>
+                    <Link to="/tareas">
+                      <strong>{task.titulo}</strong>
+                    </Link>
+                    <OdooLink task={task} />
                     <span className="muted mono">
                       {projects.find((project) => project.id === task.proyecto_id)?.nombre}
                     </span>
-                  </Link>
+                  </div>
                   <span className="mono">{formatDuration(taskTotals.get(task.id) ?? 0)}</span>
                 </div>
               ))
@@ -225,6 +238,7 @@ export default function DashboardPage() {
                     {projects.find((project) => project.id === entry.proyecto_id)?.nombre}
                   </span>
                   <p>{tasks.find((task) => task.id === entry.tarea_id)?.titulo}</p>
+                  <OdooLink task={tasks.find((task) => task.id === entry.tarea_id)} />
                   <span className="mono dim">
                     Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
                     <span className="accent">

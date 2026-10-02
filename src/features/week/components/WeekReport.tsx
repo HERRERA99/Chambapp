@@ -1,6 +1,7 @@
 import { formatDuration, formatTime } from '../../../domain/time';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Panel } from '../../../shared/ui/Panel';
+import { OdooLink } from '../../tasks/components/OdooLink';
 import type { CalendarDay, WeekBlock } from '../week.model';
 
 export function WeekReport({
@@ -39,6 +40,8 @@ export function WeekReport({
                 {project?.nombre}
                 <br />
                 {task?.titulo}
+                <br />
+                <OdooLink task={task} />
               </td>
               <td>
                 {formatTime(entry.inicio_en, entry.zona_horaria)} –{' '}

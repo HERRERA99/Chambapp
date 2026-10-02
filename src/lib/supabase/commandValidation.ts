@@ -22,6 +22,31 @@ export function isValidCommandResponse(
   data: unknown,
 ): boolean {
   if (!record(data)) return false;
+  if (
+    [
+      'fichar_entrada',
+      'fichar_salida',
+      'crear_fichaje',
+      'editar_fichaje',
+      'eliminar_fichaje',
+    ].includes(action)
+  ) {
+    if (
+      !identifier(data.id) ||
+      data.id !== payload.id ||
+      !identifier(data.usuario_id) ||
+      !identifier(data.jornada_id) ||
+      !timestamp(data.inicio_en) ||
+      (data.fin_en !== null && !timestamp(data.fin_en)) ||
+      typeof data.version !== 'number' ||
+      !Number.isSafeInteger(data.version) ||
+      data.version < 1
+    )
+      return false;
+    if (action === 'fichar_salida') return timestamp(data.fin_en);
+    if (action === 'eliminar_fichaje') return timestamp(data.eliminado_en);
+    return data.eliminado_en === null;
+  }
   if (action === 'iniciar' || action === 'detener') {
     if (data.ok === false) return typeof data.codigo === 'string' && data.codigo.length > 0;
     if (data.ok !== true || !record(data.parte) || !timestamp(data.hora_servidor)) return false;

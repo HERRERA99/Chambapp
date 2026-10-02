@@ -4,6 +4,7 @@ import { formatClock, formatDate, formatTime } from '../../../domain/time';
 import { Button, IconButton } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Badge } from '../../../shared/ui/Panel';
+import { OdooLink } from '../../tasks/components/OdooLink';
 
 export function EntriesTable({
   entries,
@@ -54,6 +55,7 @@ export function EntriesTable({
             <span className="cell-detail">
               {taskById.get(entry.tarea_id)?.titulo ?? 'Tarea no disponible'}
             </span>
+            <OdooLink task={taskById.get(entry.tarea_id)} className="odoo-entry-reference" />
           </td>
           <td className="mono nowrap">{formatTime(entry.inicio_en, entry.zona_horaria)}</td>
           <td className="mono nowrap">

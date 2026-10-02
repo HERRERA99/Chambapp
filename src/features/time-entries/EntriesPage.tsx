@@ -47,7 +47,7 @@ export default function EntriesPage() {
         (status === 'all' || (status === 'finished') === !!entry.fin_en) &&
         (!from || entry.fecha >= from) &&
         (!to || entry.fecha <= to) &&
-        `${projectById.get(entry.proyecto_id)?.nombre ?? ''} ${taskById.get(entry.tarea_id)?.titulo ?? ''} ${entry.descripcion ?? ''}`
+        `${projectById.get(entry.proyecto_id)?.nombre ?? ''} ${taskById.get(entry.tarea_id)?.titulo ?? ''} ${taskById.get(entry.tarea_id)?.odoo_id ?? ''} ${entry.descripcion ?? ''}`
           .toLocaleLowerCase('es')
           .includes(query.toLocaleLowerCase('es')),
     )
@@ -88,6 +88,8 @@ export default function EntriesPage() {
         'Zona horaria',
         'Proyecto',
         'Tarea',
+        'ID de Odoo',
+        'Enlace de Odoo',
         'Inicio exacto (ISO)',
         'Fin exacto (ISO)',
         'Duración real (s)',
@@ -100,6 +102,8 @@ export default function EntriesPage() {
         entry.zona_horaria,
         projectById.get(entry.proyecto_id)?.nombre ?? '',
         taskById.get(entry.tarea_id)?.titulo ?? '',
+        taskById.get(entry.tarea_id)?.odoo_id ?? '',
+        taskById.get(entry.tarea_id)?.odoo_url ?? '',
         entry.inicio_en,
         entry.fin_en,
         entry.duracion_real_segundos,
@@ -179,7 +183,7 @@ export default function EntriesPage() {
         <div className="form-grid">
           <InputField
             label="Buscar en partes"
-            placeholder="Buscar tarea, proyecto o nota…"
+            placeholder="Buscar tarea, ID de Odoo, proyecto o nota…"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

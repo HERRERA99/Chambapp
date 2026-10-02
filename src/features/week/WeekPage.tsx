@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
 import type { TimeEntry, Workday } from '../../domain/models';
-import { formatClock, formatDuration, mondayForDate, todayInZone } from '../../domain/time';
+import { formatClock, formatDuration, mondayForDate } from '../../domain/time';
 import { downloadCsv } from '../../lib/export';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
@@ -12,6 +12,8 @@ import { DayGoalModal } from './components/DayGoalModal';
 import { WeekChart } from './components/WeekChart';
 import { WeekReport } from './components/WeekReport';
 import { EntryModal } from '../time-entries/components/EntryModal';
+import { AttendanceComparison } from '../attendance/AttendanceComparison';
+import { useAttendance } from '../attendance/useAttendance';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
@@ -24,11 +26,14 @@ export default function WeekPage() {
   const { data, isLoading, error, reload } = useWorkspace();
   const { run, pending } = useCommand();
   const tracker = useTracker();
+  const attendance = useAttendance();
   const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<EntryForm | null>(null);
   const [goal, setGoal] = useState<Workday | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
-  const today = todayInZone(data?.profile.zona_horaria ?? 'Europe/Madrid');
+  const today = DateTime.fromISO(attendance.now, {
+    zone: data?.profile.zona_horaria ?? 'Europe/Madrid',
+  }).toISODate()!;
   const monday = selectedMonday ?? mondayForDate(today);
   const week = useMemo(() => (data ? buildWeek(data, monday, today) : null), [data, monday, today]);
 
@@ -60,6 +65,8 @@ export default function WeekPage() {
         'Proyecto',
         'Cliente',
         'Tarea',
+        'ID Odoo',
+        'Enlace Odoo',
         'Inicio exacto',
         'Fin exacto',
         'Zona horaria',
@@ -74,6 +81,8 @@ export default function WeekPage() {
         project?.nombre ?? '',
         project?.cliente ?? null,
         task?.titulo ?? '',
+        task?.odoo_id ?? null,
+        task?.odoo_url ?? null,
         entry.inicio_en,
         entry.fin_en,
         entry.zona_horaria,
@@ -151,9 +160,9 @@ export default function WeekPage() {
             accent: true,
           },
           {
-            label: 'Tiempo real semanal',
+            label: 'Tiempo real en tareas',
             value: formatDuration(week.realSeconds),
-            detail: 'Inicio y fin exactos',
+            detail: 'Duración exacta de los partes finalizados',
             icon: 'clock',
           },
           {
@@ -251,6 +260,7 @@ export default function WeekPage() {
       >
         <WeekChart days={week.days} />
       </Panel>
+      <AttendanceComparison monday={monday} />
       <div className="two-columns two-columns--wide week-insights">
         <Panel title="Un balance para organizar tu ritmo" icon="shield">
           <p className="muted section-intro">

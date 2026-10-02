@@ -2,6 +2,8 @@
 
 La migración `supabase/migrations/20261001181821_initial_chambapp.sql` implementa el modelo acumulado de los documentos v1, v2 y v3. La migración posterior `20261001213125_duration_rounding_and_preferences.sql` aplica la decisión más reciente: conservar el inicio y fin exactos y redondear únicamente la duración total hacia arriba. Añade también preferencias, finalización de onboarding, cliente y presupuesto de proyecto.
 
+`20261002190139_odoo_and_attendance.sql` añade referencias opcionales de Odoo a las tareas y fichajes de presencia independientes de los partes. Mantiene las acciones anteriores de la RPC y sus datos históricos.
+
 La cadena de migraciones se puede aplicar a un proyecto nuevo. La segunda migración actualiza una instalación que ya tiene la inicial, conserva sus registros, permisos y tipos de las vistas. Los modelos anteriores se conservan como documentación; no son migraciones que deban aplicarse por separado.
 
 ## Tablas y lectura
@@ -10,25 +12,36 @@ La cadena de migraciones se puede aplicar a un proyecto nuevo. La segunda migrac
 | ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | PerfilUsuario           | `public.perfiles`                         | Mismo UUID que `auth.users`; perfil creado al registrar una cuenta, `onboarding_completado` y `preferencias` JSON. |
 | Proyecto                | `public.proyectos`                        | Propietario, cliente opcional, presupuesto opcional en minutos, archivado, eliminación lógica y versión.           |
-| Tarea                   | `public.tareas`                           | Un proyecto; sus partes pueden pertenecer a distintas jornadas.                                                    |
+| Tarea                   | `public.tareas`                           | Un proyecto; referencia y URL de Odoo opcionales; sus partes pueden pertenecer a distintas jornadas.               |
 | ConfiguracionSemanal    | `public.configuraciones_semanales`        | Versiones por lunes de entrada en vigor.                                                                           |
 | DiaConfiguracionSemanal | `public.dias_configuracion_semanal`       | Reparto semanal, con suma validada al confirmar la transacción.                                                    |
 | Jornada                 | `public.jornadas`                         | Una por usuario y fecha; zona horaria y objetivo históricos.                                                       |
 | ParteHoras              | `public.partes_horas`                     | Instantes reales, preferencias de redondeo copiadas, eliminación lógica y versión.                                 |
 | OperacionCronometro     | `chambapp_private.operaciones_cronometro` | Resultado de peticiones de inicio y parada; acceso mediante RPC.                                                   |
+| Fichaje                 | `public.fichajes`                         | Entrada y salida de presencia, jornada histórica, eliminación lógica y versión; sin redondeo.                      |
+| OperacionFichaje        | `chambapp_private.operaciones_fichajes`   | Resultado de intenciones de creación, salida, edición y borrado; acceso exclusivamente mediante RPC.               |
 
 Todas las tablas tienen RLS. En las tablas públicas, cada usuario autenticado solo puede leer sus datos. No hay acceso de lectura para `anon`. Las escrituras directas del cliente están revocadas: se realizan mediante RPC autenticada.
 
-Las tablas de proyectos, tareas y partes permiten leer las marcas `eliminado_en` propias para reconciliar operaciones. Las vistas habituales del frontend deben filtrar `eliminado_en IS NULL`. El historial eliminado no aparece en las vistas de totales.
+Las tablas de proyectos, tareas, partes y fichajes permiten leer las marcas `eliminado_en` propias para reconciliar operaciones. Las vistas habituales del frontend deben filtrar `eliminado_en IS NULL`. El historial eliminado no aparece en las vistas de totales.
 
 Vistas disponibles con `security_invoker = true`, respetando RLS:
 
-- `partes_detalle`: inicio y fin exactos, duración real e imputada en segundos, fecha de jornada y proyecto. Los alias de compatibilidad `inicio_imputado_en` y `fin_imputado_en` contienen los mismos instantes exactos; la duración imputada se calcula aparte.
+- `partes_detalle`: inicio y fin exactos, duración real e imputada en segundos, fecha de jornada, proyecto y referencias `odoo_id` / `odoo_url` actuales de la tarea. Los alias de compatibilidad `inicio_imputado_en` y `fin_imputado_en` contienen los mismos instantes exactos; la duración imputada se calcula aparte.
+- `fichajes_detalle`: fichajes vivos, fecha y zona históricas de la jornada y duración exacta en segundos; `duracion_segundos` es `null` mientras la salida esté pendiente.
 - `resumen_jornadas`: objetivos, totales reales e imputados, saldo en segundos y número de partes abiertos.
 - `resumen_tareas` y `resumen_proyectos`: totales reales e imputados de partes finalizados.
 - `resumen_semanas`: objetivos y totales por lunes. El objetivo incluye las jornadas existentes; se debe generar la semana completa para compararla con la planificación completa.
 
-Los totales persistidos de las vistas no incluyen tiempo provisional de cronómetros abiertos. El frontend lo calcula usando el inicio confirmado y la referencia de hora del servidor.
+Los totales persistidos de las vistas no incluyen tiempo provisional de cronómetros abiertos. El frontend lo calcula usando el inicio confirmado y la referencia de hora del servidor. Las vistas `resumen_*` mantienen el significado de horas de tareas; la presencia se obtiene de `fichajes_detalle` y se compara por separado.
+
+## Referencias de Odoo y presencia
+
+`odoo_id` y `odoo_url` son independientes y opcionales. El ID admite `T` mayúscula seguido de uno o más dígitos, hasta 64 caracteres. El frontend normaliza el ID y guarda la URL canónica del navegador; la base admite HTTP(S), DNS ASCII/punycode, IPv4 e IPv6 válidas y puertos entre 0 y 65535, hasta 2048 caracteres. Se rechazan credenciales, espacios, controles y barras inversas. Las rutas, parámetros y fragmentos propios de Odoo se conservan. Guardar estos datos prepara la navegación; no sincroniza ni envía información a Odoo.
+
+Un fichaje guarda presencia real y puede coexistir con un cronómetro de tarea. Se permiten varios intervalos por jornada, incluidos descansos y turnos que crucen medianoche. La restricción de exclusión comprueba solapamientos por usuario sobre todo el historial vivo; un intervalo abierto ocupa desde su entrada hasta el infinito. Solo puede existir uno abierto. Entrada y salida deben ser finitas, no futuras, y la salida debe ser posterior a la entrada. Dos sesiones pueden tocarse en el mismo instante.
+
+La presencia nunca se redondea. Para los indicadores diarios y semanales, el frontend reparte los segundos de un turno entre los días locales que atraviesa según la zona actual del perfil, indicada en la comparativa. La zona histórica de cada fichaje se conserva para su edición. Los cambios de horario de verano usan los instantes reales. El porcentaje de imputación compara los segundos imputados de tareas con los segundos de presencia, pudiendo superar el 100 % por redondeo o registros independientes. La presencia cero no produce un porcentaje. Eliminar una tarea o proyecto conserva los fichajes.
 
 ## Redondeo de duración
 
@@ -49,15 +62,15 @@ const { data, error } = await supabase.rpc('chambapp_operar', {
 });
 ```
 
-No se envía `usuario_id`: se obtiene de la sesión. Si se incluye un propietario en el JSON, no se utiliza. Los UUID de proyectos, tareas y partes los genera el servidor; los UUID de operaciones del cronómetro los genera el cliente.
+No se envía `usuario_id`: se obtiene de la sesión. Si se incluye un propietario en el JSON, no se utiliza. Los UUID de proyectos, tareas y partes los genera el servidor; los UUID de operaciones del cronómetro y de fichajes los genera el cliente.
 
 | Acción                                 | Campos de `p_datos`                                                                                                                         |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `editar_perfil`                        | `version`; opcionales `nombre`, `zona_horaria`, `intervalo_redondeo_minutos`, `onboarding_completado` booleano, `preferencias` objeto JSON. |
 | `crear_proyecto`                       | `nombre`; opcionales `descripcion`, `cliente`, `presupuesto_minutos` entero no negativo.                                                    |
 | `editar_proyecto`                      | `id`, `version`; opcionales `nombre`, `descripcion`, `cliente`, `presupuesto_minutos`, `archivado` booleano.                                |
-| `crear_tarea`                          | `proyecto_id`, `titulo`; opcionales `descripcion`, `estado`, `estimacion_minutos`.                                                          |
-| `editar_tarea`                         | `id`, `version`; opcionales `titulo`, `descripcion`, `estado`, `estimacion_minutos`, `proyecto_id`, `archivado`.                            |
+| `crear_tarea`                          | `proyecto_id`, `titulo`; opcionales `descripcion`, `estado`, `estimacion_minutos`, `odoo_id`, `odoo_url`.                                   |
+| `editar_tarea`                         | `id`, `version`; opcionales `titulo`, `descripcion`, `estado`, `estimacion_minutos`, `proyecto_id`, `archivado`, `odoo_id`, `odoo_url`.     |
 | `crear_configuracion_semanal`          | `minutos_semanales`, `vigente_desde` (lunes), `dias` (lista de números 1–7); opcional `reparto` con minutos por día.                        |
 | `generar_semana`                       | `lunes`, como fecha `YYYY-MM-DD`.                                                                                                           |
 | `editar_jornada`                       | `id`, `version`; opcionales `minutos_objetivo`, `notas`.                                                                                    |
@@ -69,8 +82,15 @@ No se envía `usuario_id`: se obtiene de la sesión. Si se incluye un propietari
 | `detener`                              | `operacion_id`, `parte_id`.                                                                                                                 |
 | `consultar_operacion`                  | `operacion_id`.                                                                                                                             |
 | `consultar_cronometro`                 | Objeto vacío.                                                                                                                               |
+| `fichar_entrada`                       | `id` UUID generado y persistido por el cliente; utiliza la hora de recepción del servidor.                                                  |
+| `fichar_salida`                        | `id`, `version`; utiliza la hora de recepción del servidor.                                                                                 |
+| `crear_fichaje`                        | `id`, `inicio_en`; opcional `fin_en` o `null`. Los instantes deben ser ISO 8601 con desplazamiento UTC explícito.                           |
+| `editar_fichaje`                       | `id`, `version`; opcionales `inicio_en`, `fin_en`, `confirmar_zona`. Omitir la salida la conserva; `null` permite corregirla a abierta.     |
+| `eliminar_fichaje`                     | `id`, `version`; eliminación lógica, también de un fichaje abierto.                                                                         |
 
 En las ediciones, omitir un campo mantiene su valor; enviar `null` borra los campos opcionales. Campos obligatorios no admiten `null`. La API no permite cambiar propietario, fechas de control, versión, preferencias históricas de un parte o marca de eliminación libremente. `archivado: false` permite desarchivar.
+
+Todas las acciones de fichaje devuelven la fila confirmada (`id`, propietario, jornada, instantes, versión y fechas de control). Sus escrituras están serializadas con el mismo bloqueo del perfil usado por el cronómetro y las demás acciones.
 
 `onboarding_completado` comienza en `false`. `preferencias` comienza en `{}`, debe ser un objeto y se reemplaza completo si se envía: el frontend debe combinar los valores actuales antes de guardar un subconjunto. Almacena preferencias de presentación, región, recordatorios y flexibilidad; no interviene en autorización ni concede acceso. `cliente` admite hasta 200 caracteres no vacíos, o `null`; `presupuesto_minutos` admite cero, un entero positivo o `null`.
 
@@ -112,7 +132,9 @@ Las respuestas de inicio y parada tienen `ok`, `parte` y, cuando corresponde, `h
 
 `consultar_operacion` devuelve `encontrada`, el `resultado` original y `parte_actual`, que puede haberse editado, finalizado o eliminado desde entonces. Una operación no encontrada no demuestra por sí sola que una petición pendiente vaya a fallar: se reintenta con el mismo ID y se vuelve a reconciliar. `consultar_cronometro` devuelve el parte abierto o `null`, junto con `hora_servidor`.
 
-Una respuesta perdida se recupera sin duplicar efectos. Si el servidor nunca recibió la parada, el reintento registra su hora de recepción; el usuario puede corregir el fin real después. Los fallos de red no se presentan como guardados confirmados. La cola local, los estados visuales y los reintentos de la interfaz quedan para la implementación del frontend.
+Una respuesta perdida se recupera sin duplicar efectos. Si el servidor nunca recibió la parada, el reintento registra su hora de recepción; el usuario puede corregir el fin real después. Los fallos de red no se presentan como guardados confirmados. El frontend conserva la cola local y muestra los estados pendientes y sus controles de reintento.
+
+Los fichajes mantienen su propio registro de intenciones en `operaciones_fichajes`: la clave es usuario, ID del fichaje, acción y versión solicitada (0 para la creación). Repetir la misma acción con exactamente los mismos datos devuelve el resultado original, incluso si después se corrigió o eliminó la fila. Repetir una salida confirmada conserva su instante original. Cambiar los parámetros de una creación con el mismo UUID devuelve `FICHAJE_ID_REUTILIZADO`; cambiar los de una edición con la misma versión devuelve `CONFLICTO_VERSION`. El cliente debe persistir la intención completa antes del envío y actualizar el estado actual tras reconciliarla.
 
 ## Edición, eliminación y errores
 
@@ -124,6 +146,8 @@ Archivar conserva las horas en informes; eliminar las excluye. No se crean tarea
 
 Al cambiar la fecha de inicio de un parte se reasigna su jornada según la zona histórica de origen. Si la jornada destino usa otra zona, se devuelve `CONFIRMAR_CAMBIO_ZONA:<zona>` y se exige enviar `confirmar_zona` con esa zona para aceptar el cambio. El redondeo no determina la jornada: un parte cerca de medianoche conserva su fecha de inicio real.
 
+La edición de entrada de un fichaje aplica la misma reasignación y confirmación de zona histórica. Su salida puede corregirse a `null` si no provoca solapamientos. `ENTRADA_REQUERIDA`, `ZONA_HORARIA_REQUERIDA`, `FICHAJE_NO_DISPONIBLE` y `FICHAJE_ID_REQUERIDO` identifican errores de fichaje; las restricciones de formato de Odoo son `tareas_odoo_id_formato` y `tareas_odoo_url_formato`.
+
 Errores de validación se devuelven mediante `error` de Supabase RPC. Además de los anteriores: `SESION_REQUERIDA`, `ZONA_HORARIA_INVALIDA`, `INTERVALO_REAL_FUTURO`, `REPARTO_SEMANAL_INVALIDO`, `CONFIRMACION_CASCADA_REQUERIDA`, `DETENER_O_DESCARTAR_ACTIVO` y `ACCION_NO_ADMITIDA`. Una restricción de exclusión rechaza solapamientos con código PostgreSQL `23P01`; una restricción única usa `23505`. Las respuestas `ok: false` de cronómetro son conflictos de negocio y no errores de transporte.
 
 ## Decisiones de implementación
@@ -134,6 +158,7 @@ Errores de validación se devuelven mediante `error` de Supabase RPC. Además de
 - El UUID de una operación se identifica junto a su usuario (`usuario_id`, `id`) para evitar colisiones entre cuentas. No hay eliminación automática del registro de operaciones.
 - El historial de zona y del intervalo de redondeo se conserva. Un parte válido tiene duración real positiva; con redondeo activo su duración imputada es al menos un intervalo. El helper admite cero para cálculos provisionales. Los solapamientos se validan sobre los instantes reales.
 - Un intervalo que cruza medianoche sigue imputado a la jornada de inicio, como en la v3. Trabajar en una tarea varios días se representa con distintos partes; la tarea no tiene una fecha única.
+- Los fichajes se vinculan a la jornada de entrada y conservan su zona histórica. Los indicadores de presencia reparten el intervalo entre días; no cambian la atribución histórica de los partes de tareas.
 - La baja definitiva de cuenta, equipos, festivos, aprobaciones y reparto automático por tareas quedan pendientes, como indican los modelos.
 
 Las funciones con privilegios de escritura están en `chambapp_private`, fuera de los esquemas expuestos de la API. La función pública es `SECURITY INVOKER`; el punto de escritura privado verifica la sesión, el propietario y cada acción admitida. El trigger de alta de Auth es una operación de sistema: crea el perfil para `NEW.id` y usa metadatos únicamente como nombre visible, nunca como autorización.
@@ -144,7 +169,7 @@ Referencias: [Supabase Auth y perfiles](https://supabase.com/docs/guides/auth/ma
 
 El flujo con los comandos instalados del proyecto se detalla en [ejecutar-migraciones.md](ejecutar-migraciones.md). `supabase/verify.sql` permite comprobar los objetos y permisos tras aplicar la migración.
 
-La configuración local usa PostgreSQL 17, expone solo `public` y `graphql_public` y exige permisos explícitos de API. Ambas migraciones están aplicadas en el proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), organización Aitor, región París (`eu-west-3`). Las versiones locales coinciden con las registradas remotamente: `20261001181821` y `20261001213125`.
+La configuración local usa PostgreSQL 17, expone solo `public` y `graphql_public` y exige permisos explícitos de API. Las tres migraciones están aplicadas en el proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), organización Aitor, región París (`eu-west-3`): `20261001181821`, `20261001213125` y `20261002190139`. La migración de Odoo y fichajes se verificó en PostgreSQL aislado antes del despliegue; el nombre del archivo local se alineó con la versión registrada por el plugin de Supabase. Los tipos TypeScript se regeneraron desde la base remota actualizada y `supabase/verify.sql` confirmó el catálogo y los permisos después de aplicar la migración.
 
 Con Docker funcionando, se puede iniciar el entorno Supabase local desde la raíz del repositorio:
 
@@ -170,8 +195,10 @@ npm ci --ignore-scripts
 npm test
 ```
 
-La suite usa PostgreSQL 17.10 real y recrea únicamente las tablas/roles mínimos de Auth para probar SQL, RLS y permisos. Comprueba 15 grupos de casos: actualización con datos existentes y tipos de vistas, alta de perfil, aislamiento, validación de zona/versiones, onboarding/preferencias, cliente/presupuesto, propiedad, reparto semanal, todos los intervalos de duración, segundos y DST, partes y solapamientos, historial/edición, reintentos, concurrencia/borrado y catálogo de seguridad. Los directorios temporales contienen solo datos sintéticos y se conservan tras detener el servidor. No simula el servicio GoTrue, la validación JWT ni PostgREST.
+La suite usa PostgreSQL 17.10 real y recrea únicamente las tablas/roles mínimos de Auth para probar SQL, RLS y permisos. Comprueba 23 grupos de casos: actualización con datos existentes y tipos de vistas, alta de perfil, aislamiento, validación de zona/versiones, onboarding/preferencias, cliente/presupuesto, propiedad, reparto semanal, todos los intervalos de duración, segundos y DST, partes y solapamientos, historial/edición, reintentos, concurrencia/borrado y catálogo de seguridad. Incluye formatos y navegación de Odoo, creación idempotente de fichajes, presencia independiente, permisos y propiedad, entradas y salidas manuales o automáticas, turnos nocturnos, ambos cambios DST, zona histórica, omisión y borrado de campos, repetición tras correcciones y carreras de entrada/salida/edición. Los directorios temporales contienen solo datos sintéticos y se conservan tras detener el servidor. No simula el servicio GoTrue, la validación JWT ni PostgREST.
 
-Resultado local de ambas migraciones: los 15 grupos pasan. La nueva migración conserva RLS, SECURITY INVOKER en las vistas y RPC pública, las restricciones de propiedad y la comprobación de versiones. La verificación remota documentada a continuación corresponde a la migración inicial. Además, `supabase/verify.sql` se ha ejecutado correctamente en el proyecto alojado. Una prueba remota transaccional ha validado el trigger de perfil en `auth.users`, RLS bajo el rol `authenticated`, creación de proyecto y tarea, inicio idempotente, parada y lectura de partes. Se han comprobado las restricciones diferidas y revertido la transacción sin dejar datos de ejemplo. Los advisors remotos no muestran errores ni advertencias; hay avisos informativos por índices aún sin uso y por la tabla interna con RLS sin políticas (su acceso directo está revocado de forma intencionada). Docker está instalado, pero su motor no estaba activo durante la verificación local. La verificación de registro y login a través de la interfaz se realiza aparte de las pruebas SQL.
+Resultado local de las tres migraciones: los 23 grupos pasan. La nueva migración conserva RLS, SECURITY INVOKER en las vistas y RPC pública, las restricciones de propiedad y la comprobación de versiones. La implementación anterior de las acciones se conserva en una función privada sin permisos de ejecución del cliente; el dispatcher actualizado valida la sesión y delega en ella las acciones anteriores.
+
+La verificación remota documentada a continuación corresponde a la migración inicial y la de redondeo. `supabase/verify.sql` se ejecutó correctamente en el proyecto alojado antes de ampliar los checks de fichajes. Una prueba remota transaccional validó el trigger de perfil en `auth.users`, RLS bajo el rol `authenticated`, creación de proyecto y tarea, inicio idempotente, parada y lectura de partes. Se comprobaron las restricciones diferidas y se revirtió la transacción sin dejar datos de ejemplo. Los advisors remotos de esa revisión no mostraron errores ni advertencias; hubo avisos informativos por índices aún sin uso y por la tabla interna con RLS sin políticas (su acceso directo está revocado de forma intencionada). Docker está instalado, pero su motor no estaba activo durante la verificación local. La verificación de registro y login a través de la interfaz se realiza aparte de las pruebas SQL.
 
 Referencias de esos avisos: [índices sin uso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) y [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).

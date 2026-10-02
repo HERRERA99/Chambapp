@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Project, Task } from '../../../domain/models';
+import { normalizeOdooId, normalizeOdooUrl } from '../../../domain/odoo';
 import { Button } from '../../../shared/ui/Button';
 import { InputField, SelectField } from '../../../shared/ui/FormField';
 import { Modal } from '../../../shared/ui/Modal';
@@ -33,6 +34,8 @@ export function TaskForm({
   );
   const [title, setTitle] = useState(task?.titulo ?? '');
   const [description, setDescription] = useState(task?.descripcion ?? '');
+  const [odooId, setOdooId] = useState(task?.odoo_id ?? '');
+  const [odooUrl, setOdooUrl] = useState(task?.odoo_url ?? '');
   const [status, setStatus] = useState<Task['estado']>(task?.estado ?? 'pendiente');
   const [estimate, setEstimate] = useState(
     task?.estimacion_minutos != null ? String(task.estimacion_minutos / 60) : '',
@@ -57,6 +60,8 @@ export function TaskForm({
         proyecto_id: project,
         titulo: title.trim(),
         descripcion: description.trim() || null,
+        odoo_id: normalizeOdooId(odooId),
+        odoo_url: normalizeOdooUrl(odooUrl),
         estado: status,
         estimacion_minutos: minutes,
       });
@@ -112,6 +117,31 @@ export function TaskForm({
           onChange={(event) => setDescription(event.target.value)}
           disabled={pending}
         />
+        <div className="form-grid">
+          <InputField
+            label="ID de Odoo (opcional)"
+            value={odooId}
+            onChange={(event) => setOdooId(event.target.value)}
+            onBlur={() => setOdooId(odooId.trim().toUpperCase())}
+            placeholder="T443212"
+            hint="T seguida de números. Puedes dejarlo vacío."
+            maxLength={64}
+            autoCapitalize="characters"
+            spellCheck={false}
+            disabled={pending}
+          />
+          <InputField
+            label="Enlace a la tarea de Odoo (opcional)"
+            type="url"
+            value={odooUrl}
+            onChange={(event) => setOdooUrl(event.target.value)}
+            placeholder="https://odoo.example.com/…"
+            hint="Se mostrará también en sus partes de horas."
+            maxLength={2048}
+            spellCheck={false}
+            disabled={pending}
+          />
+        </div>
         <div className="form-grid">
           <InputField
             label="Estimación (horas)"
