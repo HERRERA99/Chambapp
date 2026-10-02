@@ -77,6 +77,7 @@ export function assertEntry(row: EntryRow): asserts row is TimeEntry {
   ];
   if (
     required.some((value) => typeof value !== 'string' || value.length === 0) ||
+    typeof row.imputado_en_odoo !== 'boolean' ||
     row.version === null ||
     !Number.isSafeInteger(row.version) ||
     row.version < 1 ||

@@ -38,6 +38,12 @@ begin
      not exists(select 1 from information_schema.columns where table_schema='public'
     and table_name='tareas' and column_name='odoo_url') then
     raise exception 'Faltan referencias de Odoo'; end if;
+  if not exists(select 1 from information_schema.columns where table_schema='public'
+    and table_name='partes_horas' and column_name='imputado_en_odoo'
+    and data_type='boolean' and is_nullable='NO' and column_default='false') or
+    not exists(select 1 from information_schema.columns where table_schema='public'
+    and table_name='partes_detalle' and column_name='imputado_en_odoo' and data_type='boolean') then
+    raise exception 'Falta la marca manual de imputación de Odoo'; end if;
 end $$;
 
 select s.nspname as esquema, c.relname as tabla, c.relrowsecurity as rls

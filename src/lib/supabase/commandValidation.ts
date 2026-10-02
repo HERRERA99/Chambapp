@@ -23,6 +23,14 @@ export function isValidCommandResponse(
 ): boolean {
   if (!record(data)) return false;
   if (
+    (action === 'crear_parte' || action === 'editar_parte') &&
+    (typeof data.imputado_en_odoo !== 'boolean' ||
+      (action === 'editar_parte' && data.id !== payload.id) ||
+      (payload.imputado_en_odoo !== undefined &&
+        data.imputado_en_odoo !== payload.imputado_en_odoo))
+  )
+    return false;
+  if (
     [
       'fichar_entrada',
       'fichar_salida',

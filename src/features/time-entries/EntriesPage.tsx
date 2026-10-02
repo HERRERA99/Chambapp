@@ -19,6 +19,7 @@ import { RoundingPreview } from './components/RoundingPreview';
 import { entryTotals } from './entryTotals';
 
 type StatusFilter = 'all' | 'live' | 'finished';
+type OdooFilter = 'all' | 'pending' | 'imputed';
 
 export default function EntriesPage() {
   const { data, isLoading, error, reload } = useWorkspace();
@@ -28,6 +29,7 @@ export default function EntriesPage() {
   const [query, setQuery] = useState('');
   const [project, setProject] = useState('all');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [odooStatus, setOdooStatus] = useState<OdooFilter>('all');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [simulationInterval, setSimulationInterval] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export default function EntriesPage() {
       (entry) =>
         (project === 'all' || project === entry.proyecto_id) &&
         (status === 'all' || (status === 'finished') === !!entry.fin_en) &&
+        (odooStatus === 'all' || (odooStatus === 'imputed') === entry.imputado_en_odoo) &&
         (!from || entry.fecha >= from) &&
         (!to || entry.fecha <= to) &&
         `${projectById.get(entry.proyecto_id)?.nombre ?? ''} ${taskById.get(entry.tarea_id)?.titulo ?? ''} ${taskById.get(entry.tarea_id)?.odoo_id ?? ''} ${entry.descripcion ?? ''}`
@@ -80,6 +83,25 @@ export default function EntriesPage() {
     setDeleting(null);
   }
 
+  async function updateOdoo(entry: TimeEntry, checked: boolean) {
+    if (busy) return;
+    setActionError('');
+    try {
+      await run('editar_parte', {
+        id: entry.id,
+        version: entry.version,
+        imputado_en_odoo: checked,
+      });
+      notify(
+        checked ? 'Parte marcado como imputado en Odoo.' : 'Parte marcado como pendiente en Odoo.',
+      );
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : 'No se pudo guardar la marca de Odoo.',
+      );
+    }
+  }
+
   function exportEntries() {
     downloadCsv(
       'partes-de-horas.csv',
@@ -90,6 +112,7 @@ export default function EntriesPage() {
         'Tarea',
         'ID de Odoo',
         'Enlace de Odoo',
+        'Imputado en Odoo',
         'Inicio exacto (ISO)',
         'Fin exacto (ISO)',
         'Duración real (s)',
@@ -104,6 +127,7 @@ export default function EntriesPage() {
         taskById.get(entry.tarea_id)?.titulo ?? '',
         taskById.get(entry.tarea_id)?.odoo_id ?? '',
         taskById.get(entry.tarea_id)?.odoo_url ?? '',
+        entry.imputado_en_odoo ? 'Sí' : 'No',
         entry.inicio_en,
         entry.fin_en,
         entry.duracion_real_segundos,
@@ -206,6 +230,18 @@ export default function EntriesPage() {
               </option>
             ))}
           </SelectField>
+          <SelectField
+            label="Imputación en Odoo"
+            value={odooStatus}
+            onChange={(event) => {
+              setOdooStatus(event.target.value as OdooFilter);
+              setPageIndex(1);
+            }}
+          >
+            <option value="all">Todos los partes</option>
+            <option value="pending">Pendientes en Odoo</option>
+            <option value="imputed">Imputados en Odoo</option>
+          </SelectField>
           <InputField
             label="Desde"
             type="date"
@@ -258,6 +294,7 @@ export default function EntriesPage() {
             onStop={() => void stop()}
             onEdit={setModal}
             onDelete={setDeleting}
+            onOdooChange={(entry, checked) => void updateOdoo(entry, checked)}
           />
         )}
         {!isLoading && !visible.length ? (
@@ -274,6 +311,7 @@ export default function EntriesPage() {
                   setQuery('');
                   setProject('all');
                   setStatus('all');
+                  setOdooStatus('all');
                   setFrom('');
                   setTo('');
                 }}

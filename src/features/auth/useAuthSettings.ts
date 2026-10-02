@@ -9,6 +9,6 @@ export function useAuthSettings() {
     enabled: !configurationError,
     staleTime: 5 * 60_000,
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 }

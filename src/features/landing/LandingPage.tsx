@@ -1,91 +1,75 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  domAnimation,
+  LazyMotion,
+  m,
+  MotionConfig,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+} from 'motion/react';
 import { Brand } from '../../shared/brand/Brand';
-import { ButtonLink, IconButton, Button } from '../../shared/ui/Button';
+import { ButtonLink, IconButton } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import type { IconName } from '../../shared/ui/Icon';
-import { Badge, Panel, Notice } from '../../shared/ui/Panel';
-import { SegmentedControl } from '../../shared/ui/SegmentedControl';
-import { RoundingPreview } from '../time-entries/components/RoundingPreview';
-import { WeekChart } from '../week/components/WeekChart';
-import { TimerDisplay } from '../tracker/TimerDisplay';
+import { LivingBackground } from './components/LivingBackground';
 import { ProductPreview } from './components/ProductPreview';
+import { FeatureCards } from './components/FeatureCards';
+import { RoundingLab } from './components/RoundingLab';
+import { WeekExplorer } from './components/WeekExplorer';
+import { Reveal } from './components/Reveal';
 import './landing.css';
 
-const architecture: readonly {
-  number: string;
-  title: string;
-  icon: IconName;
-  text: string;
-  sample: string;
-}[] = [
-  {
-    number: '01',
-    title: 'Proyectos',
-    icon: 'folder',
-    text: 'El contenedor principal de negocio o cliente. Consolida las horas dedicadas a cada cuenta.',
-    sample: 'Rediseño Web 2025',
-  },
-  {
-    number: '02',
-    title: 'Tareas',
-    icon: 'tasks',
-    text: 'Entregables concretos con estimación. Una tarea se trabaja en distintos días sin duplicarla.',
-    sample: 'Maquetación de landing',
-  },
-  {
-    number: '03',
-    title: 'Partes de horas',
-    icon: 'clock',
-    text: 'Intervalos con inicio y fin. Consulta el tiempo real y la granularidad imputada.',
-    sample: '09:07 – 12:45 · 3h 38m',
-  },
-  {
-    number: '04',
-    title: 'Jornada y balance',
-    icon: 'gauge',
-    text: 'Todos los partes del día, tu objetivo y el saldo de la semana en una misma vista.',
-    sample: '7,5h cumplidas · +15m',
-  },
-];
-
-export default function LandingPage() {
+function LandingContent() {
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [interval, setInterval] = useState('15');
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll();
+  const progress = useSpring(scrollYProgress, { stiffness: 150, damping: 30 });
   return (
     <div className="landing">
       <a className="skip-link" href="#landing-main">
         Saltar al contenido
       </a>
+      <LivingBackground />
+      <m.div
+        className="landing-scroll-progress"
+        style={{ scaleX: reduced ? scrollYProgress : progress }}
+        aria-hidden="true"
+      />
       <header className="landing-header">
-        <div className="landing-header__inner">
+        <div className="landing-header__inner landing-container">
           <Brand />
           <nav
-            className={mobileMenu ? 'landing-nav landing-nav--open' : 'landing-nav'}
+            id="landing-navigation"
+            className={`landing-nav ${mobileMenu ? 'landing-nav--open' : ''}`}
             aria-label="Navegación pública"
           >
-            <a href="#caracteristicas" onClick={() => setMobileMenu(false)}>
-              Características
+            <a href="#producto" onClick={() => setMobileMenu(false)}>
+              El producto
             </a>
-            <a href="#cronometro" onClick={() => setMobileMenu(false)}>
-              Cronómetro
+            <a href="#tu-tiempo" onClick={() => setMobileMenu(false)}>
+              Tu tiempo
             </a>
-            <a href="#semana" onClick={() => setMobileMenu(false)}>
+            <a href="#tu-semana" onClick={() => setMobileMenu(false)}>
               Tu semana
             </a>
-          </nav>
-          <div className="actions">
-            <ButtonLink to="/login" variant="ghost" className="landing-login">
+            <Link className="landing-nav__mobile-login" to="/login">
               Iniciar sesión
-            </ButtonLink>
+            </Link>
+          </nav>
+          <div className="landing-header__actions">
+            <Link to="/login" className="landing-login">
+              Iniciar sesión <Icon name="up" size={13} />
+            </Link>
             <ButtonLink to="/registro" variant="primary">
-              Crear cuenta
+              Crear cuenta <Icon name="arrow" size={14} />
             </ButtonLink>
             <IconButton
               icon={mobileMenu ? 'close' : 'menu'}
-              className="mobile-menu"
+              className="landing-menu"
               label={mobileMenu ? 'Cerrar menú' : 'Abrir menú'}
               aria-expanded={mobileMenu}
+              aria-controls="landing-navigation"
               onClick={() => setMobileMenu((value) => !value)}
             />
           </div>
@@ -93,317 +77,268 @@ export default function LandingPage() {
       </header>
       <main id="landing-main">
         <section className="landing-hero landing-container">
-          <Badge tone="accent">
-            <span className="status-dot" /> Chambapp · Tu jornada, con precisión
-          </Badge>
-          <h1>
-            Tu tiempo.
-            <br />
-            <span>Bajo control.</span>
-          </h1>
-          <p>
-            Organiza tus proyectos, registra cada sesión de trabajo sin fricción mental y diseña una
-            semana de 37,5 horas que tenga sentido real.
-          </p>
-          <div className="hero-actions">
-            <ButtonLink to="/onboarding" variant="primary" icon="zap">
-              Empieza a organizar tu jornada
-            </ButtonLink>
-            <a href="#cronometro" className="button button--secondary">
-              <Icon name="play" />
-              Ver Chambapp en acción
+          <div className="landing-hero__copy">
+            <m.div
+              initial={reduced ? false : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="landing-kicker"
+            >
+              <span className="landing-kicker__dot" /> Tu jornada, a tu ritmo
+            </m.div>
+            <h1>
+              <m.span
+                initial={reduced ? false : { opacity: 0, y: 35 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+              >
+                Cada minuto.
+              </m.span>
+              <m.span
+                className="landing-gradient-text"
+                initial={reduced ? false : { opacity: 0, y: 35 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              >
+                En su sitio.
+              </m.span>
+            </h1>
+            <m.p
+              className="landing-hero__description"
+              initial={reduced ? false : { opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.35 }}
+            >
+              Ficha tu jornada. Dale contexto a tus horas.
+              <br className="landing-desktop-break" /> Y termina la semana sabiendo dónde estuvo tu
+              tiempo.
+            </m.p>
+            <m.div
+              className="landing-hero__actions"
+              initial={reduced ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.45 }}
+            >
+              <ButtonLink to="/registro" variant="primary">
+                Empieza con Chambapp <Icon name="arrow" size={17} />
+              </ButtonLink>
+              <a href="#demo" className="landing-demo-link">
+                <span>
+                  <Icon name="play" size={13} />
+                </span>{' '}
+                Prueba cómo funciona
+              </a>
+            </m.div>
+            <m.div
+              className="landing-hero__notes"
+              initial={reduced ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.65 }}
+            >
+              <span>
+                <Icon name="check" size={13} /> Fichajes exactos
+              </span>
+              <span>
+                <Icon name="check" size={13} /> Proyectos con contexto
+              </span>
+            </m.div>
+          </div>
+          <m.div
+            id="demo"
+            className="landing-hero__visual"
+            initial={reduced ? false : { opacity: 0, y: 45, rotate: 2 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
+            transition={{ duration: 1, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="landing-preview-glow" aria-hidden="true" />
+            <ProductPreview />
+            <div className="landing-floating-note" aria-hidden="true">
+              <span>
+                <Icon name="verified" size={16} />
+              </span>
+              <div>
+                <strong>Cada segundo cuenta.</strong>
+                <small>El fichaje siempre es exacto.</small>
+              </div>
+            </div>
+          </m.div>
+          <div className="landing-hero__bottom">
+            <span className="mono">MENOS RECONSTRUIR. MÁS TRABAJAR.</span>
+            <a href="#producto" aria-label="Descubrir el producto">
+              <Icon name="down" size={18} />
             </a>
           </div>
-          <ProductPreview />
-          <p className="landing-demo-note">
-            <Icon name="info" size={14} /> Vista ilustrativa. Crea tu cuenta para guardar tus
-            proyectos y tu tiempo.
-          </p>
         </section>
-        <div className="landing-metrics landing-container">
+        <div
+          className="landing-principles landing-container"
+          aria-label="Todo tu tiempo en un mismo lugar"
+        >
+          <span>
+            Una jornada.
+            <br />
+            <strong>Todo el contexto.</strong>
+          </span>
           {[
-            { value: 'Un clic', text: 'Para iniciar o pausar tu tarea' },
-            { value: 'Real + Imputado', text: 'Horas exactas, duración redondeada' },
-            { value: '37,5h', text: 'Una semana bien repartida' },
-            { value: 'Cero ruido', text: 'Una consola para concentrarte' },
-          ].map((metric) => (
-            <div key={metric.value}>
-              <strong>{metric.value}</strong>
-              <span>{metric.text}</span>
+            { icon: 'activity' as const, label: 'Entradas y salidas' },
+            { icon: 'timer' as const, label: 'Tiempo por tarea' },
+            { icon: 'gauge' as const, label: 'Balance de horas' },
+            { icon: 'calendar' as const, label: 'Tu semana' },
+          ].map((item) => (
+            <div key={item.label}>
+              <Icon name={item.icon} size={19} />
+              <span>{item.label}</span>
             </div>
           ))}
         </div>
-        <section id="caracteristicas" className="landing-section landing-container">
-          <div className="landing-section__heading">
-            <p className="eyebrow">El problema que resolvemos</p>
-            <h2>De partes dispersos a una semana estructurada y transparente.</h2>
-            <p className="muted">
-              Deja de reconstruir el viernes de memoria qué hiciste el martes por la mañana. El
-              trabajo se entiende mejor cuando el tiempo tiene contexto.
-            </p>
-          </div>
-          <div className="two-columns comparison-grid">
-            <Panel title="La gestión tradicional de horas" icon="info" className="comparison-card">
-              <ul>
-                {[
-                  'Adivinanzas de fin de semana para recordar llamadas, correos y arreglos.',
-                  'Minutos de pequeñas tareas que se pierden entre proyectos.',
-                  'Desconexión con tu jornada: no saber cuándo has cumplido tu objetivo.',
-                ].map((text) => (
-                  <li key={text}>
-                    <Icon name="close" />
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-            <Panel
-              title="El estándar Chambapp"
-              icon="verified"
-              className="comparison-card comparison-card--accent"
-            >
-              <ul>
-                {[
-                  'Cronómetro visible en todas las vistas para trabajar con continuidad.',
-                  'Tiempo real e imputado por separado, sin perder el detalle.',
-                  'Objetivos diarios y balance semanal para encontrar tu ritmo.',
-                ].map((text) => (
-                  <li key={text}>
-                    <Icon name="verified" />
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          </div>
-        </section>
-        <section className="landing-section landing-container">
-          <div className="landing-section__heading">
-            <p className="eyebrow">Una estructura clara</p>
+        <section id="producto" className="landing-section landing-container">
+          <Reveal className="landing-section__heading">
+            <p className="landing-eyebrow">TODO ENCAJA</p>
             <h2>
-              De proyecto a tiempo registrado,
+              La jornada completa.
               <br />
-              paso a paso.
+              <span className="landing-muted-heading">La historia de cada hora.</span>
             </h2>
-            <p className="muted">
-              Una tarea puede atenderse en múltiples días y sesiones. Cada parte conserva su
-              contexto.
+            <p>
+              Del primer fichaje al último parte. Un espacio para trabajar, registrar y entender tu
+              tiempo.
             </p>
-          </div>
-          <div className="architecture-grid">
-            {architecture.map((item) => (
-              <article key={item.number}>
-                <div className="split-label">
-                  <span className="architecture-number mono">{item.number}</span>
-                  <Icon name={item.icon} size={26} />
-                </div>
-                <h3>{item.title}</h3>
-                <p className="muted">{item.text}</p>
-                <span className="architecture-sample mono">{item.sample}</span>
-              </article>
-            ))}
-          </div>
+          </Reveal>
+          <FeatureCards />
         </section>
-        <section id="cronometro" className="landing-section landing-container landing-split">
-          <div className="landing-section__heading">
-            <p className="eyebrow">El corazón de la app</p>
+        <section id="tu-tiempo" className="landing-section landing-container landing-time-section">
+          <Reveal className="landing-section__heading">
+            <p className="landing-eyebrow">PRECISIÓN SIN COMPLICACIONES</p>
             <h2>
-              Un cronómetro.
+              El tiempo que trabajas.
               <br />
-              Todo tu trabajo.
+              <span className="landing-muted-heading">El tiempo que imputas.</span>
             </h2>
-            <p className="muted">
-              Selecciona una tarea y empieza. Una sesión activa visible en cada vista mantiene el
-              contexto de tu trabajo.
+            <p>
+              Dos medidas, una visión clara. Tu jornada conserva cada segundo. Tú eliges el redondeo
+              de los partes de tareas.
             </p>
-            <div className="landing-feature">
-              <Icon name="timer" />
-              <div>
-                <strong>Siempre a mano</strong>
-                <p className="muted">
-                  Controles consistentes en el resumen, las tareas y la semana.
-                </p>
-              </div>
+            <div className="landing-time-facts">
+              <span>
+                <Icon name="lock" size={16} /> Inicio y fin exactos
+              </span>
+              <span>
+                <Icon name="settings" size={16} /> Redondeo por parte
+              </span>
+              <span>
+                <Icon name="gauge" size={16} /> Porcentaje imputado
+              </span>
             </div>
-            <div className="landing-feature">
-              <Icon name="shield" />
-              <div>
-                <strong>Sin perder de vista los minutos</strong>
-                <p className="muted">
-                  Consulta el intervalo real y la previsión de redondeo de cada sesión.
-                </p>
-              </div>
-            </div>
-            <ButtonLink to="/resumen" variant="ghost" icon="arrow">
-              Explorar la consola
-            </ButtonLink>
-          </div>
-          <Panel className="landing-timer-panel">
-            <div className="split-label">
-              <Badge tone="accent">Vista previa del cronómetro</Badge>
-              <Icon name="timer" />
-            </div>
-            <p className="eyebrow">Tarea seleccionada</p>
-            <h3>Revisión de componentes de UI & Test de accesibilidad</h3>
-            <p className="muted">Mercury UI · Sprint 24</p>
-            <TimerDisplay preview />
-            <p className="mono dim">Redondeo previsto: 2h 45m · Ejemplo estático</p>
-          </Panel>
+          </Reveal>
+          <Reveal delay={0.12}>
+            <RoundingLab />
+          </Reveal>
         </section>
-        <section className="landing-section landing-container">
-          <div className="landing-section__heading">
-            <p className="eyebrow">Transparencia de principio a fin</p>
+        <section id="tu-semana" className="landing-section landing-container">
+          <Reveal className="landing-section__heading landing-section__heading--center">
+            <p className="landing-eyebrow">LEVANTA LA VISTA</p>
             <h2>
-              Horas reales vs.
+              Tu semana tiene un ritmo.
               <br />
-              Horas imputadas.
+              <span className="landing-muted-heading">Encuentra el tuyo.</span>
             </h2>
-            <p className="muted">
-              Ambos registros en cada parte. Una granularidad clara para revisar tu jornada y
-              preparar tus informes.
+            <p>
+              Compara horas fichadas e imputadas, ajusta tus objetivos y consulta el balance de cada
+              día.
             </p>
-          </div>
-          <div className="landing-rounding">
-            <div className="split-label">
-              <strong>Intervalo de redondeo configurable</strong>
-              <SegmentedControl
-                label="Redondeo ilustrativo"
-                value={interval}
-                onChange={setInterval}
-                options={[
-                  { value: '15', label: '15 min' },
-                  { value: '30', label: '30 min' },
-                  { value: '60', label: '1 hora' },
-                ]}
-              />
-            </div>
-            <RoundingPreview interval={interval} />
-          </div>
+          </Reveal>
+          <Reveal>
+            <WeekExplorer />
+          </Reveal>
         </section>
-        <section id="semana" className="landing-section landing-container">
-          <div className="landing-section__heading">
-            <p className="eyebrow">Flexibilidad y equilibrio</p>
+        <section className="landing-workflow landing-container">
+          <Reveal className="landing-workflow__intro">
+            <p className="landing-eyebrow">UN FLUJO NATURAL</p>
             <h2>
-              Tu semana, a tu medida.
+              Empieza el día.
               <br />
-              37,5 horas bien repartidas.
-            </h2>
-            <p className="muted">
-              Ajusta tus días laborables y el objetivo de cada jornada. Tu saldo te muestra cuándo
-              has cumplido tu compromiso.
-            </p>
-          </div>
-          <Panel className="landing-week">
-            <WeekChart preview />
-            <div className="landing-week__summary">
-              <div>
-                <Icon name="calendar" />
-                <strong>Planificación semanal de 37,5 horas</strong>
-                <p className="muted">Elige tus días laborables y reparte tu jornada.</p>
-              </div>
-              <div>
-                <span className="eyebrow">Acumulado</span>
-                <strong className="mono">31h 30m</strong>
-              </div>
-              <div>
-                <span className="eyebrow">Objetivo</span>
-                <strong className="mono">37h 30m</strong>
-              </div>
-              <div>
-                <span className="eyebrow">Saldo semanal</span>
-                <strong className="mono accent">+45 min</strong>
-              </div>
-            </div>
-          </Panel>
-        </section>
-        <section className="landing-section landing-container">
-          <div className="landing-section__heading">
-            <p className="eyebrow">Diseño para largas jornadas</p>
-            <h2>
-              Una aplicación privada que
+              Sigue el hilo.
               <br />
-              respeta tu concentración.
+              <span className="landing-gradient-text">Cierra con claridad.</span>
             </h2>
-            <p className="muted">
-              Fondos oscuros, paneles carbón y una interfaz que pone el trabajo en primer plano.
-            </p>
-          </div>
-          <div className="showcase-grid">
+          </Reveal>
+          <div className="landing-workflow__steps">
             {[
               {
-                icon: 'grid',
-                title: 'Dashboard Ejecutivo',
-                description: 'Objetivo diario, tarea en curso y saldo de un vistazo.',
-                to: '/resumen',
-                tag: 'Métricas · Saldo · Semana',
+                title: 'Entra en tu jornada',
+                text: 'Ficha la entrada o introduce la hora manualmente. Tu jornada empieza a contar.',
+                icon: 'play' as const,
               },
               {
-                icon: 'folder',
-                title: 'Proyectos & Tareas',
-                description: 'Entregables, estimaciones y múltiples partes de trabajo.',
-                to: '/proyectos',
-                tag: 'Filtros · Presupuestos · Detalle',
+                title: 'Trabaja con contexto',
+                text: 'Elige una tarea, inicia el cronómetro o registra un parte manual. Cada sesión tiene su lugar.',
+                icon: 'tasks' as const,
               },
               {
-                icon: 'file',
-                title: 'Partes de Horas',
-                description: 'Intervalos reales e imputados en una tabla precisa.',
-                to: '/partes-de-horas',
-                tag: 'Redondeo · Desglose · Notas',
+                title: 'Mira el día completo',
+                text: 'Ficha la salida y revisa la relación entre tu jornada y las horas imputadas.',
+                icon: 'verified' as const,
               },
-            ].map((item) => (
-              <Link to={item.to} className="showcase-card" key={item.title}>
-                <div className="showcase-card__visual">
-                  <Icon name={item.icon as IconName} size={36} />
-                  <div className="abstract-ui">
-                    <i />
-                    <i />
-                    <i />
-                  </div>
+            ].map((step, index) => (
+              <Reveal key={step.title} delay={index * 0.08} className="landing-workflow__step">
+                <span className="landing-workflow__number mono">0{index + 1}</span>
+                <div>
+                  <Icon name={step.icon} size={19} />
+                  <h3>{step.title}</h3>
+                  <p>{step.text}</p>
                 </div>
-                <h3>
-                  {item.title}
-                  <Icon name="up" size={20} />
-                </h3>
-                <p className="muted">{item.description}</p>
-                <span className="mono dim">{item.tag}</span>
-              </Link>
+              </Reveal>
             ))}
           </div>
         </section>
-        <section className="landing-cta landing-container">
-          <Badge>Tu espacio de trabajo personal</Badge>
-          <h2>
-            Haz espacio
-            <br />
-            para trabajar mejor.
-          </h2>
-          <p className="muted">Tu jornada, tus proyectos y cada minuto en su lugar.</p>
-          <div className="hero-actions">
-            <ButtonLink to="/registro" variant="primary" icon="arrow">
-              Crear mi cuenta
-            </ButtonLink>
-            <ButtonLink to="/resumen">Abrir mi espacio</ButtonLink>
-          </div>
-        </section>
-        <div className="landing-container">
-          <Notice title="Tus datos, en tu cuenta">
-            Guarda proyectos, tareas, sesiones y objetivos semanales. Consulta y exporta tu tiempo
-            real e imputado.
-          </Notice>
-        </div>
+        <Reveal className="landing-container">
+          <section className="landing-cta">
+            <div className="landing-cta__orb" aria-hidden="true" />
+            <span className="landing-kicker">
+              <span className="landing-kicker__dot" /> Tu espacio. Tu tiempo.
+            </span>
+            <h2>
+              Recupera el hilo
+              <br />
+              de tu tiempo.
+            </h2>
+            <p>Una jornada más clara empieza por saber dónde van tus horas.</p>
+            <div className="landing-hero__actions">
+              <ButtonLink to="/registro" variant="primary">
+                Crear mi cuenta <Icon name="arrow" size={17} />
+              </ButtonLink>
+              <ButtonLink to="/login" variant="ghost">
+                Ya tengo cuenta
+              </ButtonLink>
+            </div>
+            <span className="landing-cta__footnote">
+              Proyectos, tareas, fichajes y partes. En un mismo lugar.
+            </span>
+          </section>
+        </Reveal>
       </main>
       <footer className="landing-footer landing-container">
         <Brand />
-        <p className="dim">© Chambapp · Tu tiempo. Bajo control.</p>
-        <div className="actions">
-          <Link to="/login">Acceso</Link>
-          <Link to="/onboarding">Configuración</Link>
-          <Button variant="ghost" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            Volver arriba
-          </Button>
+        <p>© Chambapp · Cada minuto, en su sitio.</p>
+        <div>
+          <Link to="/login">Iniciar sesión</Link>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: reduced ? 'instant' : 'smooth' })}
+          >
+            Volver arriba <Icon name="up" size={13} />
+          </button>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">
+        <LandingContent />
+      </MotionConfig>
+    </LazyMotion>
   );
 }

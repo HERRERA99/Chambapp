@@ -15,6 +15,7 @@ export function EntriesTable({
   onStop,
   onEdit,
   onDelete,
+  onOdooChange,
 }: {
   entries: TimeEntry[];
   projects: Project[];
@@ -24,6 +25,7 @@ export function EntriesTable({
   onStop: () => void;
   onEdit: (entry: TimeEntry) => void;
   onDelete: (entry: TimeEntry) => void;
+  onOdooChange: (entry: TimeEntry, checked: boolean) => void;
 }) {
   const projectById = new Map(projects.map((project) => [project.id, project]));
   const taskById = new Map(tasks.map((task) => [task.id, task]));
@@ -39,6 +41,7 @@ export function EntriesTable({
         'Dur. imputada',
         'Descripción',
         'Estado',
+        'Imputado en Odoo',
         'Acciones',
       ]}
     >
@@ -83,6 +86,21 @@ export function EntriesTable({
             <Badge tone={entry.fin_en ? 'neutral' : 'accent'}>
               {entry.fin_en ? 'Finalizado' : 'En curso'}
             </Badge>
+          </td>
+          <td>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={entry.imputado_en_odoo}
+                disabled={busy || !entry.fin_en}
+                aria-label={`Imputado en Odoo: parte del ${entry.fecha} a las ${formatTime(entry.inicio_en, entry.zona_horaria)}`}
+                onChange={(event) => onOdooChange(entry, event.target.checked)}
+              />
+              {entry.imputado_en_odoo ? 'Imputado' : 'Pendiente'}
+            </label>
+            {!entry.fin_en ? (
+              <span className="cell-detail">Finaliza el parte para marcarlo</span>
+            ) : null}
           </td>
           <td>
             {entry.fin_en ? (

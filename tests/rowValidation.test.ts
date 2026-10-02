@@ -20,6 +20,7 @@ const entry: Database['public']['Views']['partes_detalle']['Row'] = {
   intervalo_redondeo_minutos: 15,
   modo_redondeo: 'superior',
   descripcion: null,
+  imputado_en_odoo: false,
   eliminado_en: null,
   version: 1,
   duracion_real_segundos: 0.000001,
@@ -47,6 +48,8 @@ test('cannot display finalized totals from incomplete or invalid view data', () 
   assert.throws(() => assertEntry({ ...entry, duracion_real_segundos: NaN }));
   assert.throws(() => assertEntry({ ...entry, intervalo_redondeo_minutos: 7 }));
   assert.throws(() => assertEntry({ ...entry, inicio_en: 'not-an-instant' }));
+  assert.throws(() => assertEntry({ ...entry, imputado_en_odoo: null }));
+  assert.doesNotThrow(() => assertEntry({ ...entry, imputado_en_odoo: true }));
 });
 
 const attendance: Database['public']['Views']['fichajes_detalle']['Row'] = {

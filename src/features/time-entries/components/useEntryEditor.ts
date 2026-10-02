@@ -43,6 +43,7 @@ export function useEntryEditor({
   const [startTime, setStartTime] = useState(start?.toFormat('HH:mm:ss') ?? '');
   const [endTime, setEndTime] = useState(end?.toFormat('HH:mm:ss') ?? '');
   const [description, setDescription] = useState(entry?.descripcion ?? '');
+  const [imputedInOdoo, setImputedInOdoo] = useState(entry?.imputado_en_odoo ?? false);
   const [error, setError] = useState('');
   const [targetZone, setTargetZone] = useState<string | null>(null);
   const [acceptZone, setAcceptZone] = useState(false);
@@ -79,7 +80,10 @@ export function useEntryEditor({
       if (!selectedTask) throw new Error('Selecciona una tarea para este parte.');
       const inicio = exactStart();
       const fin = exactEnd();
-      if (Date.parse(fin) <= Date.parse(inicio))
+      // Server-confirmed microsecond intervals can collapse to the same browser
+      // millisecond. Keep them valid when only notes or Odoo status change.
+      const unchangedInterval = entry?.inicio_en === inicio && entry.fin_en === fin;
+      if (!unchangedInterval && Date.parse(fin) <= Date.parse(inicio))
         throw new Error('La fecha y hora de fin deben ser posteriores al inicio.');
       if (targetZone && !acceptZone)
         throw new Error('Confirma el cambio de zona horaria antes de guardar.');
@@ -89,6 +93,7 @@ export function useEntryEditor({
         inicio_en: inicio,
         fin_en: fin,
         descripcion: description.trim() || null,
+        imputado_en_odoo: imputedInOdoo,
         ...(targetZone && acceptZone ? { confirmar_zona: targetZone } : {}),
       });
       notify(entry ? 'Parte actualizado.' : 'Parte de horas creado.');
@@ -111,8 +116,13 @@ export function useEntryEditor({
 
   let duration: number | null = null;
   try {
-    const elapsed = (Date.parse(exactEnd()) - Date.parse(exactStart())) / 1000;
-    if (Number.isFinite(elapsed) && elapsed > 0) duration = elapsed;
+    const inicio = exactStart();
+    const fin = exactEnd();
+    const elapsed =
+      entry?.inicio_en === inicio && entry.fin_en === fin
+        ? entry.duracion_real_segundos
+        : (Date.parse(fin) - Date.parse(inicio)) / 1000;
+    if (elapsed !== null && Number.isFinite(elapsed) && elapsed > 0) duration = elapsed;
   } catch {
     /* The incomplete form is validated on submit. */
   }
@@ -138,6 +148,8 @@ export function useEntryEditor({
     setEndTime,
     description,
     setDescription,
+    imputedInOdoo,
+    setImputedInOdoo,
     error,
     targetZone,
     acceptZone,

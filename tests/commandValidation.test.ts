@@ -102,3 +102,23 @@ test('attendance confirms only complete responses matching the durable intent', 
     true,
   );
 });
+
+test('manual Odoo status confirms only a response containing the requested boolean', () => {
+  const payload = { id: partId, version: 1, imputado_en_odoo: true };
+  const row = { id: partId, version: 2, imputado_en_odoo: true };
+  assert.equal(isValidCommandResponse('editar_parte', payload, row), true);
+  assert.equal(isValidCommandResponse('editar_parte', payload, { ...row, id: taskId }), false);
+  assert.equal(
+    isValidCommandResponse('editar_parte', payload, { ...row, imputado_en_odoo: false }),
+    false,
+  );
+  assert.equal(
+    isValidCommandResponse('editar_parte', payload, { ...row, imputado_en_odoo: null }),
+    false,
+  );
+  assert.equal(isValidCommandResponse('editar_parte', payload, { id: partId, version: 2 }), false);
+  assert.equal(
+    isValidCommandResponse('crear_parte', {}, { ...row, imputado_en_odoo: false }),
+    true,
+  );
+});

@@ -186,6 +186,7 @@ export type Database = {
           eliminado_en: string | null;
           fin_en: string | null;
           id: string;
+          imputado_en_odoo: boolean;
           inicio_en: string;
           intervalo_redondeo_minutos: number;
           jornada_id: string;
@@ -201,6 +202,7 @@ export type Database = {
           eliminado_en?: string | null;
           fin_en?: string | null;
           id?: string;
+          imputado_en_odoo?: boolean;
           inicio_en: string;
           intervalo_redondeo_minutos: number;
           jornada_id: string;
@@ -216,6 +218,7 @@ export type Database = {
           eliminado_en?: string | null;
           fin_en?: string | null;
           id?: string;
+          imputado_en_odoo?: boolean;
           inicio_en?: string;
           intervalo_redondeo_minutos?: number;
           jornada_id?: string;
@@ -477,6 +480,7 @@ export type Database = {
           fin_en: string | null;
           fin_imputado_en: string | null;
           id: string | null;
+          imputado_en_odoo: boolean | null;
           inicio_en: string | null;
           inicio_imputado_en: string | null;
           intervalo_redondeo_minutos: number | null;

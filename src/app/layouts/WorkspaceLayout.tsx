@@ -75,7 +75,7 @@ export function WorkspaceLayout() {
         aria-label="Panel de navegación"
       >
         <div className="sidebar__brand">
-          <Brand compact />
+          <Brand compact to={paths.dashboard} label="Chambapp · Resumen" />
           <IconButton
             className="sidebar__close"
             icon="close"

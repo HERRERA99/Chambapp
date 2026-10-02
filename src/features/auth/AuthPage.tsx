@@ -11,8 +11,11 @@ import { configurationError, getSupabase } from '../../lib/supabase/client';
 import { paths } from '../../app/paths';
 import { useAuth } from './useAuth';
 import { safeReturnTo } from './returnTo';
-import { authErrorMessage } from './errors';
+import { authErrorMessage, oauthCallbackError } from './errors';
 import { useAuthSettings } from './useAuthSettings';
+import { enabledOAuthProviders, oauthCredentials } from './oauth';
+import type { OAuthProviderDefinition } from './oauth';
+import { OAuthProviderIcon } from './OAuthProviderIcon';
 import './auth.css';
 
 function RecoveryRequest({ onClose }: { onClose: () => void }) {
@@ -89,10 +92,18 @@ function AuthConsole({
   callbackError: string | null;
 }) {
   const { error: sessionError } = useAuth();
-  const { data: settings } = useAuthSettings();
+  const {
+    data: settings,
+    isFetching: settingsPending,
+    error: settingsError,
+    refetch: reloadSettings,
+  } = useAuthSettings();
   const [showPassword, setShowPassword] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [pendingProvider, setPendingProvider] = useState<OAuthProviderDefinition['id'] | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(callbackError);
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
   const suffix = `?returnTo=${encodeURIComponent(returnTo)}`;
@@ -102,9 +113,7 @@ function AuthConsole({
       : settings && !settings.external.email
         ? 'El acceso por correo está deshabilitado en este espacio.'
         : null;
-  const showOAuth =
-    (!register || !settings?.disableSignup) &&
-    (settings?.external.google || settings?.external.github);
+  const availableProviders = enabledOAuthProviders(settings, register);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,24 +152,27 @@ function AuthConsole({
     }
   }
 
-  async function signInWithProvider(provider: 'google' | 'github') {
-    if (pending || !settings?.external[provider]) return;
+  async function signInWithProvider(provider: OAuthProviderDefinition['id']) {
+    if (pending) return;
     setPending(true);
+    setPendingProvider(provider);
     setError(null);
     try {
-      const { error: authError } = await getSupabase().auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}${paths.login}${suffix}` },
-      });
+      const { data, error: authError } = await getSupabase().auth.signInWithOAuth(
+        oauthCredentials(provider, settings, returnTo, window.location.origin, register),
+      );
       if (authError) throw authError;
+      if (!data.url)
+        throw new Error('No se pudo abrir el proveedor de acceso. Inténtalo de nuevo.');
+      // Keep controls busy until the browser leaves for the provider.
     } catch (cause) {
       setError(authErrorMessage(cause));
-    } finally {
       setPending(false);
+      setPendingProvider(null);
     }
   }
 
-  const visibleError = emailConfigurationError ?? error ?? sessionError;
+  const visibleError = error ?? sessionError;
   return (
     <>
       <nav className="auth-tabs" aria-label="Modo de acceso">
@@ -202,32 +214,59 @@ function AuthConsole({
           </div>
         ) : (
           <>
-            {showOAuth ? (
+            {settingsPending && !settings ? (
+              <p role="status" className="field__hint">
+                Consultando métodos de acceso…
+              </p>
+            ) : null}
+            {settingsError ? (
+              <Notice title="No se pudieron consultar todos los métodos de acceso">
+                <p role="alert">Reintenta para comprobar qué plataformas están disponibles.</p>
+                <Button disabled={settingsPending || pending} onClick={() => void reloadSettings()}>
+                  {settingsPending ? 'Consultando…' : 'Reintentar'}
+                </Button>
+              </Notice>
+            ) : null}
+            {availableProviders.length ? (
               <>
-                <div className="auth-sso">
-                  {settings?.external.github ? (
+                <div
+                  className="auth-sso"
+                  role="group"
+                  aria-label={
+                    register ? 'Crear cuenta con otra plataforma' : 'Acceder con otra plataforma'
+                  }
+                  aria-busy={pendingProvider !== null}
+                >
+                  {availableProviders.map((provider) => (
                     <Button
-                      icon="github"
+                      key={provider.id}
+                      className="auth-provider"
                       disabled={pending || !!configurationError}
-                      onClick={() => void signInWithProvider('github')}
+                      onClick={() => void signInWithProvider(provider.id)}
                     >
-                      GitHub
+                      <OAuthProviderIcon provider={provider.id} />
+                      {pendingProvider === provider.id
+                        ? `Conectando con ${provider.label}…`
+                        : `Continuar con ${provider.label}`}
                     </Button>
-                  ) : null}
-                  {settings?.external.google ? (
-                    <Button
-                      icon="globe"
-                      disabled={pending || !!configurationError}
-                      onClick={() => void signInWithProvider('google')}
-                    >
-                      Google
-                    </Button>
-                  ) : null}
+                  ))}
                 </div>
-                <div className="auth-divider">
-                  <span>o credenciales directas</span>
-                </div>
+                <p className="field__hint auth-oauth-hint">
+                  {register
+                    ? 'La primera vez crearemos tu cuenta y podrás completar tu perfil.'
+                    : 'Si es tu primera visita, podrás completar tu perfil después de acceder.'}
+                </p>
+                {settings?.external.email ? (
+                  <div className="auth-divider">
+                    <span>o continúa con tu correo</span>
+                  </div>
+                ) : null}
               </>
+            ) : null}
+            {emailConfigurationError ? (
+              <p className="field__hint" role="status">
+                {emailConfigurationError}
+              </p>
             ) : null}
             <form className="form-stack" onSubmit={submit} aria-busy={pending}>
               {register ? (
@@ -275,7 +314,7 @@ function AuthConsole({
                   <button
                     type="button"
                     className="text-button"
-                    disabled={!!emailConfigurationError}
+                    disabled={pending || !!emailConfigurationError}
                     onClick={() => setRecoveryOpen(true)}
                   >
                     ¿Olvidaste la clave?
@@ -315,9 +354,8 @@ export default function AuthPage() {
   const { user, loading, isPasswordRecovery } = useAuth();
   const register = location.pathname === paths.register;
   const query = new URLSearchParams(location.search);
-  const fragment = new URLSearchParams(location.hash.slice(1));
   const returnTo = safeReturnTo(query.get('returnTo'));
-  const callbackError = query.get('error_description') ?? fragment.get('error_description');
+  const callbackError = oauthCallbackError(location.search, location.hash);
 
   if (loading)
     return (

@@ -1,4 +1,5 @@
 const messages: Record<string, string> = {
+  IMPUTACION_ODOO_INVALIDA: 'Indica si este parte está imputado en Odoo con una marca válida.',
   SESION_REQUERIDA: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
   CONFLICTO_VERSION:
     'Los datos han cambiado en otra sesión. Cierra el formulario y vuelve a abrirlo para revisar los valores actualizados.',

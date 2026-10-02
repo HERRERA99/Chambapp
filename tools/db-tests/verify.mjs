@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyAttendance } from './attendance.mjs';
+import { verifyOdooStatus } from './odoo-status.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const databaseDir = await mkdtemp(join(tmpdir(), 'chambapp-db-test-'));
@@ -101,6 +102,7 @@ try {
   assert.equal(Number(upgraded.duracion_imputada_segundos), 255 * 60);
   assert.equal(upgraded.odoo_id, null);
   assert.equal(upgraded.odoo_url, null);
+  assert.equal(upgraded.imputado_en_odoo, false);
   await admin.query('delete from public.partes_horas where usuario_id=$1', [upgradeUser]);
   await admin.query('delete from public.jornadas where usuario_id=$1', [upgradeUser]);
   await admin.query('delete from public.tareas where usuario_id=$1', [upgradeUser]);
@@ -619,6 +621,7 @@ try {
     'competing starts create one part; cascade deletion/active discard/retries preserve tombstones and totals',
   );
   await verifyAttendance({ admin, ca, cb, anonymous, client, rpc, expectError, ok });
+  await verifyOdooStatus({ ca, cb, client, rpc, expectError, ok });
   await expectError(
     () =>
       admin.query('update public.configuraciones_semanales set minutos_semanales=1 where id=$1', [

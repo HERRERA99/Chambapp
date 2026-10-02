@@ -135,6 +135,20 @@ function EntryEditor({
             placeholder="¿En qué has trabajado?"
             disabled={editor.pending}
           />
+          <div className="field">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={editor.imputedInOdoo}
+                onChange={(event) => editor.setImputedInOdoo(event.target.checked)}
+                disabled={editor.pending}
+              />
+              Ya imputado en Odoo
+            </label>
+            <span className="field__hint">
+              Marca este parte cuando hayas registrado sus horas en Odoo.
+            </span>
+          </div>
           <Notice
             title={
               editor.interval

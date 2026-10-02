@@ -50,6 +50,7 @@ export type TimeRecord = OwnedRecord & {
   intervalo_redondeo_minutos: number;
   modo_redondeo: string;
   descripcion: string | null;
+  imputado_en_odoo: boolean;
   eliminado_en: string | null;
 };
 

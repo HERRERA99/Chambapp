@@ -36,7 +36,7 @@ En **Authentication → URL Configuration**, registra `http://127.0.0.1:5173/**`
 
 El registro con correo y contraseña respeta la configuración **Confirm email** del proyecto. Si está activada, abre el enlace recibido para confirmar la cuenta antes de acceder. La recuperación de contraseña utiliza un enlace enviado por correo y la pantalla `/recuperar-contrasena`.
 
-Google y GitHub están deshabilitados actualmente en el proyecto Chambapp. La interfaz consulta la configuración pública de Auth y solo muestra proveedores habilitados. Para activarlos necesitas configurar sus credenciales OAuth en Supabase y el callback que indique cada proveedor. El código no contiene esas credenciales.
+El login y el registro admiten los proveedores sociales de Supabase, incluidos Google, Apple, Microsoft, GitHub, Facebook, Discord, X y LinkedIn. La interfaz consulta la configuración pública de Auth y solo muestra los proveedores habilitados. Actualmente el proyecto Chambapp tiene desactivados todos los proveedores sociales: necesitan una aplicación OAuth y sus credenciales en el panel de Supabase. El código no contiene esas credenciales. [Configuración de proveedores y redirecciones](docs/oauth.md).
 
 El entorno Supabase local configura las redirecciones del puerto 5173 en `supabase/config.toml`. En producción, el alojamiento debe servir `index.html` al abrir directamente una ruta de la SPA.
 
@@ -55,9 +55,13 @@ El entorno Supabase local configura las redirecciones del puerto 5173 en `supaba
 
 Los providers de Auth, Workspace y Tracker coordinan la sesión, la caché de consultas y el cronómetro. Los componentes presentan datos y envían comandos a través de esa capa; los cálculos se mantienen en utilidades y selectores verificables.
 
+Dentro del espacio de trabajo, el logo de Chambapp abre **Resumen** y mantiene al usuario en la aplicación.
+
 ## Odoo y fichajes
 
 Cada tarea admite un **ID de Odoo** opcional (`T` seguida de números, por ejemplo `T443212`) y un enlace HTTP(S) opcional. Se pueden guardar y borrar por separado. El formulario normaliza el ID a mayúsculas y el enlace a una URL válida. Los enlaces aparecen en tareas, partes y calendario; las búsquedas admiten el ID y los CSV incluyen ambos campos. Estos datos permiten navegar a Odoo; la sincronización con su API queda para una integración posterior.
+
+Cada parte de horas tiene una marca **Imputado en Odoo**, editable en su formulario y desde la lista. Permite filtrar los partes pendientes o imputados y se incluye en el CSV. La marca registra una confirmación manual del usuario; no envía horas a Odoo. Los partes existentes empiezan como pendientes.
 
 En **Fichajes** (`/fichajes`) puedes registrar entrada y salida con la hora del servidor, introducirlas manualmente o corregir un registro. Se admiten varias sesiones al día, una entrada abierta por usuario y tramos que cruzan medianoche. Los fichajes no se redondean y sus solapamientos se rechazan; los partes de tareas siguen siendo independientes. El tiempo de descanso se excluye cerrando un fichaje y abriendo otro al volver.
 
@@ -83,9 +87,11 @@ Web Locks coordina las operaciones entre pestañas del mismo origen y `storage` 
 
 Las tablas tienen RLS y cada cuenta lee únicamente sus registros. Las escrituras pasan por `chambapp_operar`, con propietario derivado de la sesión, validación de relaciones y versiones para detectar cambios concurrentes. Las vistas utilizan `security_invoker`; el cliente no tiene permisos directos de escritura. [Modelo y payloads RPC](docs/base-de-datos.md).
 
-El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821`, `20261001213125` y `20261002190139`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
+El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821`, `20261001213125`, `20261002190139` y `20261002201755`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
 
 La migración [Odoo y fichajes](supabase/migrations/20261002190139_odoo_and_attendance.sql) está aplicada al proyecto alojado y verificada tanto en PostgreSQL aislado como con los controles remotos de catálogo y permisos. Añade los campos Odoo, las tablas y vistas de fichajes y amplía la RPC existente. Los tipos TypeScript se han generado desde la base actualizada; la versión del archivo coincide con el historial remoto.
+
+La migración [Marca manual de imputación en Odoo](supabase/migrations/20261002201755_manual_odoo_time_entry_status.sql) añade `imputado_en_odoo` a los partes y su vista, con valor inicial `false`, y amplía la creación y edición por RPC. Está aplicada, con tipos regenerados y la verificación remota de catálogo y permisos correcta.
 
 ```powershell
 npm run db:login
