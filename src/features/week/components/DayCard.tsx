@@ -57,7 +57,10 @@ export function DayCard({
           />
         ) : null}
       </div>
-      <p className="day-card__duration mono">Fichado: {formatDuration(day.workedSeconds)}</p>
+      <p className="day-card__duration mono">
+        <span className="day-card__duration-label dim">Fichado:</span>{' '}
+        <span>{formatDuration(day.workedSeconds)}</span>
+      </p>
       {day.provisionalSeconds > 0 ? <p className="field__hint">Incluye fichaje en curso</p> : null}
       <Progress
         value={day.targetSeconds > 0 ? (day.workedSeconds / day.targetSeconds) * 100 : 0}
