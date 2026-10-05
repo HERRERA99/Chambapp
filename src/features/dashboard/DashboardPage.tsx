@@ -241,7 +241,7 @@ export default function DashboardPage() {
                   <p>{tasks.find((task) => task.id === entry.tarea_id)?.titulo}</p>
                   <OdooEntryStatus entry={entry} />
                   <OdooLink task={tasks.find((task) => task.id === entry.tarea_id)} />
-                  <span className="mono dim">
+                  <span className="mono dim entry-summary__duration">
                     Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
                     <span className="accent">
                       → Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}

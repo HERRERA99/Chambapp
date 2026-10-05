@@ -1,3 +1,4 @@
+import { TaskPagination } from './components/TaskPagination';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Task } from '../../domain/models';
@@ -233,23 +234,13 @@ export default function TasksPage() {
                 })}
               </div>
               {visible.length ? (
-                <nav className="actions" aria-label="Paginación de tareas">
-                  <Button
-                    disabled={page === 1}
-                    onClick={() => setPagination({ key: filterKey, page: page - 1 })}
-                  >
-                    Anterior
-                  </Button>
-                  <span role="status">
-                    Página {page} de {pages} · {visible.length} tareas
-                  </span>
-                  <Button
-                    disabled={page === pages}
-                    onClick={() => setPagination({ key: filterKey, page: page + 1 })}
-                  >
-                    Siguiente
-                  </Button>
-                </nav>
+                <TaskPagination
+                  page={page}
+                  pages={pages}
+                  total={visible.length}
+                  pageSize={pageSize}
+                  onChange={(next) => setPagination({ key: filterKey, page: next })}
+                />
               ) : null}
               {!visible.length ? <p className="muted">No hay tareas con estos filtros.</p> : null}
               <Button

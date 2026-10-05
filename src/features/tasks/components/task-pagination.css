@@ -1,0 +1,47 @@
+.task-pagination {
+  margin: 8px 0 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.task-pagination__controls {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-pagination__controls .icon-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+
+.task-pagination__controls .icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.task-pagination__page {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.task-pagination__page strong {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-pagination__count {
+  margin: 8px 0 0;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

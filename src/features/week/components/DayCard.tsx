@@ -90,7 +90,7 @@ export function DayCard({
             <h3>{task?.titulo ?? 'Tarea'}</h3>
             <OdooEntryStatus entry={entry} />
             <OdooLink task={task} />
-            <span className="mono dim">
+            <span className="mono dim day-block__interval">
               {formatTime(entry.inicio_en, entry.zona_horaria)} –{' '}
               {entry.fin_en ? formatTime(entry.fin_en, entry.zona_horaria) : 'Ahora'}
             </span>

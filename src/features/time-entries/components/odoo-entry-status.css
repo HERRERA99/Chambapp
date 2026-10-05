@@ -1,0 +1,50 @@
+.odoo-entry-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 7px 0;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.odoo-entry-status > .icon {
+  flex-shrink: 0;
+}
+
+.odoo-entry-status > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.odoo-entry-status--imputed {
+  color: var(--success);
+  background: #88cbb20a;
+  border-color: #88cbb22b;
+}
+
+.odoo-entry-status--pending {
+  color: var(--warning);
+  background: #ecb67c08;
+  border-color: #ecb67c24;
+}
+
+.entry-summary__duration {
+  display: block;
+  margin-top: 7px;
+  line-height: 1.7;
+}
+
+.day-block__interval {
+  display: block;
+  margin-top: 7px;
+  line-height: 1.8;
+}
