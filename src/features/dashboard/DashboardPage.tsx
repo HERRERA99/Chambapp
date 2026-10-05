@@ -21,6 +21,7 @@ import { dashboardSummary } from './dashboardSelectors';
 import { formatDate, formatDuration, formatTime, mondayForDate } from '../../domain/time';
 import { readableError } from '../../lib/supabase/errors';
 import type { TimeEntry } from '../../domain/models';
+import { attendanceDays, attendanceTotal } from '../../domain/attendance';
 
 export default function DashboardPage() {
   const { data } = useWorkspace();
@@ -32,6 +33,15 @@ export default function DashboardPage() {
   const { profile, entries, tasks, projects } = data;
   const today = DateTime.fromISO(attendance.now, { zone: profile.zona_horaria }).toISODate()!;
   const { week, day, total, missingDays } = dashboardSummary(data, today);
+  const workedDays = attendanceDays(
+    data.fichajes,
+    [],
+    week.map((item) => item.date),
+    profile.zona_horaria,
+    attendance.now,
+  );
+  const workedTotal = attendanceTotal(workedDays);
+  const workedByDate = new Map(workedDays.map((item) => [item.date, item.workedSeconds]));
   const activeTask = tasks.find((task) => task.id === tracker.active?.tarea_id);
   const activeProject = projects.find((project) => project.id === activeTask?.proyecto_id);
   const available = tasks.filter(
@@ -149,30 +159,34 @@ export default function DashboardPage() {
       <AttendanceComparison monday={mondayForDate(today)} today={today} compact />
       <Panel
         eyebrow="Comparativa semanal"
-        title="Horas imputadas y objetivo"
+        title="Horas fichadas y objetivo"
         action={
           <div className="chart-legend">
             <span>
-              <i /> Imputado
+              <i /> Fichado
             </span>
             <span>
               <i className="chart-legend__target" /> Objetivo
             </span>
             <strong className="mono">
-              {formatDuration(total.logged)} / {formatDuration(total.target)}
+              {formatDuration(workedTotal.workedSeconds)} / {formatDuration(total.target)}
             </strong>
           </div>
         }
       >
         <WeekChart
+          hoursLabel="fichadas"
           days={week.map((item) => ({
             date: item.date,
             label: DateTime.fromISO(item.date).setLocale('es').toFormat('ccc dd'),
-            loggedSeconds: item.logged,
+            loggedSeconds: workedByDate.get(item.date) ?? 0,
             targetSeconds: item.targetSeconds,
             isToday: item.date === today,
           }))}
         />
+        {workedTotal.provisionalSeconds > 0 ? (
+          <p className="field__hint">Incluye el fichaje en curso como tiempo provisional.</p>
+        ) : null}
       </Panel>
       <div className="two-columns">
         <Panel

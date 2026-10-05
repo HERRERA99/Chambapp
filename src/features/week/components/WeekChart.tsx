@@ -21,9 +21,11 @@ const emptyDays: readonly WeekChartDay[] = [];
 export function WeekChart({
   days = emptyDays,
   preview = false,
+  hoursLabel = 'imputadas',
 }: {
   days?: readonly WeekChartDay[];
   preview?: boolean;
+  hoursLabel?: 'imputadas' | 'fichadas';
 }) {
   const values = preview ? previewDays : days;
   if (!values.length)
@@ -35,7 +37,7 @@ export function WeekChart({
   const description = values
     .map(
       (day) =>
-        `${day.label}: ${formatDuration(day.loggedSeconds)} imputadas; objetivo ${formatDuration(day.targetSeconds)}`,
+        `${day.label}: ${formatDuration(day.loggedSeconds)} ${hoursLabel}; objetivo ${formatDuration(day.targetSeconds)}`,
     )
     .join('; ');
   return (
