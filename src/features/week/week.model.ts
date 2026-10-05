@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import type { Project, Task, TimeEntry, Workday, WorkspaceData } from '../../domain/models';
 import { formatDuration, weekDates } from '../../domain/time.ts';
+import { attendanceDays } from '../../domain/attendance.ts';
 
 export type WeekBlock = {
   entry: TimeEntry;
@@ -20,6 +21,8 @@ export type CalendarDay = {
   targetSeconds: number;
   realSeconds: number;
   loggedSeconds: number;
+  workedSeconds: number;
+  provisionalSeconds: number;
   blocks: WeekBlock[];
 };
 
@@ -28,8 +31,14 @@ export function describeBalance(seconds: number) {
   return `${formatDuration(Math.abs(seconds))} ${seconds > 0 ? 'a favor' : 'pendientes'}`;
 }
 
-export function buildWeek(data: WorkspaceData, monday: string, today: string) {
+export function buildWeek(
+  data: WorkspaceData,
+  monday: string,
+  today: string,
+  now = new Date().toISOString(),
+) {
   const dates = weekDates(monday);
+  const attendance = attendanceDays(data.fichajes, [], dates, data.profile.zona_horaria, now);
   const selectedDates = new Set(dates);
   const configuration = data.configurations.reduce<
     (typeof data.configurations)[number] | undefined
@@ -79,6 +88,8 @@ export function buildWeek(data: WorkspaceData, monday: string, today: string) {
       jornada,
       plannedTargetSeconds: targets.get(index + 1) ?? 0,
       targetSeconds: (jornada?.minutos_objetivo ?? 0) * 60,
+      workedSeconds: attendance[index]!.workedSeconds,
+      provisionalSeconds: attendance[index]!.provisionalSeconds,
       realSeconds: completed.reduce(
         (sum, block) => sum + (block.entry.duracion_real_segundos ?? 0),
         0,
@@ -104,6 +115,11 @@ export function buildWeek(data: WorkspaceData, monday: string, today: string) {
     targetSeconds: days.reduce((sum, day) => sum + day.targetSeconds, 0),
     realSeconds: days.reduce((sum, day) => sum + day.realSeconds, 0),
     loggedSeconds: days.reduce((sum, day) => sum + day.loggedSeconds, 0),
+    workedSeconds: days.reduce((sum, day) => sum + day.workedSeconds, 0),
+    provisionalSeconds: days.reduce((sum, day) => sum + day.provisionalSeconds, 0),
+    completedAttendanceDays: days.filter(
+      (day) => day.jornada && day.targetSeconds > 0 && day.workedSeconds >= day.targetSeconds,
+    ).length,
     completedDays: days.filter(
       (day) => day.jornada && day.targetSeconds > 0 && day.loggedSeconds >= day.targetSeconds,
     ).length,

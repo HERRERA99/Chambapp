@@ -57,15 +57,16 @@ export function DayCard({
           />
         ) : null}
       </div>
-      <p className="day-card__duration mono">{formatDuration(day.loggedSeconds)}</p>
+      <p className="day-card__duration mono">Fichado: {formatDuration(day.workedSeconds)}</p>
+      {day.provisionalSeconds > 0 ? <p className="field__hint">Incluye fichaje en curso</p> : null}
       <Progress
-        value={day.targetSeconds > 0 ? (day.loggedSeconds / day.targetSeconds) * 100 : 0}
+        value={day.targetSeconds > 0 ? (day.workedSeconds / day.targetSeconds) * 100 : 0}
         label={`Objetivo registrado del ${day.name}`}
         tone={day.isToday ? 'accent' : 'soft'}
       />
       <p className="day-card__balance">
         {day.jornada && day.targetSeconds > 0
-          ? describeBalance(day.loggedSeconds - day.targetSeconds)
+          ? describeBalance(day.workedSeconds - day.targetSeconds)
           : day.jornada
             ? 'Sin objetivo'
             : target > 0

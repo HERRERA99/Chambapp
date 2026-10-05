@@ -35,7 +35,10 @@ export default function WeekPage() {
     zone: data?.profile.zona_horaria ?? 'Europe/Madrid',
   }).toISODate()!;
   const monday = selectedMonday ?? mondayForDate(today);
-  const week = useMemo(() => (data ? buildWeek(data, monday, today) : null), [data, monday, today]);
+  const week = useMemo(
+    () => (data ? buildWeek(data, monday, today, attendance.now) : null),
+    [data, monday, today, attendance.now],
+  );
 
   async function generate() {
     setCommandError(null);
@@ -110,7 +113,7 @@ export default function WeekPage() {
     );
   const startDate = DateTime.fromISO(monday, { zone: 'UTC' }).setLocale('es');
   const endDate = startDate.plus({ days: 6 });
-  const progress = week.targetSeconds > 0 ? (week.loggedSeconds / week.targetSeconds) * 100 : 0;
+  const progress = week.targetSeconds > 0 ? (week.workedSeconds / week.targetSeconds) * 100 : 0;
   const canAdd = week.canAdd;
   const activeInWeek =
     tracker.active && week.days.some((day) => day.date === tracker.active?.fecha);
@@ -119,7 +122,7 @@ export default function WeekPage() {
       <PageHeader
         eyebrow="Operaciones / Planificación / Mi semana"
         title="Mi Semana Laboral & Balances"
-        description="Objetivos diarios y tiempos reales e imputados de tus sesiones de trabajo."
+        description="Objetivos diarios y horas fichadas de tu jornada laboral."
         actions={
           <>
             <ButtonLink to="/ajustes#jornada" icon="settings">
@@ -153,9 +156,12 @@ export default function WeekPage() {
             progress,
           },
           {
-            label: 'Tiempo imputado semanal',
-            value: formatDuration(week.loggedSeconds),
-            detail: 'Partes finalizados de la semana',
+            label: 'Tiempo fichado semanal',
+            value: formatDuration(week.workedSeconds),
+            detail:
+              week.provisionalSeconds > 0
+                ? 'Incluye fichaje en curso · provisional'
+                : 'Entradas y salidas de la semana, sin contar pausas',
             icon: 'timer',
             accent: true,
           },
@@ -167,8 +173,8 @@ export default function WeekPage() {
           },
           {
             label: 'Balance semanal',
-            value: `${week.loggedSeconds >= week.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(week.loggedSeconds - week.targetSeconds))}`,
-            detail: `${week.completedDays} de ${week.workdays} objetivos cumplidos`,
+            value: `${week.workedSeconds >= week.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(week.workedSeconds - week.targetSeconds))}`,
+            detail: `${week.completedAttendanceDays} de ${week.workdays} objetivos cumplidos`,
             icon: 'gauge',
             accent: true,
           },
@@ -197,8 +203,8 @@ export default function WeekPage() {
       ) : null}
       {activeInWeek ? (
         <Notice title="Tramo activo · tiempo provisional">
-          {formatClock(tracker.elapsedSeconds)} transcurridos. Se incorporará al balance al detener
-          el cronómetro.
+          {formatClock(tracker.elapsedSeconds)} transcurridos. Se incorporará al tiempo en tareas al
+          detener el cronómetro.
         </Notice>
       ) : null}
       <Panel
@@ -246,11 +252,11 @@ export default function WeekPage() {
         </div>
       </Panel>
       <Panel
-        title="Horas imputadas frente al objetivo"
+        title="Horas fichadas frente al objetivo"
         action={
           <div className="chart-legend">
             <span>
-              <i /> Imputado
+              <i /> Fichado
             </span>
             <span>
               <i className="chart-legend__target" /> Objetivo
@@ -258,15 +264,18 @@ export default function WeekPage() {
           </div>
         }
       >
-        <WeekChart days={week.days} />
+        <WeekChart
+          hoursLabel="fichadas"
+          days={week.days.map((day) => ({ ...day, loggedSeconds: day.workedSeconds }))}
+        />
       </Panel>
       <AttendanceComparison monday={monday} />
       <div className="two-columns two-columns--wide week-insights">
         <Panel title="Un balance para organizar tu ritmo" icon="shield">
           <p className="muted section-intro">
-            {describeBalance(week.loggedSeconds - week.targetSeconds)} en las jornadas registradas.
-            Los objetivos y los tiempos en curso se presentan por separado para revisar la semana
-            con claridad.
+            {describeBalance(week.workedSeconds - week.targetSeconds)} en las jornadas registradas.
+            El balance usa los fichajes e incluye el tiempo en curso como provisional para revisar
+            la semana con claridad.
           </p>
           <div className="principles">
             <div>
@@ -299,7 +308,7 @@ export default function WeekPage() {
           <p className="export-progress mono">{Math.round(progress)}%</p>
           <Progress value={progress} label="Progreso respecto a las jornadas registradas" />
           <p className="mono muted">
-            {formatDuration(week.loggedSeconds)} / {formatDuration(week.targetSeconds)}
+            {formatDuration(week.workedSeconds)} / {formatDuration(week.targetSeconds)}
           </p>
           <Button
             icon="download"

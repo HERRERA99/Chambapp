@@ -61,7 +61,9 @@ export default function DashboardPage() {
         (taskTotals.get(entry.tarea_id) ?? 0) + (entry.duracion_imputada_segundos ?? 0),
       );
   const todayEntries = entries.filter((entry) => entry.fecha === today && entry.fin_en);
-  const balance = total.logged - total.due;
+  const balance =
+    workedDays.reduce((sum, item) => sum + (item.date <= today ? item.workedSeconds : 0), 0) -
+    total.due;
   async function toggleTask(id: string) {
     try {
       if (tracker.active?.tarea_id === id) await tracker.stop();
@@ -111,7 +113,7 @@ export default function DashboardPage() {
           {
             label: 'Saldo hasta hoy',
             value: `${balance >= 0 ? '+' : '−'}${formatDuration(Math.abs(balance))}`,
-            detail: 'Tiempo imputado frente al objetivo acumulado',
+            detail: 'Tiempo fichado frente al objetivo acumulado',
             icon: 'gauge',
             accent: balance >= 0,
           },

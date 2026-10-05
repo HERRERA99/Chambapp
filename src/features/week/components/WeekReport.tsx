@@ -16,15 +16,15 @@ export function WeekReport({
     <div className="week-print-report">
       <Panel title="Detalle de jornadas">
         <DataTable
-          caption="Objetivos y duración de partes finalizados"
-          headers={['Fecha', 'Objetivo', 'Real', 'Imputado']}
+          caption="Objetivos y horas fichadas por jornada"
+          headers={['Fecha', 'Objetivo', 'Fichado', 'En curso']}
         >
           {days.map((day) => (
             <tr key={day.date}>
               <td>{day.date}</td>
               <td>{formatDuration(day.targetSeconds)}</td>
-              <td>{formatDuration(day.realSeconds)}</td>
-              <td>{formatDuration(day.loggedSeconds)}</td>
+              <td>{formatDuration(day.workedSeconds)}</td>
+              <td>{formatDuration(day.provisionalSeconds)}</td>
             </tr>
           ))}
         </DataTable>

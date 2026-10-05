@@ -3,6 +3,8 @@ import { buildWeek, describeBalance } from '../src/features/week/week.model.ts';
 
 const monday = '2026-09-28';
 const data = {
+  profile: { zona_horaria: 'Europe/Madrid' },
+  fichajes: [],
   configurations: [
     { id: 'future', vigente_desde: '2026-10-05', minutos_semanales: 1200 },
     { id: 'old', vigente_desde: '2026-09-21', minutos_semanales: 2250 },
@@ -99,6 +101,7 @@ assert.equal(week.targetSeconds, 24000);
 assert.equal(week.entries.length, 4);
 assert.equal(week.workdays, 1);
 assert.equal(week.completedDays, 0);
+assert.equal(week.workedSeconds, 0);
 assert.equal(week.canAdd, true);
 assert.equal(week.days[0].blocks[0].project.nombre, 'Cliente A');
 assert.equal(describeBalance(0), 'Objetivo cumplido');
@@ -140,4 +143,27 @@ assert.equal(noConfiguration.entries.length, 0);
 assert.equal(noConfiguration.targetSeconds, 0);
 console.log(
   'PASS: previous/future week navigation, unsaved objectives, archived/missing projects and empty account.',
+);
+
+const attendedWeek = buildWeek(
+  {
+    ...data,
+    fichajes: [
+      { inicio_en: '2026-09-28T07:00:00Z', fin_en: '2026-09-28T14:00:00Z', eliminado_en: null },
+      { inicio_en: '2026-10-01T08:00:00Z', fin_en: null, eliminado_en: null },
+    ],
+  },
+  monday,
+  '2026-10-01',
+  '2026-10-01T09:00:00Z',
+);
+assert.equal(attendedWeek.workedSeconds, 8 * 3600);
+assert.equal(attendedWeek.provisionalSeconds, 3600);
+assert.equal(attendedWeek.days[0].workedSeconds, 7 * 3600);
+assert.equal(attendedWeek.days[3].workedSeconds, 3600);
+assert.equal(attendedWeek.completedAttendanceDays, 1);
+assert.equal(attendedWeek.loggedSeconds, week.loggedSeconds);
+assert.equal(attendedWeek.completedDays, 0);
+console.log(
+  'PASS: attendance drives weekly and daily balances, including open attendance independently of task time.',
 );
