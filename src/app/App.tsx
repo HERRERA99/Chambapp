@@ -11,6 +11,7 @@ import { paths } from './paths';
 
 const LandingPage = lazy(() => import('../features/landing/LandingPage'));
 const AuthPage = lazy(() => import('../features/auth/AuthPage'));
+const OAuthCallbackPage = lazy(() => import('../features/auth/OAuthCallbackPage'));
 const PasswordRecoveryPage = lazy(() => import('../features/auth/PasswordRecoveryPage'));
 const OnboardingPage = lazy(() => import('../features/onboarding/OnboardingPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
@@ -25,6 +26,7 @@ const NotFoundPage = lazy(() => import('./NotFoundPage'));
 const routeTitles: Record<string, string> = {
   '/': 'Tu tiempo, bajo control',
   '/login': 'Acceso',
+  '/auth/callback': 'Completando acceso',
   '/registro': 'Crear cuenta',
   '/recuperar-contrasena': 'Recuperar acceso',
   '/onboarding': 'Configuración inicial',
@@ -66,6 +68,7 @@ export function App() {
                   <Routes>
                     <Route path={paths.home} element={<LandingPage />} />
                     <Route path={paths.login} element={<AuthPage />} />
+                    <Route path={paths.authCallback} element={<OAuthCallbackPage />} />
                     <Route path={paths.register} element={<AuthPage />} />
                     <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
                     <Route element={<RequireAuth onboarding />}>

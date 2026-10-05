@@ -204,9 +204,11 @@ function AuthConsole({
         ) : null}
         {verificationEmail ? (
           <div role="status" className="form-stack">
-            <Notice title="Confirma tu correo">
-              Hemos solicitado el alta de {verificationEmail}. Abre el enlace de confirmación que
-              recibirás para acceder a tu espacio.
+            <Notice title="Solicitud de registro recibida">
+              Si {verificationEmail} corresponde a una cuenta nueva pendiente de confirmar,
+              recibirás un enlace de activación. Revisa también la carpeta de spam. Si ya tenías una
+              cuenta, inicia sesión con el método que usaste al crearla. Si fue con Google, pulsa
+              «Continuar con Google» en la pantalla de acceso.
             </Notice>
             <Link className="text-link" to={`${paths.login}${suffix}`}>
               Volver a iniciar sesión
@@ -240,7 +242,7 @@ function AuthConsole({
                   {availableProviders.map((provider) => (
                     <Button
                       key={provider.id}
-                      className="auth-provider"
+                      className={`auth-provider ${provider.id === 'google' ? 'auth-provider--google' : ''}`}
                       disabled={pending || !!configurationError}
                       onClick={() => void signInWithProvider(provider.id)}
                     >

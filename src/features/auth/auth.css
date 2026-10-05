@@ -351,3 +351,27 @@
     padding-inline: 10px;
   }
 }
+
+.auth-sso:has(> .auth-provider:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.auth-sso .auth-provider--google {
+  justify-content: center;
+  background: #fff;
+  color: #1f1f1f;
+  border-color: #dadce0;
+  font-weight: 500;
+}
+.auth-sso .auth-provider--google:hover:not(:disabled) {
+  background: #f2f2f2;
+  border-color: #b8b8b8;
+}
+.auth-callback {
+  display: grid;
+  gap: 28px;
+  width: min(520px, calc(100% - 40px));
+  margin: 80px auto;
+}
+.auth-callback .panel > .button {
+  margin-top: 20px;
+}

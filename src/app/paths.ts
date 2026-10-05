@@ -1,6 +1,7 @@
 export const paths = {
   home: '/',
   login: '/login',
+  authCallback: '/auth/callback',
   register: '/registro',
   recovery: '/recuperar-contrasena',
   onboarding: '/onboarding',

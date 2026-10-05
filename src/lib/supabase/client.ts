@@ -15,7 +15,12 @@ export const configurationError =
 const client = configurationError
   ? null
   : createClient<Database>(url!, key!, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      auth: {
+        flowType: 'pkce',
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
     });
 
 export function getSupabase() {

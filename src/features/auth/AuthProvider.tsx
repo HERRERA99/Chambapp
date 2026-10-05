@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { configurationError, getSupabase } from '../../lib/supabase/client';
 import { AuthContext } from './AuthContext';
+import { authErrorMessage } from './errors';
 
 type SessionState = { session: Session | null; loading: boolean; error: string | null };
 
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = getSupabase();
     let active = true;
     let events = 0;
+    let initialized = false;
     // Auth listeners stay synchronous: querying Supabase from an async listener
     // can wait on the same auth lock held by the event that invoked it.
     const {
@@ -28,26 +30,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = client.auth.onAuthStateChange((event, session) => {
       if (!active) return;
       events += 1;
-      setState({ session, loading: false, error: null });
+      setState({ session, loading: !initialized, error: null });
       if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
       if (event === 'SIGNED_OUT') setIsPasswordRecovery(false);
     });
 
     void client.auth
-      .getSession()
+      .initialize()
+      .then(({ error }) => {
+        if (error) throw error;
+        return client.auth.getSession();
+      })
       .then(({ data, error }) => {
+        initialized = true;
         // A newer auth event takes precedence over the initial request.
-        if (active && events === 0) {
-          setState({ session: data.session, loading: false, error: error?.message ?? null });
+        if (active) {
+          setState((current) =>
+            events === 0
+              ? {
+                  session: data.session,
+                  loading: false,
+                  error: error ? authErrorMessage(error) : null,
+                }
+              : { ...current, loading: false },
+          );
         }
       })
       .catch((error: unknown) => {
-        if (active && events === 0) {
-          setState({
-            session: null,
-            loading: false,
-            error: error instanceof Error ? error.message : 'No se pudo comprobar la sesión.',
-          });
+        initialized = true;
+        if (active) {
+          setState((current) => ({ ...current, loading: false, error: authErrorMessage(error) }));
         }
       });
 

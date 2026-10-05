@@ -52,13 +52,14 @@ export function oauthCredentials(
 ): SignInWithOAuthCredentials {
   const definition = enabledOAuthProviders(settings, register).find((item) => item.id === provider);
   if (!definition) throw new Error('Este método de acceso no está disponible. Elige otro.');
-  const callback = new URL(paths.login, origin);
+  const callback = new URL(paths.authCallback, origin);
   callback.searchParams.set('returnTo', safeReturnTo(returnTo, callback.origin));
   return {
     provider,
     options: {
       redirectTo: callback.href,
       ...(definition.scopes ? { scopes: definition.scopes } : {}),
+      ...(provider === 'google' ? { queryParams: { prompt: 'select_account' } } : {}),
     },
   };
 }

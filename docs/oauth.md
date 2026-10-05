@@ -12,6 +12,16 @@ No se ha activado ningún proveedor remoto ni se han añadido secretos. Para pon
 
 ## Callback del proveedor y regreso a Chambapp
 
+En producción, `Site URL` es `https://chambapp-tracker.vercel.app`. Añadir a `Redirect URLs`:
+
+```text
+https://chambapp-tracker.vercel.app/auth/callback**
+https://chambapp-tracker.vercel.app/login**
+https://chambapp-tracker.vercel.app/recuperar-contrasena**
+```
+
+La entrada de `/login` mantiene compatibilidad con versiones publicadas anteriores. El archivo `vercel.json` de la raíz sirve `index.html` para las rutas de la SPA: permite volver del proveedor y recargar rutas como `/resumen` sin un 404 del servidor. Publicar un nuevo despliegue después de cambiar este archivo; modificar solo las URLs de Supabase no corrige las rutas de Vercel. [Configuración oficial para Vite SPA](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas).
+
 Son dos destinos distintos:
 
 1. **Proveedor → Supabase:** registrar esta URL exacta en cada aplicación del proveedor:
@@ -22,11 +32,11 @@ Son dos destinos distintos:
 
    Copiar siempre el callback mostrado por **Authentication → Sign In / Providers** en el [proyecto de Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv/auth/providers), especialmente si se configura un dominio personalizado de Supabase.
 
-2. **Supabase → Chambapp:** el código usa el origen actual del navegador y `/login?returnTo=<destino codificado>`. Configurar **Authentication → URL Configuration** con la URL de producción en `Site URL` y una entrada del mismo host que acepte `/login` y sus parámetros, por ejemplo `https://DOMINIO-DE-CHAMBAPP/login**`. Para desarrollo local, añadir `http://127.0.0.1:5173/login**`; si se utiliza `localhost` u otro puerto, añadir ese origen explícitamente. Conservar también los destinos existentes de recuperación de contraseña.
+2. **Supabase → Chambapp:** el código usa el origen actual del navegador y `/auth/callback?returnTo=<destino codificado>`. Configurar **Authentication → URL Configuration** con la URL de producción en `Site URL` y una entrada del mismo host que acepte `/auth/callback` y sus parámetros, por ejemplo `https://DOMINIO-DE-CHAMBAPP/auth/callback**`. Para desarrollo local, añadir `http://127.0.0.1:5173/auth/callback**`; si se utiliza `localhost` u otro puerto, añadir ese origen explícitamente. Conservar también los destinos existentes de recuperación de contraseña.
 
 La allowlist debe limitarse a los orígenes reales de Chambapp. El comodín del ejemplo permite los parámetros del callback; no añadir comodines que acepten cualquier host. `returnTo` se valida contra las rutas internas conocidas antes de iniciar OAuth y antes de navegar tras la sesión. Los errores y la cancelación del proveedor se muestran en el formulario. [Configuración oficial de redirecciones](https://supabase.com/docs/guides/auth/redirect-urls).
 
-Chambapp usa `@supabase/supabase-js` 2.117.1, una SPA con `detectSessionInUrl: true`. El cliente actual gestiona el retorno del flujo implícito; no se ha añadido un callback de servidor ni cambiado el flujo de recuperación existente.
+Chambapp usa `@supabase/supabase-js` 2.117.1, una SPA con `detectSessionInUrl: true`. El cliente usa PKCE: el SDK intercambia el código durante su inicialización y la pantalla `/auth/callback` espera esa confirmación antes de volver al destino permitido. No se intercambia el código una segunda vez desde React. Los errores de inicialización, cancelación, código caducado o navegador distinto permiten volver al login. Google solicita el selector de cuenta. Los enlaces de correo y recuperación siguen usando sus rutas originales.
 
 ## Activar los proveedores principales
 

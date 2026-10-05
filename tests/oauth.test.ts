@@ -77,7 +77,7 @@ test('OAuth sign-in and sign-up preserve the requested destination using the sam
   const credentials = oauthCredentials('google', settings, destination, origin);
   const callback = new URL(credentials.options!.redirectTo!);
   assert.equal(callback.origin, origin);
-  assert.equal(callback.pathname, '/login');
+  assert.equal(callback.pathname, '/auth/callback');
   assert.equal(callback.searchParams.get('returnTo'), destination);
   assert.deepEqual(oauthCredentials('google', settings, destination, origin, true), credentials);
 });
@@ -136,4 +136,19 @@ test('OAuth callback cancellation and provider errors are visible for query and 
     'Este proveedor de acceso todavía no está habilitado. Elige otro método disponible.',
   );
   assert.equal(oauthCallbackError('?returnTo=%2Ftareas', '#access_token=token'), null);
+});
+
+test('Google requests account selection and maps expired PKCE callbacks to a retryable sign-in message', () => {
+  const settings = parseAuthSettings({ external: { google: true, github: true } });
+  assert.deepEqual(oauthCredentials('google', settings, '/resumen', origin).options?.queryParams, {
+    prompt: 'select_account',
+  });
+  assert.equal(
+    oauthCredentials('github', settings, '/resumen', origin).options?.queryParams,
+    undefined,
+  );
+  assert.match(
+    oauthCallbackError('?error_description=PKCE+code+verifier+not+found', '')!,
+    /este navegador/,
+  );
 });

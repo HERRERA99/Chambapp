@@ -12,6 +12,12 @@ export function authErrorMessage(error: unknown): string {
     return 'El acceso con la plataforma se ha cancelado o no se ha autorizado. Puedes volver a intentarlo.';
   if (/signup.*disabled|signups.*not allowed/i.test(error.message))
     return 'La creación de cuentas está deshabilitada. Accede con una cuenta existente.';
+  if (
+    /code verifier|code_verifier|flow_state|pkce|authorization code|auth code/i.test(error.message)
+  )
+    return 'El enlace de acceso ha caducado o se abrió en otro navegador. Vuelve a iniciar sesión desde este navegador.';
+  if (/redirect_uri_mismatch|redirect.*not allowed/i.test(error.message))
+    return 'La dirección de retorno del acceso no está configurada. Contacta con quien administra Chambapp.';
   if (/failed to fetch|network/i.test(error.message))
     return 'No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.';
   if (/password.*same|same.*password/i.test(error.message))
