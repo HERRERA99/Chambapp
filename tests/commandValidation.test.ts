@@ -122,3 +122,31 @@ test('manual Odoo status confirms only a response containing the requested boole
     true,
   );
 });
+
+test('selected timer start is only confirmed when the returned instant matches the requested start', () => {
+  const reply = { ok: true, parte: part, hora_servidor: time };
+  assert.equal(
+    isValidCommandResponse('iniciar', { tarea_id: taskId, inicio_en: time }, reply),
+    true,
+  );
+  assert.equal(
+    isValidCommandResponse(
+      'iniciar',
+      { tarea_id: taskId, inicio_en: '2026-10-01T09:07:14.123456+02:00' },
+      reply,
+    ),
+    true,
+  );
+  assert.equal(
+    isValidCommandResponse(
+      'iniciar',
+      { tarea_id: taskId, inicio_en: '2026-10-01T06:00:00Z' },
+      reply,
+    ),
+    false,
+  );
+  assert.equal(
+    isValidCommandResponse('iniciar', { tarea_id: taskId, inicio_en: 'invalid' }, reply),
+    false,
+  );
+});

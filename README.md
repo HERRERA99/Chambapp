@@ -87,7 +87,7 @@ Web Locks coordina las operaciones entre pestañas del mismo origen y `storage` 
 
 Las tablas tienen RLS y cada cuenta lee únicamente sus registros. Las escrituras pasan por `chambapp_operar`, con propietario derivado de la sesión, validación de relaciones y versiones para detectar cambios concurrentes. Las vistas utilizan `security_invoker`; el cliente no tiene permisos directos de escritura. [Modelo y payloads RPC](docs/base-de-datos.md).
 
-El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821`, `20261001213125`, `20261002190139` y `20261002201755`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
+El proyecto alojado [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv) tiene aplicadas las migraciones `20261001181821`, `20261001213125`, `20261002190139`, `20261002201755` y `20261005185736`. La CLI y el plugin MCP tienen autenticaciones independientes: para futuras migraciones con CLI necesitas iniciar sesión.
 
 La migración [Odoo y fichajes](supabase/migrations/20261002190139_odoo_and_attendance.sql) está aplicada al proyecto alojado y verificada tanto en PostgreSQL aislado como con los controles remotos de catálogo y permisos. Añade los campos Odoo, las tablas y vistas de fichajes y amplía la RPC existente. Los tipos TypeScript se han generado desde la base actualizada; la versión del archivo coincide con el historial remoto.
 
@@ -123,3 +123,5 @@ npm run db:test
 ```
 
 La suite levanta PostgreSQL 17 aislado con datos sintéticos, aplica todas las migraciones y verifica RLS, propiedad, versiones, redondeo, DST, cronómetro, referencias Odoo, fichajes, reintentos y concurrencia. No modifica la base alojada. `supabase/verify.sql` comprueba catálogo y permisos después de aplicar una migración; las pruebas de SQL no sustituyen la verificación de registro, confirmación por correo y login en el navegador.
+
+La migración [Inicio retroactivo y credenciales de Odoo](supabase/migrations/20261005185736_selected_timer_start_and_odoo_credentials.sql) está aplicada al proyecto alojado y verificada con PostgreSQL aislado y con el script remoto de catálogo y permisos. Es necesaria para activar «Iniciar a otra hora» y el guardado de la API key en el tutorial y en Ajustes. Las tareas se paginan de seis en seis y todas las vistas de partes muestran su estado de imputación en Odoo.

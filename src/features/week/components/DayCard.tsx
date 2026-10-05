@@ -1,3 +1,4 @@
+import { OdooEntryStatus } from '../../time-entries/components/OdooEntryStatus';
 import type { TimeEntry } from '../../../domain/models';
 import { formatClock, formatDuration, formatTime } from '../../../domain/time';
 import { Badge, Progress } from '../../../shared/ui/Panel';
@@ -87,6 +88,7 @@ export function DayCard({
               </span>
             </div>
             <h3>{task?.titulo ?? 'Tarea'}</h3>
+            <OdooEntryStatus entry={entry} />
             <OdooLink task={task} />
             <span className="mono dim">
               {formatTime(entry.inicio_en, entry.zona_horaria)} –{' '}

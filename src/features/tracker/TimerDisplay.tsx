@@ -1,3 +1,5 @@
+import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
+import { StartTimerButton } from './StartTimerButton';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '../../shared/ui/Panel';
@@ -24,9 +26,12 @@ function LiveTimer({ compact }: { compact: boolean }) {
   }
   if (!tracker.active && !tracker.pausedTaskId && !tracker.pending)
     return (
-      <Link className="text-link" to="/tareas">
-        Iniciar cronómetro
-      </Link>
+      <div className="actions">
+        <Link className="text-link" to="/tareas">
+          Iniciar cronómetro
+        </Link>
+        <StartTimerButton />
+      </div>
     );
   const disabled = tracker.busy || tracker.pending;
   return (
@@ -40,6 +45,7 @@ function LiveTimer({ compact }: { compact: boolean }) {
               : 'Pausado'}
         </span>
         <strong>{task?.titulo ?? 'Tarea'}</strong>
+        {tracker.active ? <OdooEntryStatus entry={tracker.active} /> : null}
       </div>
       <div className="timer-display__clock">
         <span className="eyebrow">{compact ? null : 'Duración de sesión'}</span>
@@ -78,14 +84,17 @@ function LiveTimer({ compact }: { compact: boolean }) {
             </Button>
           </>
         ) : (
-          <Button
-            icon="play"
-            variant="primary"
-            disabled={disabled}
-            onClick={() => void action(tracker.resume)}
-          >
-            Reanudar
-          </Button>
+          <>
+            <StartTimerButton taskId={tracker.pausedTaskId ?? undefined} />
+            <Button
+              icon="play"
+              variant="primary"
+              disabled={disabled}
+              onClick={() => void action(tracker.resume)}
+            >
+              Reanudar
+            </Button>
+          </>
         )}
       </div>
     </div>

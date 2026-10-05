@@ -8,7 +8,7 @@ export type TrackerState = {
   pending: boolean;
   error: string | null;
   pausedTaskId: string | null;
-  start: (taskId: string) => Promise<void>;
+  start: (taskId: string, startAt?: string) => Promise<void>;
   stop: () => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;

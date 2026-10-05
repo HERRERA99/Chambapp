@@ -1,3 +1,4 @@
+import { OdooEntryStatus } from '../../time-entries/components/OdooEntryStatus';
 import type { Task, TimeEntry } from '../../../domain/models';
 import { formatDate, formatDuration, formatTime } from '../../../domain/time';
 import { Panel, Badge } from '../../../shared/ui/Panel';
@@ -30,7 +31,7 @@ export function TaskEntries({
   const dates = [...grouped.keys()].sort().reverse();
   return (
     <Panel
-      title="Partes imputados por jornada"
+      title="Partes de horas por jornada"
       icon="calendar"
       action={
         <Button icon="plus" disabled={!canCreate} onClick={onCreate}>
@@ -64,6 +65,7 @@ export function TaskEntries({
                   <div>
                     <div className="actions">
                       <strong>Sesión de trabajo</strong>
+                      <OdooEntryStatus entry={entry} />
                       <span className="mono dim">
                         {formatTime(entry.inicio_en, entry.zona_horaria)} →{' '}
                         {entry.fin_en ? formatTime(entry.fin_en, entry.zona_horaria) : 'En curso'}

@@ -1,3 +1,5 @@
+import { OdooApiKeyField } from '../settings/components/OdooSettings';
+import { configureOdoo } from '../settings/odooCredentials';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,12 +23,14 @@ const steps = [
   'Jornada semanal',
   'Motor de Redondeo',
   'Zona Horaria & Proyecto',
+  'Odoo',
 ] as const;
 const titles = [
   'Dale un lugar a tu trabajo',
   'Define tu jornada semanal',
   'Cada minuto, con total transparencia',
   'Tu consola, a tu medida',
+  'Configura tu acceso a Odoo',
 ] as const;
 const workdayChoices = [
   {
@@ -82,6 +86,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
   const [currency, setCurrency] = useState(preference(data, 'moneda', 'EUR'));
   const [project, setProject] = useState('');
   const [client, setClient] = useState('');
+  const [odooKey, setOdooKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const monday = mondayForDate(todayInZone(zone));
@@ -92,7 +97,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
   async function finish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
-    if (step !== 3) {
+    if (step !== 4) {
       continueStep();
       return;
     }
@@ -116,6 +121,10 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
     }
     setSaving(true);
     try {
+      if (odooKey.trim()) {
+        await configureOdoo(odooKey, true);
+        setOdooKey('');
+      }
       // Save the time zone before creating days: every day retains its own zone.
       const profile = await run<Profile>('editar_perfil', {
         version: data.profile.version,
@@ -199,7 +208,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
       setError('Introduce una jornada entre 1 y 120 horas semanales.');
       return;
     }
-    setStep((current) => Math.min(3, current + 1));
+    setStep((current) => Math.min(steps.length - 1, current + 1));
   }
 
   return (
@@ -217,9 +226,14 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
             <p className="eyebrow">Configuración de tu espacio de trabajo</p>
             <h2>Tu espacio. Tus reglas.</h2>
           </div>
-          <span className="mono accent">{(step + 1) * 25}% del recorrido</span>
+          <span className="mono accent">
+            {Math.round(((step + 1) / steps.length) * 100)}% del recorrido
+          </span>
         </div>
-        <Progress value={(step + 1) * 25} label="Progreso de configuración" />
+        <Progress
+          value={Math.round(((step + 1) / steps.length) * 100)}
+          label="Progreso de configuración"
+        />
         <nav className="onboarding-steps" aria-label="Pasos de configuración">
           {steps.map((label, index) => (
             <button
@@ -440,6 +454,15 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
                 </Notice>
               </>
             ) : null}
+            {step === 4 ? (
+              <Panel eyebrow="Bloque 05" title="API key de Odoo (opcional)">
+                <p className="muted">
+                  Añade la clave de tu usuario de Odoo. También puedes hacerlo más adelante desde
+                  Ajustes.
+                </p>
+                <OdooApiKeyField value={odooKey} onChange={setOdooKey} disabled={saving} />
+              </Panel>
+            ) : null}
           </div>
           <footer className="onboarding-actions">
             <Button
@@ -453,7 +476,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
             <span className="mono dim">
               {saving ? 'Guardando configuración…' : 'Se guarda al finalizar'}
             </span>
-            {step === 3 ? (
+            {step === 4 ? (
               <Button key="finish" type="submit" variant="primary" icon="arrow" disabled={saving}>
                 {saving ? 'Guardando…' : 'Guardar y abrir Workspace'}
               </Button>

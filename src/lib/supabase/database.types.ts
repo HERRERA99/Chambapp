@@ -624,6 +624,10 @@ export type Database = {
       };
     };
     Functions: {
+      chambapp_configurar_odoo: {
+        Args: { p_api_key?: string; p_guardar?: boolean };
+        Returns: boolean;
+      };
       chambapp_operar: {
         Args: { p_accion: string; p_datos?: Json };
         Returns: Json;

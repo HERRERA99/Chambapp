@@ -67,7 +67,12 @@ export function isValidCommandResponse(
     )
       return false;
     return action === 'iniciar'
-      ? part.tarea_id === payload.tarea_id
+      ? part.tarea_id === payload.tarea_id &&
+          (payload.inicio_en === undefined ||
+            (typeof payload.inicio_en === 'string' &&
+              typeof part.inicio_en === 'string' &&
+              timestamp(payload.inicio_en) &&
+              Date.parse(part.inicio_en) === Date.parse(payload.inicio_en)))
       : part.id === payload.parte_id && timestamp(part.fin_en);
   }
   if (action === 'consultar_cronometro')

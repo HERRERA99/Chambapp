@@ -7,6 +7,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyAttendance } from './attendance.mjs';
 import { verifyOdooStatus } from './odoo-status.mjs';
+import { verifySelectedStartAndCredentials } from './selected-start-and-credentials.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const databaseDir = await mkdtemp(join(tmpdir(), 'chambapp-db-test-'));
@@ -622,6 +623,17 @@ try {
   );
   await verifyAttendance({ admin, ca, cb, anonymous, client, rpc, expectError, ok });
   await verifyOdooStatus({ ca, cb, client, rpc, expectError, ok });
+  await verifySelectedStartAndCredentials({
+    admin,
+    ca,
+    cb,
+    anonymous,
+    noSession,
+    client,
+    rpc,
+    expectError,
+    ok,
+  });
   await expectError(
     () =>
       admin.query('update public.configuraciones_semanales set minutos_semanales=1 where id=$1', [
@@ -633,7 +645,7 @@ try {
     await admin.query(`select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname in ('public','chambapp_private') and c.relkind='r'`)
   ).rows;
-  assert.equal(catalog.length, 10);
+  assert.equal(catalog.length, 11);
   assert.ok(catalog.every((x) => x.relrowsecurity));
   const unsafe = (
     await admin.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
@@ -661,7 +673,10 @@ try {
     ).rows[0].allowed,
     false,
   );
-  ok('all ten tables have RLS, weekly versions are immutable and public RPC is security invoker');
+  ok(
+    'all eleven tables have RLS, weekly versions are immutable and public RPC is security invoker',
+  );
+  await admin.query(await readFile(join(root, 'supabase/verify.sql'), 'utf8'));
   console.log(
     `PASS: ${count} database verification groups. PostgreSQL ${(await admin.query('show server_version')).rows[0].server_version}.`,
   );

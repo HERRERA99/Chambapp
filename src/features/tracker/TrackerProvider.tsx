@@ -103,10 +103,14 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
     }
   }
 
-  async function start(taskId: string) {
+  async function start(taskId: string, startAt?: string) {
     await perform({
       action: 'iniciar',
-      payload: { operacion_id: crypto.randomUUID(), tarea_id: taskId },
+      payload: {
+        operacion_id: crypto.randomUUID(),
+        tarea_id: taskId,
+        ...(startAt ? { inicio_en: startAt } : {}),
+      },
       after: 'start',
       taskId,
     });

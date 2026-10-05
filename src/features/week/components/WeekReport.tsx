@@ -1,3 +1,4 @@
+import { OdooEntryStatus } from '../../time-entries/components/OdooEntryStatus';
 import { formatDuration, formatTime } from '../../../domain/time';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Panel } from '../../../shared/ui/Panel';
@@ -31,7 +32,14 @@ export function WeekReport({
       <Panel title="Partes de la semana">
         <DataTable
           caption="Inicio y fin exactos; el redondeo se aplica a la duración"
-          headers={['Fecha', 'Proyecto / tarea', 'Inicio / fin', 'Real', 'Imputado']}
+          headers={[
+            'Fecha',
+            'Proyecto / tarea',
+            'Inicio / fin',
+            'Real',
+            'Imputado',
+            'Estado en Odoo',
+          ]}
         >
           {entries.map(({ entry, task, project }) => (
             <tr key={entry.id}>
@@ -54,6 +62,9 @@ export function WeekReport({
               </td>
               <td>
                 {entry.fin_en ? formatDuration(entry.duracion_imputada_segundos ?? 0) : 'Pendiente'}
+              </td>
+              <td>
+                <OdooEntryStatus entry={entry} />
               </td>
             </tr>
           ))}

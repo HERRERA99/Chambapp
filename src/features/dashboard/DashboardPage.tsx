@@ -1,3 +1,4 @@
+import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
 import { useState } from 'react';
 import { DateTime } from 'luxon';
 import { Link } from 'react-router-dom';
@@ -238,6 +239,7 @@ export default function DashboardPage() {
                     {projects.find((project) => project.id === entry.proyecto_id)?.nombre}
                   </span>
                   <p>{tasks.find((task) => task.id === entry.tarea_id)?.titulo}</p>
+                  <OdooEntryStatus entry={entry} />
                   <OdooLink task={tasks.find((task) => task.id === entry.tarea_id)} />
                   <span className="mono dim">
                     Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
@@ -257,6 +259,7 @@ export default function DashboardPage() {
               <span className="status-dot" />
               <div>
                 <strong>Tramo en curso</strong>
+                <OdooEntryStatus entry={tracker.active} />
                 <p className="muted">Duración provisional; se consolida al detener.</p>
               </div>
               <Badge tone="accent">{formatDuration(tracker.elapsedSeconds)}</Badge>

@@ -26,6 +26,7 @@ export default function TasksPage() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [query, setQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [pagination, setPagination] = useState({ key: '', page: 1 });
   const projects = data?.projects.filter((project) => !project.eliminado_en) ?? [];
   const tasks = data?.tasks.filter((task) => !task.eliminado_en) ?? [];
   const entries = data?.entries.filter((entry) => !entry.eliminado_en) ?? [];
@@ -40,7 +41,12 @@ export default function TasksPage() {
         .toLocaleLowerCase('es')
         .includes(query.toLocaleLowerCase('es')),
   );
-  const selected = visible.find((task) => task.id === selectedId) ?? visible[0];
+  const pageSize = 6;
+  const filterKey = JSON.stringify([projectId, filter, includeArchived, query]);
+  const pages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const page = Math.min(pages, pagination.key === filterKey ? pagination.page : 1);
+  const pageTasks = visible.slice((page - 1) * pageSize, page * pageSize);
+  const selected = pageTasks.find((task) => task.id === selectedId) ?? pageTasks[0];
   const canCreate = projects.some((project) => !project.archivado_en);
   const taskTotals = entryTotalsBy(entries, 'tarea_id');
   const totals = (id: string) => taskTotals.get(id) ?? { real: 0, logged: 0, count: 0 };
@@ -189,7 +195,7 @@ export default function TasksPage() {
                 placeholder="Buscar tarea, proyecto o ID de Odoo…"
               />
               <div className="backlog">
-                {visible.map((task) => {
+                {pageTasks.map((task) => {
                   const logged = totals(task.id).logged;
                   return (
                     <div
@@ -226,6 +232,25 @@ export default function TasksPage() {
                   );
                 })}
               </div>
+              {visible.length ? (
+                <nav className="actions" aria-label="Paginación de tareas">
+                  <Button
+                    disabled={page === 1}
+                    onClick={() => setPagination({ key: filterKey, page: page - 1 })}
+                  >
+                    Anterior
+                  </Button>
+                  <span role="status">
+                    Página {page} de {pages} · {visible.length} tareas
+                  </span>
+                  <Button
+                    disabled={page === pages}
+                    onClick={() => setPagination({ key: filterKey, page: page + 1 })}
+                  >
+                    Siguiente
+                  </Button>
+                </nav>
+              ) : null}
               {!visible.length ? <p className="muted">No hay tareas con estos filtros.</p> : null}
               <Button
                 icon="plus"

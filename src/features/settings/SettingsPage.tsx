@@ -1,3 +1,4 @@
+import { OdooSettings } from './components/OdooSettings';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
@@ -170,6 +171,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           { id: 'jornada', label: 'Jornada semanal' },
           { id: 'redondeo', label: 'Redondeo de duración' },
           { id: 'regional', label: 'Perfil y zona horaria' },
+          { id: 'odoo', label: 'Odoo' },
           { id: 'seguridad', label: 'Seguridad' },
         ].map((section) => (
           <a key={section.id} href={`#${section.id}`}>
@@ -222,6 +224,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
         }}
         disabled={saving}
       />
+      <OdooSettings disabled={saving} />
       <SecuritySettings disabled={saving} />
       <div className="settings-footer">
         <Notice title="El histórico se conserva" icon="shield">

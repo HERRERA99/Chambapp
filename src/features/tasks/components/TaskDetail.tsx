@@ -1,3 +1,5 @@
+import { OdooEntryStatus } from '../../time-entries/components/OdooEntryStatus';
+import { StartTimerButton } from '../../tracker/StartTimerButton';
 import { useState } from 'react';
 import type { Project, Task, TimeEntry } from '../../../domain/models';
 import { formatDuration, formatTime, formatClock } from '../../../domain/time';
@@ -109,6 +111,10 @@ export function TaskDetail({
           >
             {active ? 'Detener' : 'Iniciar cronómetro'}
           </Button>
+          <StartTimerButton
+            taskId={task.id}
+            disabled={busy || blocked || task.estado === 'completada'}
+          />
           <Button
             icon="check"
             disabled={busy || !!active || blocked}
@@ -185,6 +191,7 @@ export function TaskDetail({
             <span className="status-dot" />
             <div>
               <strong>Cronómetro en esta tarea</strong>
+              <OdooEntryStatus entry={active} />
               <p className="muted">
                 Inicio exacto: {formatTime(active.inicio_en, active.zona_horaria)}
               </p>

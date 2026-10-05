@@ -16,7 +16,7 @@ El último comando aplica la migración a PostgreSQL 17 aislado y verifica sus r
 
 ## Preparar el destino alojado
 
-`supabase/project.json` ya guarda la referencia pública `azylnnujzpqwpzedkoxv` del proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), creado en la organización Aitor, región París. Las tres migraciones están aplicadas mediante el plugin y sus versiones locales coinciden con el historial remoto: `20261001181821`, `20261001213125` y `20261002190139`. La tercera añade Odoo y fichajes; su versión local coincide con la registrada por el plugin al desplegarla. `db:migrate` se reserva para futuras migraciones pendientes.
+`supabase/project.json` ya guarda la referencia pública `azylnnujzpqwpzedkoxv` del proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), creado en la organización Aitor, región París. Las cinco migraciones están aplicadas mediante el plugin y sus versiones locales coinciden con el historial remoto: `20261001181821`, `20261001213125`, `20261002190139`, `20261002201755` y `20261005185736`. La tercera añade Odoo y fichajes; su versión local coincide con la registrada por el plugin al desplegarla. `db:migrate` se reserva para futuras migraciones pendientes.
 
 Como alternativa, establece `SUPABASE_PROJECT_REF` en el entorno o en `.env.local`. No es una contraseña. Para cambiar de destino en una ejecución, usa `--project-ref <ref>`.
 
@@ -40,7 +40,7 @@ npm run db:status
 
 `db:plan` realiza una simulación y muestra lo pendiente. `db:migrate` aplica las migraciones pendientes y registra su versión en Supabase; no utiliza un reset. Si la migración ya está aplicada y el historial coincide, no vuelve a crear las tablas.
 
-Después de aplicar, se puede ejecutar `supabase/verify.sql` en el SQL Editor para comprobar las ocho tablas, RLS, permisos de RPC y trigger de alta. Solo consulta el catálogo; no modifica datos. También deben revisarse los advisors de seguridad y rendimiento del proyecto.
+Después de aplicar, se puede ejecutar `supabase/verify.sql` en el SQL Editor para comprobar las once tablas, RLS, permisos de RPC y trigger de alta. Solo consulta el catálogo; no modifica datos. También deben revisarse los advisors de seguridad y rendimiento del proyecto.
 
 La migración inicial debe aplicarse a un esquema nuevo. Si ya ejecutaste su SQL manualmente desde SQL Editor, hay que comprobar el esquema y sincronizar el historial antes de ejecutar `db:migrate`. No se debe registrar una versión como aplicada sin comprobar que sus objetos coinciden.
 
