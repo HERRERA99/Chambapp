@@ -591,7 +591,7 @@
   flex-direction: column;
 }
 .workspace-header {
-  height: var(--header-height);
+  min-height: var(--header-height);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -599,7 +599,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 22px;
-  padding: 0 28px;
+  padding: 8px 28px;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
   background: #0e0e11ee;
   backdrop-filter: blur(15px);
@@ -622,10 +623,15 @@
   font-size: 8px;
 }
 .workspace-header__actions {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
   gap: 12px;
 }
 .header-tracker {
+  min-width: 0;
+  max-width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -771,7 +777,18 @@
 }
 .timer-display--compact {
   gap: 14px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+}
+.timer-display--compact .timer-display__context {
+  max-width: 180px;
+}
+.timer-display--compact .timer-display__context strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timer-display--compact .odoo-entry-status {
+  margin: 2px 0 0;
 }
 .timer-display--compact .eyebrow {
   font-size: 7px;
@@ -1888,7 +1905,7 @@
     padding: 26px 24px;
   }
   .workspace-header {
-    padding: 0 24px;
+    padding: 8px 24px;
   }
   .workspace-header__breadcrumb > .eyebrow,
   .workspace-header__breadcrumb > .dim {
@@ -1979,7 +1996,7 @@
     display: inline-flex;
   }
   .workspace-header {
-    height: 62px;
+    min-height: 62px;
   }
   .workspace-content {
     padding: 25px;
@@ -1996,7 +2013,7 @@
     padding: 24px 16px;
   }
   .workspace-header {
-    padding: 0 16px;
+    padding: 8px 16px;
     gap: 6px;
   }
   .workspace-header__actions {
