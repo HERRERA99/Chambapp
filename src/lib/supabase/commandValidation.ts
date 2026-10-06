@@ -22,6 +22,12 @@ export function isValidCommandResponse(
   data: unknown,
 ): boolean {
   if (!record(data)) return false;
+  if (action === 'sincronizar_festivos')
+    return (
+      typeof data.sincronizados === 'number' &&
+      Number.isSafeInteger(data.sincronizados) &&
+      data.sincronizados >= 0
+    );
   if (
     (action === 'crear_parte' || action === 'editar_parte') &&
     (typeof data.imputado_en_odoo !== 'boolean' ||

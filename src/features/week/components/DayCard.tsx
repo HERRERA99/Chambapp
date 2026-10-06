@@ -41,15 +41,27 @@ export function DayCard({
           <strong>{day.dayNumber}</strong>
         </div>
         <Badge tone={day.isToday ? 'accent' : 'neutral'}>
-          {target === 0 && !day.blocks.length ? 'Descanso' : status}
+          {day.absences.length
+            ? day.absences.some((absence) => absence.tipo === 'vacaciones')
+              ? 'Vacaciones'
+              : 'Festivo'
+            : target === 0 && !day.blocks.length
+              ? 'Descanso'
+              : status}
         </Badge>
       </div>
+      {day.absences.length ? (
+        <p className="field__hint">
+          {day.absences.map((absence) => absence.titulo).join(' · ')} · excluido del objetivo
+          semanal
+        </p>
+      ) : null}
       <div className="split-label week-day-target">
         <span className="mono muted">
           Obj: {formatDuration(target)}
           {!day.jornada && target > 0 ? ' · por generar' : ''}
         </span>
-        {day.jornada ? (
+        {day.jornada && !day.absences.length ? (
           <IconButton
             icon="edit"
             label={`Editar objetivo del ${day.name} ${day.dayNumber}`}

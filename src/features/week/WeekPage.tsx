@@ -125,6 +125,9 @@ export default function WeekPage() {
         description="Objetivos diarios y horas fichadas de tu jornada laboral."
         actions={
           <>
+            <ButtonLink to="/calendario" icon="calendar">
+              Festivos y vacaciones
+            </ButtonLink>
             <ButtonLink to="/ajustes#jornada" icon="settings">
               Configurar reparto
             </ButtonLink>

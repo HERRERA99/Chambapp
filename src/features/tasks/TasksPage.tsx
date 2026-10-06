@@ -1,4 +1,5 @@
 import { TaskPagination } from './components/TaskPagination';
+import { TaskBoard } from './components/TaskBoard';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Task } from '../../domain/models';
@@ -18,9 +19,15 @@ import { OdooLink } from './components/OdooLink';
 
 type Filter = 'all' | Task['estado'];
 
-export default function TasksPage() {
+export default function TasksPage({ defaultView = 'list' }: { defaultView?: 'list' | 'board' }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get('proyecto');
+  const view =
+    searchParams.get('vista') === 'lista'
+      ? 'list'
+      : searchParams.get('vista') === 'tablero'
+        ? 'board'
+        : defaultView;
   const { data, isLoading, error, reload } = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
@@ -56,7 +63,7 @@ export default function TasksPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Operaciones / Proyectos / Tareas & entregables"
-        title="Tareas & Imputaciones por Jornada"
+        title={view === 'board' ? 'Tablero de tareas' : 'Tareas & Imputaciones por Jornada'}
         description="Planifica tareas y consulta el tiempo real e imputado de sus sesiones de trabajo."
         actions={
           <>
@@ -111,6 +118,19 @@ export default function TasksPage() {
         </Notice>
       ) : null}
       <div className="toolbar">
+        <SegmentedControl<'list' | 'board'>
+          label="Vista de tareas"
+          value={view}
+          onChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            next.set('vista', value === 'board' ? 'tablero' : 'lista');
+            setSearchParams(next);
+          }}
+          options={[
+            { value: 'list', label: 'Lista' },
+            { value: 'board', label: 'Tablero' },
+          ]}
+        />
         <SegmentedControl<Filter>
           label="Estado de tareas"
           value={filter}
@@ -149,8 +169,23 @@ export default function TasksPage() {
           Incluir archivadas
         </label>
       </div>
+      {view === 'board' ? (
+        <InputField
+          label="Buscar tarea en el tablero"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Tarea, proyecto o ID de Odoo…"
+        />
+      ) : null}
       {isLoading && !data ? (
         <p role="status">Cargando tareas…</p>
+      ) : view === 'board' ? (
+        <TaskBoard
+          tasks={visible}
+          projects={projects}
+          entries={entries}
+          onCreate={() => setCreateOpen(true)}
+        />
       ) : (
         <div className="task-workspace">
           {selected ? (

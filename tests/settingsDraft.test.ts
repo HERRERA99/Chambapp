@@ -30,6 +30,8 @@ function workspace(): WorkspaceData {
     configurations: [],
     days: [],
     jornadas: [],
+    fichajes: [],
+    absences: [],
     serverTime: now,
     receivedAt: Date.parse(now),
   };

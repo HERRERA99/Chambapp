@@ -21,7 +21,15 @@ export function WeekReport({
         >
           {days.map((day) => (
             <tr key={day.date}>
-              <td>{day.date}</td>
+              <td>
+                {day.date}
+                {day.absences.length ? (
+                  <>
+                    <br />
+                    {day.absences.map((absence) => absence.titulo).join(' · ')}
+                  </>
+                ) : null}
+              </td>
               <td>{formatDuration(day.targetSeconds)}</td>
               <td>{formatDuration(day.workedSeconds)}</td>
               <td>{formatDuration(day.provisionalSeconds)}</td>

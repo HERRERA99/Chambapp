@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { verifyAttendance } from './attendance.mjs';
 import { verifyOdooStatus } from './odoo-status.mjs';
 import { verifySelectedStartAndCredentials } from './selected-start-and-credentials.mjs';
+import { verifyCalendar } from './calendar.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const databaseDir = await mkdtemp(join(tmpdir(), 'chambapp-db-test-'));
@@ -622,6 +623,7 @@ try {
     'competing starts create one part; cascade deletion/active discard/retries preserve tombstones and totals',
   );
   await verifyAttendance({ admin, ca, cb, anonymous, client, rpc, expectError, ok });
+  await verifyCalendar({ ca, cb, anonymous, noSession, rpc, expectError, ok });
   await verifyOdooStatus({ ca, cb, client, rpc, expectError, ok });
   await verifySelectedStartAndCredentials({
     admin,
@@ -645,7 +647,7 @@ try {
     await admin.query(`select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname in ('public','chambapp_private') and c.relkind='r'`)
   ).rows;
-  assert.equal(catalog.length, 11);
+  assert.equal(catalog.length, 12);
   assert.ok(catalog.every((x) => x.relrowsecurity));
   const unsafe = (
     await admin.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
@@ -674,7 +676,7 @@ try {
     false,
   );
   ok(
-    'all eleven tables have RLS, weekly versions are immutable and public RPC is security invoker',
+    'all twelve tables have RLS, weekly versions are immutable and public RPCs are security invoker',
   );
   await admin.query(await readFile(join(root, 'supabase/verify.sql'), 'utf8'));
   console.log(

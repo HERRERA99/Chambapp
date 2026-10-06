@@ -5,9 +5,13 @@ begin
   select count(*) into n from pg_catalog.pg_class c join pg_catalog.pg_namespace s on s.oid = c.relnamespace
     where c.relkind = 'r' and c.relrowsecurity and
       ((s.nspname = 'public' and c.relname in ('perfiles','proyectos','tareas','configuraciones_semanales',
-        'dias_configuracion_semanal','jornadas','partes_horas','fichajes')) or
+        'dias_configuracion_semanal','jornadas','partes_horas','fichajes','ausencias')) or
        (s.nspname = 'chambapp_private' and c.relname in ('operaciones_cronometro','operaciones_fichajes','odoo_credenciales')));
-  if n <> 11 then raise exception 'Faltan tablas o RLS: % de 11', n; end if;
+  if n <> 12 then raise exception 'Faltan tablas o RLS: % de 12', n; end if;
+  if pg_catalog.has_table_privilege('anon','public.ausencias','SELECT') or
+     pg_catalog.has_function_privilege('anon','public.chambapp_calendario(text,jsonb)','EXECUTE') or
+     not pg_catalog.has_function_privilege('authenticated','public.chambapp_calendario(text,jsonb)','EXECUTE') then
+    raise exception 'Permisos del calendario incorrectos'; end if;
   if not exists(select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace s on s.oid = p.pronamespace
     where s.nspname = 'public' and p.proname = 'chambapp_operar' and not p.prosecdef) then
     raise exception 'Falta la RPC SECURITY INVOKER'; end if;

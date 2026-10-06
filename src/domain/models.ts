@@ -107,11 +107,24 @@ export type WorkspaceData = {
   days: ScheduleDay[];
   jornadas: Workday[];
   fichajes: Attendance[];
+  absences: CalendarAbsence[];
   serverTime: string;
   receivedAt: number;
 };
 
+export type CalendarAbsence = OwnedRecord & {
+  titulo: string;
+  tipo: 'festivo' | 'vacaciones';
+  inicio: string;
+  fin: string;
+  fuente: 'manual' | 'nager';
+  ambito: string | null;
+};
+
 export type CommandAction =
+  | 'guardar_ausencia'
+  | 'eliminar_ausencia'
+  | 'sincronizar_festivos'
   | 'editar_perfil'
   | 'crear_proyecto'
   | 'editar_proyecto'

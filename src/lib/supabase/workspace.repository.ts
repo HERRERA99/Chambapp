@@ -1,6 +1,12 @@
 import { getSupabase } from './client';
 import { DataError, readableError } from './errors';
-import { assertAttendance, assertEntry, assertProfile, assertTask } from './rowValidation';
+import {
+  assertAbsence,
+  assertAttendance,
+  assertEntry,
+  assertProfile,
+  assertTask,
+} from './rowValidation';
 import { isRetryableStatus, isValidCommandResponse } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
 
@@ -35,7 +41,12 @@ export async function executeCommand<T = unknown>(
 ): Promise<T> {
   const db = getSupabase();
   const request = db
-    .rpc('chambapp_operar', { p_accion: action, p_datos: payload })
+    .rpc(
+      ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
+        ? 'chambapp_calendario'
+        : 'chambapp_operar',
+      { p_accion: action, p_datos: payload },
+    )
     .abortSignal(signal);
   if (expectedUserId) {
     const { data: auth, error: authError } = await db.auth.getSession();
@@ -147,16 +158,41 @@ export async function loadWorkspace(
         receivedAt: Date.now(),
       }),
     ),
+    readAll((from, to) =>
+      db
+        .from('ausencias')
+        .select('*')
+        .order('inicio')
+        .order('id')
+        .range(from, to)
+        .abortSignal(signal),
+    ),
   ]);
-  const [profile, projects, tasks, entries, configurations, days, jornadas, fichajes, clock] =
-    results;
+  const [
+    profile,
+    projects,
+    tasks,
+    entries,
+    configurations,
+    days,
+    jornadas,
+    fichajes,
+    clock,
+    absences,
+  ] = results;
   if (profile.error) throw new DataError(readableError(profile.error));
   assertProfile(profile.data);
   if (
     profile.data.id !== userId ||
-    [...projects, ...tasks, ...entries, ...configurations, ...jornadas, ...fichajes].some(
-      (row) => row.usuario_id !== userId,
-    )
+    [
+      ...projects,
+      ...tasks,
+      ...entries,
+      ...configurations,
+      ...jornadas,
+      ...fichajes,
+      ...absences,
+    ].some((row) => row.usuario_id !== userId)
   )
     throw new DataError(
       'La sesión ha cambiado mientras se cargaban los datos. Actualiza la página.',
@@ -176,6 +212,10 @@ export async function loadWorkspace(
     }),
     configurations,
     days,
+    absences: absences.map((row) => {
+      assertAbsence(row);
+      return row;
+    }),
     jornadas,
     fichajes: fichajes.map((row) => {
       assertAttendance(row);

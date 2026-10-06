@@ -8,6 +8,48 @@ export type Database = {
   };
   public: {
     Tables: {
+      ausencias: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          titulo: string;
+          tipo: 'festivo' | 'vacaciones';
+          inicio: string;
+          fin: string;
+          fuente: 'manual' | 'nager';
+          ambito: string | null;
+          creado_en: string;
+          actualizado_en: string;
+          version: number;
+        };
+        Insert: {
+          id?: string;
+          usuario_id?: string;
+          titulo: string;
+          tipo: string;
+          inicio: string;
+          fin: string;
+          fuente?: string;
+          ambito?: string | null;
+          creado_en?: string;
+          actualizado_en?: string;
+          version?: number;
+        };
+        Update: {
+          id?: string;
+          usuario_id?: string;
+          titulo?: string;
+          tipo?: string;
+          inicio?: string;
+          fin?: string;
+          fuente?: string;
+          ambito?: string | null;
+          creado_en?: string;
+          actualizado_en?: string;
+          version?: number;
+        };
+        Relationships: [];
+      };
       configuraciones_semanales: {
         Row: {
           creado_en: string;
@@ -624,6 +666,7 @@ export type Database = {
       };
     };
     Functions: {
+      chambapp_calendario: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_configurar_odoo: {
         Args: { p_api_key?: string; p_guardar?: boolean };
         Returns: boolean;

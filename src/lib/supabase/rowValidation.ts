@@ -1,10 +1,25 @@
-import type { Attendance, Profile, Task, TimeEntry } from '../../domain/models';
+import type { Attendance, CalendarAbsence, Profile, Task, TimeEntry } from '../../domain/models';
+import { validDateRange } from '../../domain/calendar.ts';
 import type { Database } from './database.types';
 import { isOdooId, isOdooUrl } from '../../domain/odoo.ts';
 
 type Tables = Database['public']['Tables'];
 type EntryRow = Database['public']['Views']['partes_detalle']['Row'];
 type AttendanceRow = Database['public']['Views']['fichajes_detalle']['Row'];
+
+export function assertAbsence(row: Tables['ausencias']['Row']): asserts row is CalendarAbsence {
+  if (
+    !['festivo', 'vacaciones'].includes(row.tipo) ||
+    !['manual', 'nager'].includes(row.fuente) ||
+    !validDateRange(row.inicio, row.fin) ||
+    typeof row.titulo !== 'string' ||
+    !row.titulo.trim() ||
+    !Number.isSafeInteger(row.version) ||
+    row.version < 1
+  ) {
+    throw new Error('El calendario contiene un registro no válido.');
+  }
+}
 
 // SQL CHECKs and INNER JOINs guarantee these values. Validate at the API boundary
 // because generated PostgREST view types conservatively mark every column nullable.

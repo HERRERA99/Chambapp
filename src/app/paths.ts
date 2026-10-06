@@ -8,6 +8,8 @@ export const paths = {
   dashboard: '/resumen',
   projects: '/proyectos',
   tasks: '/tareas',
+  board: '/tablero',
+  calendar: '/calendario',
   entries: '/partes-de-horas',
   attendance: '/fichajes',
   week: '/mi-semana',

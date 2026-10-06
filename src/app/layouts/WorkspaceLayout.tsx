@@ -20,9 +20,11 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.dashboard, label: 'Resumen', icon: 'grid' },
   { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
   { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
+  { to: paths.board, label: 'Tablero de tareas', icon: 'grid' },
   { to: paths.entries, label: 'Partes de horas', icon: 'clock' },
   { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
   { to: paths.week, label: 'Mi semana', icon: 'calendar' },
+  { to: paths.calendar, label: 'Festivos & vacaciones', icon: 'calendar' },
   { to: paths.settings, label: 'Ajustes', icon: 'settings' },
 ];
 

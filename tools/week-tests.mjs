@@ -167,3 +167,39 @@ assert.equal(attendedWeek.completedDays, 0);
 console.log(
   'PASS: attendance drives weekly and daily balances, including open attendance independently of task time.',
 );
+
+const daysOff = [
+  { id: 'holiday', titulo: 'Festivo', tipo: 'festivo', inicio: monday, fin: monday },
+  {
+    id: 'vacation',
+    titulo: 'Vacaciones',
+    tipo: 'vacaciones',
+    inicio: '2026-09-29',
+    fin: '2026-10-06',
+  },
+  {
+    id: 'overlap',
+    titulo: 'Otro festivo',
+    tipo: 'festivo',
+    inicio: '2026-09-29',
+    fin: '2026-09-29',
+  },
+];
+const excluded = buildWeek({ ...data, absences: daysOff }, monday, '2026-10-01');
+assert.equal(excluded.targetSeconds, 0);
+assert.equal(excluded.missingDays, 0);
+assert.equal(excluded.workdays, 0);
+assert.equal(excluded.days[1].absences.length, 2);
+assert.equal(excluded.days[0].plannedTargetSeconds, 0);
+assert.equal(excluded.loggedSeconds, week.loggedSeconds);
+assert.equal(excluded.realSeconds, week.realSeconds);
+assert.equal(excluded.entries.length, week.entries.length);
+assert.equal(data.jornadas[0].minutos_objetivo, 400);
+const restored = buildWeek({ ...data, absences: [] }, monday, '2026-10-01');
+assert.equal(restored.targetSeconds, week.targetSeconds);
+assert.equal(restored.missingDays, week.missingDays);
+const nextWeekExcluded = buildWeek({ ...data, absences: daysOff }, '2026-10-05', '2026-10-01');
+assert.equal(nextWeekExcluded.days[0].targetSeconds, 0);
+console.log(
+  'PASS: holidays, overlapping vacations, multi-week intervals, preserved entries and restored original targets.',
+);

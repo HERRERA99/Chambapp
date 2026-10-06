@@ -1,5 +1,13 @@
 import { DateTime } from 'luxon';
-import type { Project, Task, TimeEntry, Workday, WorkspaceData } from '../../domain/models';
+import type {
+  CalendarAbsence,
+  Project,
+  Task,
+  TimeEntry,
+  Workday,
+  WorkspaceData,
+} from '../../domain/models';
+import { absencesOn } from '../../domain/calendar.ts';
 import { formatDuration, weekDates } from '../../domain/time.ts';
 import { attendanceDays } from '../../domain/attendance.ts';
 
@@ -17,6 +25,7 @@ export type CalendarDay = {
   isToday: boolean;
   isFuture: boolean;
   jornada: Workday | undefined;
+  absences: CalendarAbsence[];
   plannedTargetSeconds: number;
   targetSeconds: number;
   realSeconds: number;
@@ -74,6 +83,7 @@ export function buildWeek(
   const days: CalendarDay[] = dates.map((date, index) => {
     const local = DateTime.fromISO(date, { zone: 'UTC' }).setLocale('es');
     const jornada = jornadas.get(date);
+    const absences = absencesOn(data.absences ?? [], date);
     const dayBlocks = (blocks.get(date) ?? []).sort(
       (a, b) => Date.parse(a.entry.inicio_en) - Date.parse(b.entry.inicio_en),
     );
@@ -86,8 +96,9 @@ export function buildWeek(
       isToday: date === today,
       isFuture: date > today,
       jornada,
-      plannedTargetSeconds: targets.get(index + 1) ?? 0,
-      targetSeconds: (jornada?.minutos_objetivo ?? 0) * 60,
+      absences,
+      plannedTargetSeconds: absences.length ? 0 : (targets.get(index + 1) ?? 0),
+      targetSeconds: absences.length ? 0 : (jornada?.minutos_objetivo ?? 0) * 60,
       workedSeconds: attendance[index]!.workedSeconds,
       provisionalSeconds: attendance[index]!.provisionalSeconds,
       realSeconds: completed.reduce(
