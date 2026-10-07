@@ -45,6 +45,7 @@ export function AttendanceEditor({
   const [targetZone, setTargetZone] = useState<string | null>(null);
   const [acceptZone, setAcceptZone] = useState(false);
   const blocked = attendance.busy || attendance.pending;
+  const anotherEntryOpen = !!attendance.active && attendance.active.id !== record?.id;
 
   function exactStart() {
     return record &&
@@ -68,6 +69,8 @@ export function AttendanceEditor({
     try {
       const start = exactStart();
       const end = exactEnd();
+      if (!end && anotherEntryOpen)
+        throw new Error('Ya hay una jornada en curso. Introduce la salida del fichaje anterior.');
       if (Date.parse(start) > Date.parse(attendance.now))
         throw new Error('La entrada no puede estar en el futuro.');
       const unchangedInterval = record && start === record.inicio_en && end === record.fin_en;
@@ -177,11 +180,16 @@ export function AttendanceEditor({
             <input
               type="checkbox"
               checked={openEntry}
-              disabled={blocked}
+              disabled={blocked || anotherEntryOpen}
               onChange={(event) => setOpenEntry(event.target.checked)}
             />
             Salida pendiente: seguir dentro hasta fichar la salida
           </label>
+        ) : null}
+        {anotherEntryOpen && mode === 'interval' ? (
+          <Notice title="Jornada en curso">
+            Registra la entrada y la salida del día anterior. Tu jornada actual seguirá en curso.
+          </Notice>
         ) : null}
         {!openEntry ? (
           <div className="form-grid">

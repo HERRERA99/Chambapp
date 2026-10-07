@@ -10,7 +10,7 @@ export function ManualAttendanceButton() {
   const attendance = useAttendance();
   const { data, error } = useWorkspace();
   const [editor, setEditor] = useState<
-    { mode: 'entry' } | { mode: 'exit'; record: Attendance } | null
+    { mode: 'entry' | 'interval' } | { mode: 'exit'; record: Attendance } | null
   >(null);
   if (!data) return null;
   const today = DateTime.fromISO(attendance.now, {
@@ -29,6 +29,13 @@ export function ManualAttendanceButton() {
         }
       >
         {attendance.active ? 'Salida manual' : 'Entrada manual'}
+      </Button>
+      <Button
+        icon="plus"
+        disabled={attendance.busy || attendance.pending || !!error}
+        onClick={() => setEditor({ mode: 'interval' })}
+      >
+        Registrar día pasado
       </Button>
       {editor ? (
         <AttendanceEditor
