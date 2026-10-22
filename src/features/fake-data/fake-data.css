@@ -9,7 +9,8 @@
   gap: 16px;
 }
 .fake-data-groups {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 5px;
   border: 1px solid var(--border);
@@ -594,11 +595,14 @@
 }
 
 @media (max-width: 650px) {
+  .fake-data-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .fake-record__identity-sticky {
     position: static;
   }
   .fake-data-groups > button {
-    flex-direction: column;
+    flex-direction: row;
     gap: 6px;
     padding: 10px 6px;
     font-size: 11px;

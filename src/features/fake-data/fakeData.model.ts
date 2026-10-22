@@ -9,6 +9,8 @@ import {
   generateSocialSecurity,
 } from './identifiers.ts';
 import type { DocumentType, TaxCountry } from './identifiers.ts';
+import { generateCadastralReference, generateCups } from './propertyIdentifiers.ts';
+import type { CadastralKind, SupplyKind } from './propertyIdentifiers.ts';
 
 export const FAKE_DATA_CATEGORIES = [
   {
@@ -28,8 +30,13 @@ export const FAKE_DATA_CATEGORIES = [
   },
   {
     id: 'properties',
-    label: 'Inmuebles',
-    description: 'Viviendas de ejemplo con características y precios coherentes.',
+    label: 'Referencias catastrales',
+    description: 'Urbana, rústica y verificación.',
+  },
+  {
+    id: 'cups',
+    label: 'CUPS de luz y gas',
+    description: 'Códigos de suministro de ejemplo y verificación.',
   },
   {
     id: 'documents',
@@ -84,6 +91,9 @@ export interface FakeDataOptions {
   referenceDate?: Date;
   documentType?: DocumentType;
   taxCountry?: TaxCountry;
+  cadastralKind?: CadastralKind;
+  supplyKind?: SupplyKind;
+  emailDomain?: 'yopmail.com' | 'example.com';
 }
 
 export type FakeDataTextCase = 'original' | 'upper' | 'lower' | 'camel';
@@ -141,49 +151,41 @@ const locations = [
     city: 'Madrid',
     province: 'Madrid',
     postalCodes: ['28001', '28004', '28010'],
-    pricePerSquareMeter: 4200,
   },
   {
     city: 'Barcelona',
     province: 'Barcelona',
     postalCodes: ['08001', '08013', '08025'],
-    pricePerSquareMeter: 4600,
   },
   {
     city: 'Valencia',
     province: 'Valencia',
     postalCodes: ['46001', '46004', '46010'],
-    pricePerSquareMeter: 2600,
   },
   {
     city: 'Sevilla',
     province: 'Sevilla',
     postalCodes: ['41001', '41003', '41010'],
-    pricePerSquareMeter: 2300,
   },
   {
     city: 'Málaga',
     province: 'Málaga',
     postalCodes: ['29001', '29010', '29013'],
-    pricePerSquareMeter: 3100,
   },
   {
     city: 'Bilbao',
     province: 'Bizkaia',
     postalCodes: ['48001', '48005', '48010'],
-    pricePerSquareMeter: 3300,
   },
   {
     city: 'Zaragoza',
     province: 'Zaragoza',
     postalCodes: ['50001', '50004', '50009'],
-    pricePerSquareMeter: 1900,
   },
   {
     city: 'A Coruña',
     province: 'A Coruña',
     postalCodes: ['15001', '15004', '15009'],
-    pricePerSquareMeter: 2200,
   },
 ] as const;
 const streets = [
@@ -308,11 +310,6 @@ const testCards = [
   { brand: 'Mastercard', number: '5555 5555 5555 4444', cvcLength: 3 },
   { brand: 'American Express', number: '3782 822463 10005', cvcLength: 4 },
 ] as const;
-const money = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
 
 function slug(value: string): string {
   return value
@@ -368,6 +365,15 @@ export function generateFakeData(
   const taxCountry = options.taxCountry ?? 'ES';
   const taxCountryName = EUROPEAN_TAX_COUNTRIES.find((item) => item.value === taxCountry)?.label;
   if (!taxCountryName) throw new Error('País fiscal inválido.');
+  const cadastralKind = options.cadastralKind ?? 'urban';
+  if (cadastralKind !== 'urban' && cadastralKind !== 'rural')
+    throw new Error('Tipo de referencia catastral inválido.');
+  const supplyKind = options.supplyKind ?? 'electricity';
+  if (supplyKind !== 'electricity' && supplyKind !== 'gas')
+    throw new Error('Tipo de suministro inválido.');
+  const emailDomain = options.emailDomain ?? 'yopmail.com';
+  if (emailDomain !== 'yopmail.com' && emailDomain !== 'example.com')
+    throw new Error('Dominio de correo inválido.');
   const random = options.random ?? Math.random;
   const integer = (min: number, max: number) => {
     const value = random();
@@ -378,7 +384,8 @@ export function generateFakeData(
   const pick = <T>(values: readonly T[]): T => values[integer(0, values.length - 1)]!;
   const digits = (length: number) => Array.from({ length }, () => integer(0, 9)).join('');
   const personName = () => `${pick(firstNames)} ${pick(surnames)} ${pick(surnames)}`;
-  const phone = () => `+34 000 ${digits(3)} ${digits(3)}`;
+  const mobilePhone = () => `${pick(['6', '7'])}${digits(8)}`;
+  const landlinePhone = () => `${pick(['8', '9'])}${digits(8)}`;
   const password = () => {
     const groups = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '!#%+?'];
     const charset = groups.join('');
@@ -482,8 +489,8 @@ export function generateFakeData(
             `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${birthYear}`,
           ),
           field('age', 'Edad', age),
-          field('email', 'Correo electrónico', `${slug(fullName)}.${digits(3)}@example.com`),
-          field('phone', 'Teléfono ficticio', phone()),
+          field('email', 'Correo electrónico', `${slug(fullName)}.${digits(3)}@${emailDomain}`),
+          field('phone', 'Teléfono ficticio', mobilePhone()),
           field('profession', 'Profesión', pick(professions)),
           field('passport', 'Pasaporte de ejemplo', generatePassport(random)),
           field('socialSecurity', 'Seguridad Social', generateSocialSecurity(random)),
@@ -527,9 +534,9 @@ export function generateFakeData(
           field('cnae', 'CNAE-2025', activity.cnae),
           field('activity', 'Actividad', activity.activity),
           field('sector', 'Sector', activity.sector),
-          field('email', 'Correo electrónico', `${companySlug}@example.com`),
-          field('phone', 'Teléfono ficticio', phone()),
-          field('fax', 'Fax ficticio', phone()),
+          field('email', 'Correo electrónico', `${companySlug}@${emailDomain}`),
+          field('phone', 'Teléfono ficticio', landlinePhone()),
+          field('fax', 'Fax ficticio', landlinePhone()),
           field('website', 'Sitio web de ejemplo', `https://example.com/${companySlug}`),
           field('employees', 'Empleados', integer(3, 250)),
           ...addressFields(headquarters),
@@ -647,36 +654,50 @@ export function generateFakeData(
       };
     }
 
-    const residence = address();
-    const type = pick(['Piso', 'Apartamento', 'Ático', 'Casa adosada', 'Chalet'] as const);
-    const isHouse = type === 'Casa adosada' || type === 'Chalet';
-    const bedrooms = integer(isHouse ? 3 : 1, isHouse ? 5 : 4);
-    const surface = bedrooms * integer(20, 30) + integer(15, 35);
-    const bathrooms = integer(1, Math.min(bedrooms, isHouse ? 3 : 2));
-    const operation = pick(['Venta', 'Alquiler'] as const);
-    const saleValue = (surface * residence.location.pricePerSquareMeter * integer(85, 115)) / 100;
-    const priceValue =
-      operation === 'Venta'
-        ? Math.round(saleValue / 1000) * 1000
-        : Math.round((saleValue * 0.004) / 10) * 10;
-    const reference = `DEMO-${digits(4)}-${String(index + 1).padStart(3, '0')}`;
-    const price = `${money.format(priceValue)}${operation === 'Alquiler' ? '/mes' : ''}`;
+    if (category === 'cups') {
+      const cups = generateCups(supplyKind, random);
+      const supplyLabel = supplyKind === 'electricity' ? 'Luz' : 'Gas';
+      return {
+        id,
+        category,
+        title: cups,
+        subtitle: `CUPS ${supplyLabel.toLocaleLowerCase('es-ES')} · Ejemplo`,
+        fields: [
+          field('cups', 'Código CUPS', cups),
+          field('supplyKind', 'Tipo de suministro', supplyLabel),
+          field('country', 'País', 'España'),
+          field('distributorCode', 'Código de distribuidora', cups.slice(2, 6)),
+          field('supplyNumber', 'Número de suministro', cups.slice(6, 18)),
+          field('checkCharacters', 'Caracteres de control', cups.slice(18, 20)),
+        ],
+      };
+    }
+
+    const reference = generateCadastralReference(cadastralKind, random);
+    const kindLabel = cadastralKind === 'urban' ? 'Urbana' : 'Rústica';
     return {
       id,
       category,
-      title: `${type} en ${residence.location.city}`,
-      subtitle: `${surface} m² · ${bedrooms} hab. · ${price}`,
+      title: reference,
+      subtitle: `Referencia catastral ${kindLabel.toLocaleLowerCase('es-ES')} · Ejemplo`,
       fields: [
-        field('reference', 'Referencia de ejemplo', reference),
-        field('type', 'Tipo de inmueble', type),
-        field('operation', 'Operación', operation),
-        ...addressFields(residence),
-        field('surface', 'Superficie', `${surface} m²`),
-        field('bedrooms', 'Habitaciones', bedrooms),
-        field('bathrooms', 'Baños', bathrooms),
-        field('price', operation === 'Venta' ? 'Precio de venta' : 'Alquiler mensual', price),
-        field('yearBuilt', 'Año de construcción', integer(1960, referenceDate.getUTCFullYear())),
-        field('energyRating', 'Calificación energética', pick(['A', 'B', 'C', 'D', 'E', 'F', 'G'])),
+        field('cadastralReference', 'Referencia catastral', reference),
+        field('cadastralKind', 'Tipo de referencia', kindLabel),
+        ...(cadastralKind === 'urban'
+          ? [
+              field('parcel', 'Identificador de parcela', reference.slice(0, 7)),
+              field('sheet', 'Hoja del plano', reference.slice(7, 14)),
+            ]
+          : [
+              field('province', 'Código de provincia', reference.slice(0, 2)),
+              field('municipality', 'Código de municipio', reference.slice(2, 5)),
+              field('sector', 'Sector', reference.slice(5, 6)),
+              field('polygon', 'Polígono', reference.slice(6, 9)),
+              field('parcel', 'Parcela', reference.slice(9, 14)),
+            ]),
+        field('propertyNumber', 'Identificador del inmueble', reference.slice(14, 18)),
+        field('checkCharacters', 'Caracteres de control', reference.slice(18, 20)),
+        field('country', 'País', 'España'),
       ],
     };
   });
@@ -697,7 +718,6 @@ const textFieldKeys = new Set([
   'country',
   'name',
   'activity',
-  'sector',
   'type',
   'operation',
 ]);
@@ -723,7 +743,7 @@ export function formatFakeDataRecords(
   };
   return records.map((record) => ({
     ...record,
-    title: ['personal', 'banking', 'companies', 'properties'].includes(record.category)
+    title: ['personal', 'banking', 'companies'].includes(record.category)
       ? transform(record.title)
       : record.title,
     subtitle: ['personal', 'companies'].includes(record.category)
@@ -731,7 +751,10 @@ export function formatFakeDataRecords(
       : record.subtitle,
     fields: record.fields.map((item) => ({
       ...item,
-      value: textFieldKeys.has(item.key) ? transform(item.value) : item.value,
+      value:
+        textFieldKeys.has(item.key) || (record.category === 'companies' && item.key === 'sector')
+          ? transform(item.value)
+          : item.value,
     })),
   }));
 }

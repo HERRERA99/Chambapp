@@ -14,6 +14,10 @@ import {
   validateIsin,
   validateLei,
 } from '../src/features/fake-data/identifiers.ts';
+import {
+  validateCadastralReference,
+  validateCups,
+} from '../src/features/fake-data/propertyIdentifiers.ts';
 import type {
   FakeDataCategoryId,
   FakeDataRecord,
@@ -71,15 +75,15 @@ test('rejects invalid counts, categories, dates and invalid random sources', () 
     assert.throws(() => generateFakeData('personal', 1, { random: () => value }), /aleatoria/);
 });
 
-test('personal profiles have adult birth dates, valid DNI letters and safe example contact details', () => {
+test('personal profiles have adult birth dates, valid DNI letters and Yopmail contact details by default', () => {
   for (const record of generate('personal')) {
     const profile = values(record);
     assert.match(profile.fullName!, /^\S+ \S+ \S+$/);
     assert.match(profile.dni!, /^\d{8}[A-Z]$/);
     const dniNumber = Number(profile.dni!.slice(0, 8));
     assert.equal(profile.dni!.at(-1), 'TRWAGMYFPDXBNJZSQVHLCKE'[dniNumber % 23]);
-    assert.match(profile.email!, /^[a-z0-9.]+@example\.com$/);
-    assert.match(profile.phone!, /^\+34 000 \d{3} \d{3}$/);
+    assert.match(profile.email!, /^[a-z0-9.]+@yopmail\.com$/);
+    assert.match(profile.phone!, /^[67]\d{8}$/);
     const [day, month, year] = profile.birthDate!.split('/').map(Number);
     const birthday = new Date(Date.UTC(year!, month! - 1, day!));
     let age = referenceDate.getUTCFullYear() - birthday.getUTCFullYear();
@@ -119,7 +123,7 @@ test('Spanish postal codes, towns and provinces remain correlated and streets vi
     Zaragoza: ['Zaragoza', '50'],
     'A Coruña': ['A Coruña', '15'],
   };
-  for (const category of ['personal', 'companies', 'properties'] as const) {
+  for (const category of ['personal', 'companies'] as const) {
     for (const record of generate(category)) {
       const address = values(record);
       assert.ok(expected[address.city!]);
@@ -208,10 +212,10 @@ test('companies provide valid NIF control digits and clearly fictitious names an
     }, 0);
     const evenSum = digits[1]! + digits[3]! + digits[5]!;
     assert.equal(Number(company.taxId!.at(-1)), (10 - ((oddSum + evenSum) % 10)) % 10);
-    assert.match(company.email!, /@example\.com$/);
+    assert.match(company.email!, /@yopmail\.com$/);
     assert.match(company.website!, /^https:\/\/example\.com\//);
-    assert.match(company.phone!, /^\+34 000 \d{3} \d{3}$/);
-    assert.match(company.fax!, /^\+34 000 \d{3} \d{3}$/);
+    assert.match(company.phone!, /^[89]\d{8}$/);
+    assert.match(company.fax!, /^[89]\d{8}$/);
     assert.equal(company.activity, activities[company.cnae!]);
     const [day, month, year] = company.incorporationDate!.split('/').map(Number);
     assert.ok(Date.UTC(year!, month! - 1, day!) < referenceDate.getTime());
@@ -227,6 +231,7 @@ test('all requested document and finance tools are available while preserving th
       'banking',
       'companies',
       'properties',
+      'cups',
       'documents',
       'passport',
       'socialSecurity',
@@ -370,6 +375,8 @@ test('text casing transforms human-readable text, preserves codes and credential
       'europeanTaxIds',
       'lei',
       'isin',
+      'properties',
+      'cups',
     ] as const) {
       const source = generate(category, 1);
       assert.equal(formatFakeDataRecords(source, mode)[0]!.title, source[0]!.title);
@@ -388,32 +395,120 @@ test('text casing transforms human-readable text, preserves codes and credential
   assert.equal(values(formatFakeDataRecords([name], 'lower')[0]!).fullName, 'ángela núñez de león');
 });
 
-test('properties have coherent characteristics, operation and currency prices with demo references', () => {
-  const operations = new Set<string>();
-  for (const record of generate('properties')) {
-    const property = values(record);
-    const bedrooms = Number(property.bedrooms);
-    const bathrooms = Number(property.bathrooms);
-    const surface = Number.parseInt(property.surface!);
-    assert.match(property.reference!, /^DEMO-\d{4}-\d{3}$/);
-    assert.ok(bedrooms >= 1 && bedrooms <= 5);
-    assert.ok(bathrooms >= 1 && bathrooms <= bedrooms && bathrooms <= 3);
-    assert.ok(surface >= bedrooms * 20 + 15 && surface <= bedrooms * 30 + 35);
-    assert.ok(Number(property.yearBuilt) >= 1960 && Number(property.yearBuilt) <= 2026);
-    assert.match(property.energyRating!, /^[A-G]$/);
-    const price = Number(property.price!.replaceAll('.', '').replace(/[^0-9]/g, ''));
-    assert.ok(price > 0);
-    operations.add(property.operation!);
-    if (property.operation === 'Alquiler') {
-      assert.match(property.price!, /€\/mes$/);
-      assert.ok(price > 100 && price < 10000);
-    } else {
-      assert.equal(property.operation, 'Venta');
-      assert.match(property.price!, /€$/);
-      assert.ok(price >= 50000);
+test('urban and rural cadastral records expose components from the same generated reference', () => {
+  for (const cadastralKind of ['urban', 'rural'] as const) {
+    const records = generateFakeData('properties', 20, {
+      cadastralKind,
+      referenceDate,
+      random: seededRandom(),
+    });
+    for (const record of records) {
+      const property = values(record);
+      const reference = property.cadastralReference!;
+      assert.ok(validateCadastralReference(reference));
+      assert.equal(record.title, reference);
+      assert.equal(property.cadastralKind, cadastralKind === 'urban' ? 'Urbana' : 'Rústica');
+      assert.equal(property.propertyNumber, reference.slice(14, 18));
+      assert.equal(property.checkCharacters, reference.slice(18, 20));
+      assert.equal(property.country, 'España');
+      assert.equal(property.price, undefined);
+      assert.equal(property.surface, undefined);
+      assert.equal(property.bedrooms, undefined);
+      for (const mode of ['upper', 'lower', 'camel'] as const) {
+        const formatted = formatFakeDataRecords([record], mode)[0]!;
+        const presentation = values(formatted);
+        assert.equal(formatted.title, reference);
+        for (const key of [
+          'cadastralReference',
+          'parcel',
+          'sheet',
+          'municipality',
+          'sector',
+          'polygon',
+          'propertyNumber',
+          'checkCharacters',
+        ])
+          assert.equal(presentation[key], property[key]);
+      }
+      if (cadastralKind === 'urban') {
+        assert.equal(property.parcel, reference.slice(0, 7));
+        assert.equal(property.sheet, reference.slice(7, 14));
+        assert.equal(property.polygon, undefined);
+      } else {
+        assert.equal(property.province, reference.slice(0, 2));
+        assert.equal(property.municipality, reference.slice(2, 5));
+        assert.equal(property.sector, reference.slice(5, 6));
+        assert.equal(property.polygon, reference.slice(6, 9));
+        assert.equal(property.parcel, reference.slice(9, 14));
+        assert.equal(property.sheet, undefined);
+      }
+      const exported = JSON.parse(fakeDataToJson([record]))[0];
+      assert.equal(exported.cadastralReference, reference);
+      assert.ok(fakeDataToCsv([record]).includes(reference));
+      assert.ok(fakeDataToText([record]).includes(reference));
     }
   }
-  assert.equal(operations.size, 2);
+});
+
+test('electricity and gas CUPS records expose exact code components and preserve them on export', () => {
+  for (const supplyKind of ['electricity', 'gas'] as const) {
+    const records = generateFakeData('cups', 20, {
+      supplyKind,
+      referenceDate,
+      random: seededRandom(),
+    });
+    for (const record of records) {
+      const supply = values(record);
+      assert.ok(validateCups(supply.cups!));
+      assert.equal(record.title, supply.cups);
+      assert.equal(supply.supplyKind, supplyKind === 'electricity' ? 'Luz' : 'Gas');
+      assert.equal(supply.country, 'España');
+      assert.equal(supply.distributorCode, supply.cups!.slice(2, 6));
+      assert.equal(supply.supplyNumber, supply.cups!.slice(6, 18));
+      assert.equal(supply.checkCharacters, supply.cups!.slice(18, 20));
+      for (const mode of ['upper', 'lower', 'camel'] as const) {
+        const formatted = formatFakeDataRecords([record], mode)[0]!;
+        const presentation = values(formatted);
+        assert.equal(formatted.title, supply.cups);
+        for (const key of ['cups', 'distributorCode', 'supplyNumber', 'checkCharacters'])
+          assert.equal(presentation[key], supply[key]);
+      }
+      const exported = JSON.parse(fakeDataToJson([record]))[0];
+      assert.equal(exported.cups, supply.cups);
+      assert.ok(fakeDataToCsv([record]).includes(supply.cups!));
+      assert.ok(fakeDataToText([record]).includes(supply.cups!));
+    }
+  }
+});
+
+test('profile email domains can use Yopmail or example.com and reject unsupported domains', () => {
+  for (const category of ['personal', 'companies'] as const) {
+    for (const emailDomain of ['yopmail.com', 'example.com'] as const) {
+      const records = generateFakeData(category, 20, {
+        emailDomain,
+        referenceDate,
+        random: seededRandom(),
+      });
+      for (const record of records) {
+        const email = values(record).email!;
+        assert.ok(email.endsWith(`@${emailDomain}`));
+        for (const mode of ['upper', 'lower', 'camel'] as const)
+          assert.equal(values(formatFakeDataRecords([record], mode)[0]!).email, email);
+      }
+    }
+  }
+  assert.throws(
+    () => generateFakeData('personal', 1, { emailDomain: 'gmail.com' as 'yopmail.com' }),
+    /Dominio de correo/,
+  );
+  assert.throws(
+    () => generateFakeData('properties', 1, { cadastralKind: 'unknown' as 'urban' }),
+    /referencia catastral/,
+  );
+  assert.throws(
+    () => generateFakeData('cups', 1, { supplyKind: 'unknown' as 'gas' }),
+    /suministro/,
+  );
 });
 
 test('text and JSON exports preserve fields and mark generated records as fictional', () => {

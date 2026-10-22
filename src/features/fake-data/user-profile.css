@@ -1,0 +1,236 @@
+.fake-user-profile {
+  min-width: 0;
+  padding: 0;
+  overflow: clip;
+}
+
+.fake-user-profile__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px 26px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-low);
+}
+
+.fake-user-profile__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fake-user-profile__heading .eyebrow {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.fake-user-profile__heading h3 {
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.fake-user-profile__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fake-user-profile__fields {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px 22px;
+  margin: 0;
+  padding: 22px 26px 26px;
+}
+
+.fake-user-profile__field {
+  min-width: 0;
+}
+
+.fake-user-profile__field--1 {
+  grid-column: span 1;
+}
+
+.fake-user-profile__field--2 {
+  grid-column: span 2;
+}
+
+.fake-user-profile__field--3 {
+  grid-column: span 3;
+}
+
+.fake-user-profile__field--4 {
+  grid-column: span 4;
+}
+
+.fake-user-profile__field--6 {
+  grid-column: span 6;
+}
+
+.fake-user-profile__field--12 {
+  grid-column: 1 / -1;
+}
+
+.fake-user-profile__field dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  min-height: 26px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.fake-user-profile__field dt > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fake-user-profile__field dt > .icon-button {
+  flex-shrink: 0;
+  width: 24px;
+  height: 26px;
+  opacity: 0.4;
+}
+
+.fake-user-profile__field dt > .icon-button .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.fake-user-profile__field:hover dt > .icon-button,
+.fake-user-profile__field:focus-within dt > .icon-button {
+  opacity: 1;
+}
+
+.fake-user-profile__field dd {
+  min-height: 31px;
+  margin: 0;
+  padding: 5px 0 5px 11px;
+  border-left: 2px solid var(--accent-deep);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.fake-user-profile__field dd.mono {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fake-user-profile__more {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.fake-user-profile__more > summary {
+  padding: 17px 26px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fake-user-profile__more > summary:hover {
+  color: var(--text);
+}
+
+.fake-user-profile__more[open] > summary {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 1100px) {
+  .fake-user-profile__fields {
+    column-gap: 14px;
+    padding-inline: 22px;
+  }
+
+  .fake-user-profile__field dt {
+    font-size: 10px;
+  }
+
+  .fake-user-profile__field dt > .icon-button {
+    width: 20px;
+  }
+
+  .fake-user-profile__field--1 dt {
+    flex-wrap: wrap;
+  }
+
+  .fake-user-profile__field--1 dt > .icon-button {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 1100px) {
+  .fake-user-profile__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 24px;
+  }
+
+  .fake-user-profile__field {
+    grid-column: span 1;
+  }
+
+  .fake-user-profile__field--fullName,
+  .fake-user-profile__field--fullAddress {
+    grid-column: 1 / -1;
+  }
+
+  .fake-user-profile__field dt {
+    flex-wrap: nowrap;
+    font-size: 11px;
+  }
+
+  .fake-user-profile__field dt > .icon-button {
+    width: 26px;
+  }
+}
+
+@media (max-width: 540px) {
+  .fake-user-profile__header {
+    align-items: stretch;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .fake-user-profile__actions {
+    width: 100%;
+  }
+
+  .fake-user-profile__actions > .button {
+    flex: 1;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+
+  .fake-user-profile__fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+    padding: 18px 20px 24px;
+  }
+
+  .fake-user-profile__field {
+    grid-column: 1 / -1;
+  }
+
+  .fake-user-profile__field dt > .icon-button {
+    width: 30px;
+    height: 28px;
+    opacity: 0.65;
+  }
+
+  .fake-user-profile__field dd.mono {
+    font-size: 12px;
+  }
+
+  .fake-user-profile__more > summary {
+    padding-inline: 20px;
+  }
+}
