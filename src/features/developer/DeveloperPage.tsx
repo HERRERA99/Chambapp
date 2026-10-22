@@ -286,7 +286,7 @@ export default function DeveloperPage() {
                           key={n.path}
                           d={`M${p.x + 250},${p.y + 30} C${p.x + 270},${p.y + 30} ${n.x - 20},${n.y + 30} ${n.x},${n.y + 30}`}
                           fill="none"
-                          stroke="#8796ae"
+                          stroke="var(--dim)"
                           strokeWidth="2"
                         />
                       );
@@ -298,7 +298,7 @@ export default function DeveloperPage() {
                         height="60"
                         rx="8"
                         fill="var(--surface)"
-                        stroke="var(--accent)"
+                        stroke="var(--border)"
                       />
                       <foreignObject width="250" height="60">
                         <button
