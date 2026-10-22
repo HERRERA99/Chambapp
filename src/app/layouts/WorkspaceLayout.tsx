@@ -28,6 +28,7 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.percentages, label: 'Porcentajes', icon: 'percent' },
   { to: paths.timeCalculator, label: 'Calculadora de horas', icon: 'calculator' },
   { to: paths.fakeData, label: 'Datos ficticios', icon: 'dice' },
+  { to: paths.developer, label: 'Utilidades de desarrollo', icon: 'file' },
   { to: paths.settings, label: 'Ajustes', icon: 'settings' },
 ];
 

@@ -29,6 +29,7 @@ import type {
   FakeDataTextCase,
 } from './fakeData.model';
 import './fake-data.css';
+import { DeveloperGenerators } from './DeveloperGenerators';
 
 const categoryIcons: Record<FakeDataCategoryId, IconName> = {
   personal: 'user',
@@ -161,6 +162,7 @@ export default function FakeDataPage() {
         }
       />
 
+      <DeveloperGenerators />
       <div className="fake-data-picker">
         <div className="fake-data-groups" role="group" aria-label="Familia de generadores">
           {categoryGroups.map((item) => (

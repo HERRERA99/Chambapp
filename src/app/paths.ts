@@ -16,5 +16,6 @@ export const paths = {
   percentages: '/porcentajes',
   timeCalculator: '/calculadora-de-horas',
   fakeData: '/datos-ficticios',
+  developer: '/utilidades-desarrollo',
   settings: '/ajustes',
 } as const;

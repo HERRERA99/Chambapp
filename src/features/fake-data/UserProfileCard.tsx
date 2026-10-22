@@ -12,10 +12,10 @@ const profileFields = [
   { key: 'fullName', label: 'Nombre completo', span: 6 },
   { key: 'surnames', label: 'Apellidos', span: 3 },
   { key: 'birthDate', label: 'Fecha de nacimiento', span: 3 },
-  { key: 'email', label: 'Email', span: 3 },
-  { key: 'phone', label: 'Teléfono', span: 3 },
-  { key: 'passport', label: 'Pasaporte', span: 3 },
-  { key: 'socialSecurity', label: 'Seguridad social', span: 3 },
+  { key: 'email', label: 'Email', span: 6 },
+  { key: 'phone', label: 'Teléfono', span: 2 },
+  { key: 'passport', label: 'Pasaporte', span: 2 },
+  { key: 'socialSecurity', label: 'Seguridad social', span: 2 },
   { key: 'address', label: 'Dirección', span: 4 },
   { key: 'postalCode', label: 'CP', span: 2 },
   { key: 'city', label: 'Municipio', span: 3 },
@@ -62,6 +62,8 @@ function ProfileField({
   field: FakeDataField;
   span?: number;
 } & Pick<ProfileCardProps, 'index' | 'onCopy'>) {
+  const emailAt = field.key === 'email' ? field.value.lastIndexOf('@') : -1;
+
   return (
     <div
       className={`fake-user-profile__field fake-user-profile__field--${span} fake-user-profile__field--${field.key}`}
@@ -74,7 +76,17 @@ function ProfileField({
           onClick={() => void onCopy(field.value, `${field.label}: copiado.`)}
         />
       </dt>
-      <dd className={textFields.has(field.key) ? undefined : 'mono'}>{field.value}</dd>
+      <dd className={textFields.has(field.key) ? undefined : 'mono'}>
+        {emailAt > 0 ? (
+          <>
+            {field.value.slice(0, emailAt)}
+            <wbr />
+            <span className="fake-user-profile__email-domain">{field.value.slice(emailAt)}</span>
+          </>
+        ) : (
+          field.value
+        )}
+      </dd>
     </div>
   );
 }
