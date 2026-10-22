@@ -22,6 +22,8 @@ const AttendancePage = lazy(() => import('../features/attendance/AttendancePage'
 const WeekPage = lazy(() => import('../features/week/WeekPage'));
 const CalendarPage = lazy(() => import('../features/calendar/CalendarPage'));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
+const PercentagesPage = lazy(() => import('../features/calculators/PercentagesPage'));
+const TimeCalculatorPage = lazy(() => import('../features/calculators/TimeCalculatorPage'));
 const NotFoundPage = lazy(() => import('./NotFoundPage'));
 
 const routeTitles: Record<string, string> = {
@@ -39,6 +41,8 @@ const routeTitles: Record<string, string> = {
   '/partes-de-horas': 'Partes de horas',
   '/fichajes': 'Entradas y salidas',
   '/mi-semana': 'Mi semana',
+  '/porcentajes': 'Porcentajes',
+  '/calculadora-de-horas': 'Calculadora de horas',
   '/ajustes': 'Ajustes',
 };
 
@@ -87,6 +91,8 @@ export function App() {
                         <Route path={paths.entries} element={<EntriesPage />} />
                         <Route path={paths.attendance} element={<AttendancePage />} />
                         <Route path={paths.week} element={<WeekPage />} />
+                        <Route path={paths.percentages} element={<PercentagesPage />} />
+                        <Route path={paths.timeCalculator} element={<TimeCalculatorPage />} />
                         <Route path={paths.settings} element={<SettingsPage />} />
                       </Route>
                     </Route>

@@ -19,7 +19,14 @@ export let data: WorkspaceData = {
     duracion_real_segundos: 3661.25, duracion_imputada_segundos: 7200, imputado_en_odoo: false }],
   configurations: [], days: [], jornadas: [{ ...owned, id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee', fecha: '2026-10-02',
     zona_horaria: 'Europe/Madrid', configuracion_id: null, minutos_objetivo: 480, notas: null }],
-  fichajes: [], serverTime: now, receivedAt: Date.now(),
+  fichajes: [
+    { ...owned, id: 'ffffffff-ffff-4fff-ffff-fffffffffff1', jornada_id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+      inicio_en: '2026-10-02T07:00:00Z', fin_en: '2026-10-02T11:00:00Z', eliminado_en: null,
+      fecha: '2026-10-02', zona_horaria: 'Europe/Madrid', duracion_segundos: 14400 },
+    { ...owned, id: 'ffffffff-ffff-4fff-ffff-fffffffffff2', jornada_id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+      inicio_en: '2026-10-02T13:00:00Z', fin_en: null, eliminado_en: null,
+      fecha: '2026-10-02', zona_horaria: 'Europe/Madrid', duracion_segundos: null },
+  ], absences: [], serverTime: now, receivedAt: Date.now(),
 };
 export const operations: { action: string; payload: Record<string, Json | undefined> }[] = [];
 export async function executeCommand(action: string, payload: Record<string, Json | undefined>) {

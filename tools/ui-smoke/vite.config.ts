@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  publicDir: fileURLToPath(new URL('../../public', import.meta.url)),
   cacheDir: 'node_modules/.vite-ui-smoke',
   plugins: [react()],
   resolve: { alias: [{ find: /^.*workspace\.repository$/, replacement: fileURLToPath(new URL('./repository.ts', import.meta.url)) }] },

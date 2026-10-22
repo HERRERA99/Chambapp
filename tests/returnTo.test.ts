@@ -14,6 +14,8 @@ test('preserves supported workspace destinations, filters, and section anchors',
     '/partes-de-horas',
     '/fichajes?fecha=2026-10-02',
     '/mi-semana',
+    '/porcentajes',
+    '/calculadora-de-horas',
     '/onboarding',
     '/ajustes?returnTo=%2Fproyectos#regional',
   ]) {

@@ -13,5 +13,7 @@ export const paths = {
   entries: '/partes-de-horas',
   attendance: '/fichajes',
   week: '/mi-semana',
+  percentages: '/porcentajes',
+  timeCalculator: '/calculadora-de-horas',
   settings: '/ajustes',
 } as const;

@@ -25,6 +25,8 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
   { to: paths.week, label: 'Mi semana', icon: 'calendar' },
   { to: paths.calendar, label: 'Festivos & vacaciones', icon: 'calendar' },
+  { to: paths.percentages, label: 'Porcentajes', icon: 'percent' },
+  { to: paths.timeCalculator, label: 'Calculadora de horas', icon: 'calculator' },
   { to: paths.settings, label: 'Ajustes', icon: 'settings' },
 ];
 
