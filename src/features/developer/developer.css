@@ -155,3 +155,145 @@
     gap: 8px;
   }
 }
+
+/* Shared high-contrast JSON palette on an opaque editor surface. */
+.dev-page {
+  --json-bg: #151a23;
+  --json-fg: #edf2fa;
+  --json-key: #f4a5e8;
+  --json-string: #a4edac;
+  --json-number: #78dff5;
+  --json-literal: #ffc18b;
+  --json-muted: #b8c5d9;
+}
+.dev-page .json-token--key,
+.dev-page .dev-tree-row strong,
+.dev-page .dev-node strong {
+  color: var(--json-key);
+}
+.dev-page .json-token--string,
+.dev-page .dev-value--string {
+  color: var(--json-string);
+}
+.dev-page .json-token--number,
+.dev-page .dev-value--number {
+  color: var(--json-number);
+}
+.dev-page .json-token--literal,
+.dev-page .dev-value--boolean,
+.dev-page .dev-value--null {
+  color: var(--json-literal);
+}
+.dev-page .dev-value--object {
+  color: var(--json-muted);
+}
+.dev-page .dev-tree,
+.dev-page .dev-output {
+  background: var(--json-bg);
+  color: var(--json-fg);
+  border: 1px solid #556176;
+  border-radius: 8px;
+  padding: 18px;
+}
+.dev-page .dev-tree {
+  font-family: var(--font-mono);
+}
+.dev-page .dev-tree ul {
+  border-color: #566278;
+}
+.dev-page .dev-tree-row {
+  border-radius: 4px;
+}
+.dev-page .dev-tree-row:hover {
+  background: #263144;
+}
+.dev-page .dev-tree-row button {
+  color: #e1e9f8;
+  min-width: 25px;
+}
+.dev-page .dev-graph {
+  background-color: #111720;
+  background-image: radial-gradient(#4a566c 1px, transparent 1px);
+  background-size: 22px 22px;
+  height: 600px;
+  border-color: #566278;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.dev-page .dev-graph--dragging,
+.dev-page .dev-graph--dragging * {
+  cursor: grabbing;
+}
+.dev-page .dev-node {
+  background: #202938;
+  border: 1px solid #8293af;
+  border-radius: 8px;
+  color: var(--json-fg);
+}
+.dev-page .dev-node:hover {
+  background: #2b374b;
+  border-color: #f4a5e8;
+}
+.dev-page .dev-node span {
+  font: 12px var(--font-mono);
+}
+.dev-page .dev-node:focus-visible,
+.dev-page .dev-graph:focus-visible {
+  outline: 2px solid #78dff5;
+  outline-offset: 3px;
+}
+.json-code-editor {
+  position: relative;
+  height: 300px;
+  min-width: 0;
+  border: 1px solid #63718a;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--json-bg);
+}
+.json-code-editor:focus-within {
+  outline: 2px solid #78dff5;
+  outline-offset: 2px;
+}
+.dev-page .json-code-editor pre,
+.dev-page .json-code-editor textarea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 16px;
+  font: 13px/1.8 var(--font-mono);
+  letter-spacing: normal;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.dev-page .json-code-editor pre {
+  color: var(--json-fg);
+  pointer-events: none;
+  scrollbar-width: none;
+}
+.dev-page .json-code-editor pre::-webkit-scrollbar {
+  display: none;
+}
+.dev-page .json-code-editor textarea {
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #fff;
+  resize: none;
+  outline: none;
+}
+.dev-page .json-code-editor textarea::placeholder {
+  color: #b8c5d9;
+  -webkit-text-fill-color: #b8c5d9;
+}
+.dev-page .json-code-editor textarea::selection {
+  background: #42618e99;
+}

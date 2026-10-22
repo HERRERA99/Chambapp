@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { JsonEditor as Editor, JsonHighlight } from './JsonEditor';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button } from '../../shared/ui/Button';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
@@ -10,27 +11,6 @@ import './developer.css';
 
 const example =
   '{"proyecto":"Chambapp","activo":true,"usuarios":[{"nombre":"Ana","horas":8},{"nombre":"Luis","horas":6}],"notas":null}';
-function Editor({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="dev-editor">
-      <span className="eyebrow">{label}</span>
-      <textarea
-        spellCheck={false}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Pega aquí tu JSON…"
-      />
-    </label>
-  );
-}
 export default function DeveloperPage() {
   const notify = useFeedback();
   const [tab, setTab] = useState<'view' | 'format' | 'compare'>('view');
@@ -40,6 +20,16 @@ export default function DeveloperPage() {
   const [indent, setIndent] = useState('2');
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState(1);
+  const pan = useRef<{
+    x: number;
+    y: number;
+    left: number;
+    top: number;
+    id: number;
+    moved: boolean;
+  } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const suppressClick = useRef(false);
   const parsed = useMemo(() => {
     try {
       return { value: parseJson(source), error: '' };
@@ -228,10 +218,57 @@ export default function DeveloperPage() {
             <ul className="dev-tree">{tree(parsed.value, '$', 'raíz')}</ul>
           ) : (
             <div
-              className="dev-graph"
+              className={`dev-graph ${dragging ? 'dev-graph--dragging' : ''}`}
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                suppressClick.current = false;
+                pan.current = {
+                  x: e.clientX,
+                  y: e.clientY,
+                  left: e.currentTarget.scrollLeft,
+                  top: e.currentTarget.scrollTop,
+                  id: e.pointerId,
+                  moved: false,
+                };
+              }}
+              onPointerMove={(e) => {
+                const start = pan.current;
+                if (!start) return;
+                const dx = e.clientX - start.x,
+                  dy = e.clientY - start.y;
+                if (!start.moved && Math.hypot(dx, dy) < 4) return;
+                start.moved = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setDragging(true);
+                e.currentTarget.scrollLeft = start.left - dx;
+                e.currentTarget.scrollTop = start.top - dy;
+              }}
+              onPointerUp={(e) => {
+                suppressClick.current = !!pan.current?.moved;
+                pan.current = null;
+                setDragging(false);
+                if (e.currentTarget.hasPointerCapture(e.pointerId))
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+              }}
+              onPointerCancel={() => {
+                pan.current = null;
+                setDragging(false);
+              }}
+              onLostPointerCapture={() => {
+                pan.current = null;
+                setDragging(false);
+              }}
+              onClickCapture={(e) => {
+                if (suppressClick.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+                pan.current = null;
+                suppressClick.current = false;
+              }}
               tabIndex={0}
               role="region"
-              aria-label="Grafo JSON; desplázate para explorar"
+              aria-label="Grafo JSON; arrastra para desplazarte o usa las flechas del teclado"
             >
               <svg
                 width={(Math.max(0, ...graph.map((n) => n.x)) + 290) * zoom}
@@ -249,7 +286,8 @@ export default function DeveloperPage() {
                           key={n.path}
                           d={`M${p.x + 250},${p.y + 30} C${p.x + 270},${p.y + 30} ${n.x - 20},${n.y + 30} ${n.x},${n.y + 30}`}
                           fill="none"
-                          stroke="var(--muted)"
+                          stroke="#8796ae"
+                          strokeWidth="2"
                         />
                       );
                     })}
@@ -273,7 +311,11 @@ export default function DeveloperPage() {
                             {entries(n.value).length ? (closed.has(n.path) ? '▸ ' : '▾ ') : ''}
                             {n.label}
                           </strong>
-                          <span>{summary(n.value)}</span>
+                          <span
+                            className={`dev-value--${n.value === null ? 'null' : typeof n.value}`}
+                          >
+                            {summary(n.value)}
+                          </span>
                         </button>
                       </foreignObject>
                     </g>
@@ -298,7 +340,9 @@ export default function DeveloperPage() {
               Copiar resultado
             </Button>
           </div>
-          <pre className="dev-output">{output || 'El resultado aparecerá aquí.'}</pre>
+          <pre className="dev-output">
+            <JsonHighlight text={output || 'El resultado aparecerá aquí.'} />
+          </pre>
         </section>
       ) : null}
       {tab === 'compare' ? (
