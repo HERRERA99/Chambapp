@@ -23,6 +23,7 @@ import '../../src/styles/components.css';
 
 const PercentagesPage = lazy(() => import('../../src/features/calculators/PercentagesPage'));
 const TimeCalculatorPage = lazy(() => import('../../src/features/calculators/TimeCalculatorPage'));
+const FakeDataPage = lazy(() => import('../../src/features/fake-data/FakeDataPage'));
 const noop = async () => {};
 const client = new QueryClient();
 function Smoke() {
@@ -50,6 +51,7 @@ function Smoke() {
                 <Route path="/resumen" element={<DashboardPage />} />
                 <Route path="/porcentajes" element={<PercentagesPage />} />
                 <Route path="/calculadora-de-horas" element={<TimeCalculatorPage />} />
+                <Route path="/datos-ficticios" element={<FakeDataPage />} />
               </Route>
             </Routes></Suspense></MemoryRouter>
               <details><summary>Operaciones de prueba</summary><pre>{JSON.stringify(operations, null, 2)}</pre></details>

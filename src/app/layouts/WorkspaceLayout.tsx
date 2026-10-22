@@ -27,6 +27,7 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.calendar, label: 'Festivos & vacaciones', icon: 'calendar' },
   { to: paths.percentages, label: 'Porcentajes', icon: 'percent' },
   { to: paths.timeCalculator, label: 'Calculadora de horas', icon: 'calculator' },
+  { to: paths.fakeData, label: 'Datos ficticios', icon: 'dice' },
   { to: paths.settings, label: 'Ajustes', icon: 'settings' },
 ];
 

@@ -24,6 +24,7 @@ const CalendarPage = lazy(() => import('../features/calendar/CalendarPage'));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
 const PercentagesPage = lazy(() => import('../features/calculators/PercentagesPage'));
 const TimeCalculatorPage = lazy(() => import('../features/calculators/TimeCalculatorPage'));
+const FakeDataPage = lazy(() => import('../features/fake-data/FakeDataPage'));
 const NotFoundPage = lazy(() => import('./NotFoundPage'));
 
 const routeTitles: Record<string, string> = {
@@ -43,6 +44,7 @@ const routeTitles: Record<string, string> = {
   '/mi-semana': 'Mi semana',
   '/porcentajes': 'Porcentajes',
   '/calculadora-de-horas': 'Calculadora de horas',
+  '/datos-ficticios': 'Datos ficticios',
   '/ajustes': 'Ajustes',
 };
 
@@ -93,6 +95,7 @@ export function App() {
                         <Route path={paths.week} element={<WeekPage />} />
                         <Route path={paths.percentages} element={<PercentagesPage />} />
                         <Route path={paths.timeCalculator} element={<TimeCalculatorPage />} />
+                        <Route path={paths.fakeData} element={<FakeDataPage />} />
                         <Route path={paths.settings} element={<SettingsPage />} />
                       </Route>
                     </Route>

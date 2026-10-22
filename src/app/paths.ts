@@ -15,5 +15,6 @@ export const paths = {
   week: '/mi-semana',
   percentages: '/porcentajes',
   timeCalculator: '/calculadora-de-horas',
+  fakeData: '/datos-ficticios',
   settings: '/ajustes',
 } as const;

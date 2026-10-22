@@ -11,6 +11,7 @@ const protectedPaths: readonly string[] = [
   paths.week,
   paths.percentages,
   paths.timeCalculator,
+  paths.fakeData,
   paths.settings,
   paths.onboarding,
 ];
