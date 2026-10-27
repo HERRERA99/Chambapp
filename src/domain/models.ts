@@ -42,6 +42,13 @@ export type Task = OwnedRecord & {
   eliminado_en: string | null;
 };
 
+export type Note = OwnedRecord & {
+  titulo: string;
+  contenido_md: string;
+  proyecto_ids: string[];
+  tarea_ids: string[];
+};
+
 export type TimeRecord = OwnedRecord & {
   tarea_id: string;
   jornada_id: string;
@@ -102,6 +109,7 @@ export type WorkspaceData = {
   profile: Profile;
   projects: Project[];
   tasks: Task[];
+  notes: Note[];
   entries: TimeEntry[];
   configurations: WeeklyConfiguration[];
   days: ScheduleDay[];
@@ -122,6 +130,8 @@ export type CalendarAbsence = OwnedRecord & {
 };
 
 export type CommandAction =
+  | 'guardar_nota'
+  | 'eliminar_nota'
   | 'guardar_ausencia'
   | 'eliminar_ausencia'
   | 'sincronizar_festivos'

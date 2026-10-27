@@ -17,6 +17,7 @@ const OnboardingPage = lazy(() => import('../features/onboarding/OnboardingPage'
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage'));
 const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
+const NotesPage = lazy(() => import('../features/notes/NotesPage'));
 const EntriesPage = lazy(() => import('../features/time-entries/EntriesPage'));
 const AttendancePage = lazy(() => import('../features/attendance/AttendancePage'));
 const WeekPage = lazy(() => import('../features/week/WeekPage'));
@@ -39,6 +40,7 @@ const routeTitles: Record<string, string> = {
   '/proyectos': 'Proyectos y clientes',
   '/tareas': 'Tareas',
   '/tablero': 'Tablero de tareas',
+  '/notas': 'Notas Markdown',
   '/calendario': 'Festivos y vacaciones',
   '/partes-de-horas': 'Partes de horas',
   '/fichajes': 'Entradas y salidas',
@@ -91,6 +93,7 @@ export function App() {
                         <Route path={paths.projects} element={<ProjectsPage />} />
                         <Route path={paths.tasks} element={<TasksPage />} />
                         <Route path={paths.board} element={<TasksPage defaultView="board" />} />
+                        <Route path={paths.notes} element={<NotesPage />} />
                         <Route path={paths.calendar} element={<CalendarPage />} />
                         <Route path={paths.entries} element={<EntriesPage />} />
                         <Route path={paths.attendance} element={<AttendancePage />} />

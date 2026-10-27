@@ -1,4 +1,11 @@
-import type { Attendance, CalendarAbsence, Profile, Task, TimeEntry } from '../../domain/models';
+import type {
+  Attendance,
+  CalendarAbsence,
+  Note,
+  Profile,
+  Task,
+  TimeEntry,
+} from '../../domain/models';
 import { validDateRange } from '../../domain/calendar.ts';
 import type { Database } from './database.types';
 import { isOdooId, isOdooUrl } from '../../domain/odoo.ts';
@@ -6,6 +13,38 @@ import { isOdooId, isOdooUrl } from '../../domain/odoo.ts';
 type Tables = Database['public']['Tables'];
 type EntryRow = Database['public']['Views']['partes_detalle']['Row'];
 type AttendanceRow = Database['public']['Views']['fichajes_detalle']['Row'];
+
+type NoteRow = Database['public']['Views']['notas_detalle']['Row'];
+const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+export function assertNote(row: NoteRow): asserts row is Note {
+  if (
+    typeof row.id !== 'string' ||
+    !uuid.test(row.id) ||
+    typeof row.usuario_id !== 'string' ||
+    !uuid.test(row.usuario_id) ||
+    typeof row.titulo !== 'string' ||
+    !row.titulo.trim() ||
+    [...row.titulo].length > 200 ||
+    typeof row.contenido_md !== 'string' ||
+    new TextEncoder().encode(row.contenido_md).length > 1_000_000 ||
+    typeof row.creado_en !== 'string' ||
+    !Number.isFinite(Date.parse(row.creado_en)) ||
+    typeof row.actualizado_en !== 'string' ||
+    !Number.isFinite(Date.parse(row.actualizado_en)) ||
+    row.version === null ||
+    !Number.isSafeInteger(row.version) ||
+    row.version < 1 ||
+    [row.proyecto_ids, row.tarea_ids].some(
+      (ids) =>
+        !Array.isArray(ids) ||
+        ids.length > 100 ||
+        ids.some((id) => typeof id !== 'string' || !uuid.test(id)) ||
+        new Set(ids).size !== ids.length,
+    )
+  )
+    throw new Error('La nota contiene datos incompletos o no válidos.');
+}
 
 export function assertAbsence(row: Tables['ausencias']['Row']): asserts row is CalendarAbsence {
   if (

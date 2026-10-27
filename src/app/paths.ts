@@ -9,6 +9,7 @@ export const paths = {
   projects: '/proyectos',
   tasks: '/tareas',
   board: '/tablero',
+  notes: '/notas',
   calendar: '/calendario',
   entries: '/partes-de-horas',
   attendance: '/fichajes',

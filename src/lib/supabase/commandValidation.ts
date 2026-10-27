@@ -22,6 +22,44 @@ export function isValidCommandResponse(
   data: unknown,
 ): boolean {
   if (!record(data)) return false;
+  if (action === 'guardar_nota' || action === 'eliminar_nota') {
+    if (
+      !identifier(data.id) ||
+      data.id !== payload.id ||
+      !identifier(data.usuario_id) ||
+      !timestamp(data.creado_en) ||
+      !timestamp(data.actualizado_en) ||
+      typeof data.version !== 'number' ||
+      !Number.isSafeInteger(data.version) ||
+      data.version < 1 ||
+      typeof data.titulo !== 'string' ||
+      !data.titulo.trim() ||
+      [...data.titulo].length > 200 ||
+      typeof data.contenido_md !== 'string' ||
+      [data.proyecto_ids, data.tarea_ids].some(
+        (ids) =>
+          !Array.isArray(ids) ||
+          ids.length > 100 ||
+          !ids.every(identifier) ||
+          new Set(ids).size !== ids.length,
+      )
+    )
+      return false;
+    if (action === 'eliminar_nota') return data.version === payload.version;
+    const sameIds = (actual: unknown, expected: unknown) =>
+      Array.isArray(actual) &&
+      Array.isArray(expected) &&
+      actual.length === new Set(expected).size &&
+      expected.every((id) => actual.includes(id));
+    return (
+      typeof payload.titulo === 'string' &&
+      data.titulo === payload.titulo.trim() &&
+      data.contenido_md === payload.contenido_md &&
+      sameIds(data.proyecto_ids, payload.proyecto_ids) &&
+      sameIds(data.tarea_ids, payload.tarea_ids) &&
+      (payload.version === undefined || data.version === Number(payload.version) + 1)
+    );
+  }
   if (action === 'sincronizar_festivos')
     return (
       typeof data.sincronizados === 'number' &&

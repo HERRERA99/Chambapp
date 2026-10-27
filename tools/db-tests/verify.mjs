@@ -9,6 +9,7 @@ import { verifyAttendance } from './attendance.mjs';
 import { verifyOdooStatus } from './odoo-status.mjs';
 import { verifySelectedStartAndCredentials } from './selected-start-and-credentials.mjs';
 import { verifyCalendar } from './calendar.mjs';
+import { verifyNotes } from './notes.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const databaseDir = await mkdtemp(join(tmpdir(), 'chambapp-db-test-'));
@@ -19,6 +20,8 @@ const postgres = new EmbeddedPostgres({
   user: 'postgres',
   password: randomUUID(),
   persistent: true,
+  // Windows' system locale can otherwise initialize WIN1252. Match Supabase UTF-8.
+  initdbFlags: ['--encoding=UTF8'],
   onLog() {},
   onError(message) {
     console.error(String(message));
@@ -624,6 +627,7 @@ try {
   );
   await verifyAttendance({ admin, ca, cb, anonymous, client, rpc, expectError, ok });
   await verifyCalendar({ ca, cb, anonymous, noSession, rpc, expectError, ok });
+  await verifyNotes({ admin, ca, cb, anonymous, noSession, client, rpc, expectError, ok });
   await verifyOdooStatus({ ca, cb, client, rpc, expectError, ok });
   await verifySelectedStartAndCredentials({
     admin,
@@ -647,7 +651,7 @@ try {
     await admin.query(`select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname in ('public','chambapp_private') and c.relkind='r'`)
   ).rows;
-  assert.equal(catalog.length, 12);
+  assert.equal(catalog.length, 15);
   assert.ok(catalog.every((x) => x.relrowsecurity));
   const unsafe = (
     await admin.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
@@ -658,7 +662,7 @@ try {
     await admin.query(`select c.relname,c.reloptions from pg_class c
     join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='v'`)
   ).rows;
-  assert.equal(viewSecurity.length, 6);
+  assert.equal(viewSecurity.length, 7);
   assert.ok(viewSecurity.every((x) => x.reloptions.includes('security_invoker=true')));
   assert.equal(
     (
@@ -676,7 +680,7 @@ try {
     false,
   );
   ok(
-    'all twelve tables have RLS, weekly versions are immutable and public RPCs are security invoker',
+    'all fifteen tables have RLS, weekly versions are immutable and public RPCs are security invoker',
   );
   await admin.query(await readFile(join(root, 'supabase/verify.sql'), 'utf8'));
   console.log(

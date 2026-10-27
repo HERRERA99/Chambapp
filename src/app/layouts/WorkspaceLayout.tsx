@@ -21,6 +21,7 @@ const navigation: readonly { to: string; label: string; icon: IconName }[] = [
   { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
   { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
   { to: paths.board, label: 'Tablero de tareas', icon: 'grid' },
+  { to: paths.notes, label: 'Notas', icon: 'file' },
   { to: paths.entries, label: 'Partes de horas', icon: 'clock' },
   { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
   { to: paths.week, label: 'Mi semana', icon: 'calendar' },

@@ -5,9 +5,15 @@ begin
   select count(*) into n from pg_catalog.pg_class c join pg_catalog.pg_namespace s on s.oid = c.relnamespace
     where c.relkind = 'r' and c.relrowsecurity and
       ((s.nspname = 'public' and c.relname in ('perfiles','proyectos','tareas','configuraciones_semanales',
-        'dias_configuracion_semanal','jornadas','partes_horas','fichajes','ausencias')) or
+        'dias_configuracion_semanal','jornadas','partes_horas','fichajes','ausencias','notas','nota_proyectos','nota_tareas')) or
        (s.nspname = 'chambapp_private' and c.relname in ('operaciones_cronometro','operaciones_fichajes','odoo_credenciales')));
-  if n <> 12 then raise exception 'Faltan tablas o RLS: % de 12', n; end if;
+  if n <> 15 then raise exception 'Faltan tablas o RLS: % de 15', n; end if;
+  if pg_catalog.has_table_privilege('anon','public.notas_detalle','SELECT') or
+     pg_catalog.has_function_privilege('anon','public.chambapp_notas(text,jsonb)','EXECUTE') or
+     not pg_catalog.has_function_privilege('authenticated','public.chambapp_notas(text,jsonb)','EXECUTE') or
+     not exists(select 1 from pg_catalog.pg_class c where c.oid = 'public.notas_detalle'::regclass
+       and 'security_invoker=true' = any(c.reloptions)) then
+    raise exception 'Permisos de notas incorrectos'; end if;
   if pg_catalog.has_table_privilege('anon','public.ausencias','SELECT') or
      pg_catalog.has_function_privilege('anon','public.chambapp_calendario(text,jsonb)','EXECUTE') or
      not pg_catalog.has_function_privilege('authenticated','public.chambapp_calendario(text,jsonb)','EXECUTE') then

@@ -8,6 +8,48 @@ export type Database = {
   };
   public: {
     Tables: {
+      notas: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          titulo: string;
+          contenido_md: string;
+          creado_en: string;
+          actualizado_en: string;
+          version: number;
+        };
+        Insert: {
+          id?: string;
+          usuario_id?: string;
+          titulo: string;
+          contenido_md?: string;
+          creado_en?: string;
+          actualizado_en?: string;
+          version?: number;
+        };
+        Update: {
+          id?: string;
+          usuario_id?: string;
+          titulo?: string;
+          contenido_md?: string;
+          creado_en?: string;
+          actualizado_en?: string;
+          version?: number;
+        };
+        Relationships: [];
+      };
+      nota_proyectos: {
+        Row: { nota_id: string; proyecto_id: string; usuario_id: string };
+        Insert: { nota_id: string; proyecto_id: string; usuario_id?: string };
+        Update: { nota_id?: string; proyecto_id?: string; usuario_id?: string };
+        Relationships: [];
+      };
+      nota_tareas: {
+        Row: { nota_id: string; tarea_id: string; usuario_id: string };
+        Insert: { nota_id: string; tarea_id: string; usuario_id?: string };
+        Update: { nota_id?: string; tarea_id?: string; usuario_id?: string };
+        Relationships: [];
+      };
       ausencias: {
         Row: {
           id: string;
@@ -471,6 +513,20 @@ export type Database = {
       };
     };
     Views: {
+      notas_detalle: {
+        Row: {
+          id: string | null;
+          usuario_id: string | null;
+          titulo: string | null;
+          contenido_md: string | null;
+          creado_en: string | null;
+          actualizado_en: string | null;
+          version: number | null;
+          proyecto_ids: string[] | null;
+          tarea_ids: string[] | null;
+        };
+        Relationships: [];
+      };
       fichajes_detalle: {
         Row: {
           actualizado_en: string | null;
@@ -666,6 +722,7 @@ export type Database = {
       };
     };
     Functions: {
+      chambapp_notas: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_calendario: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_configurar_odoo: {
         Args: { p_api_key?: string; p_guardar?: boolean };

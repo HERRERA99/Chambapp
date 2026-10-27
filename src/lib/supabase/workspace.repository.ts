@@ -6,6 +6,7 @@ import {
   assertEntry,
   assertProfile,
   assertTask,
+  assertNote,
 } from './rowValidation';
 import { isRetryableStatus, isValidCommandResponse } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
@@ -42,9 +43,11 @@ export async function executeCommand<T = unknown>(
   const db = getSupabase();
   const request = db
     .rpc(
-      ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
-        ? 'chambapp_calendario'
-        : 'chambapp_operar',
+      ['guardar_nota', 'eliminar_nota'].includes(action)
+        ? 'chambapp_notas'
+        : ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
+          ? 'chambapp_calendario'
+          : 'chambapp_operar',
       { p_accion: action, p_datos: payload },
     )
     .abortSignal(signal);
@@ -167,6 +170,16 @@ export async function loadWorkspace(
         .range(from, to)
         .abortSignal(signal),
     ),
+    readAll((from, to) =>
+      db
+        .from('notas_detalle')
+        .select('*')
+        .eq('usuario_id', userId)
+        .order('actualizado_en', { ascending: false })
+        .order('id')
+        .range(from, to)
+        .abortSignal(signal),
+    ),
   ]);
   const [
     profile,
@@ -179,6 +192,7 @@ export async function loadWorkspace(
     fichajes,
     clock,
     absences,
+    notes,
   ] = results;
   if (profile.error) throw new DataError(readableError(profile.error));
   assertProfile(profile.data);
@@ -192,6 +206,7 @@ export async function loadWorkspace(
       ...jornadas,
       ...fichajes,
       ...absences,
+      ...notes,
     ].some((row) => row.usuario_id !== userId)
   )
     throw new DataError(
@@ -204,6 +219,10 @@ export async function loadWorkspace(
     projects,
     tasks: tasks.map((row) => {
       assertTask(row);
+      return row;
+    }),
+    notes: notes.map((row) => {
+      assertNote(row);
       return row;
     }),
     entries: entries.map((row) => {

@@ -1,6 +1,6 @@
 # Chambapp
 
-Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
+Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, notas Markdown, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
 
 ## Arrancar en local
 
@@ -56,6 +56,14 @@ El entorno Supabase local configura las redirecciones del puerto 5173 en `supaba
 Los providers de Auth, Workspace y Tracker coordinan la sesión, la caché de consultas y el cronómetro. Los componentes presentan datos y envían comandos a través de esa capa; los cálculos se mantienen en utilidades y selectores verificables.
 
 Dentro del espacio de trabajo, el logo de Chambapp abre **Resumen** y mantiene al usuario en la aplicación.
+
+## Notas Markdown
+
+En **Notas** (`/notas`) puedes crear y editar notas, importar archivos `.md` UTF-8 y descargar el contenido como Markdown. El editor ofrece vista de edición, vista previa y vista dividida, con tablas, listas de tareas y bloques de código. Usa **Guardar nota** o `Ctrl/Cmd + S` para guardar. Se admiten títulos de hasta 200 caracteres y contenido de hasta 1 MB.
+
+Cada nota puede asociarse con varios proyectos y tareas existentes, o guardarse sin asociaciones. La biblioteca permite buscar por título o contenido y filtrar por proyecto, incluidas sus tareas asociadas. Las notas son privadas de cada usuario y se guardan como texto Markdown en Supabase; la descarga contiene el texto, mientras que las asociaciones permanecen en la aplicación.
+
+El navegador conserva el borrador durante la sesión y avisa antes de cambiar de nota o salir desde la navegación. Si otra pestaña cambia la nota, el editor conserva tus cambios y permite descargar el borrador antes de cargar la versión guardada. Las migraciones de notas y sus permisos deben estar aplicadas antes de ejecutar esta versión del frontend.
 
 ## Odoo y fichajes
 

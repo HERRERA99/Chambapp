@@ -1,4 +1,10 @@
 const messages: Record<string, string> = {
+  NOTA_DATOS_INVALIDOS: 'Revisa el título, el contenido y los vínculos de la nota.',
+  NOTA_NO_DISPONIBLE: 'La nota ya no está disponible. Actualiza los datos.',
+  NOTA_ID_REUTILIZADO:
+    'Esta nota ya se ha guardado con otros datos. Actualiza la página para revisarla.',
+  NOTA_DEMASIADO_GRANDE: 'La nota supera el límite de 1 MB de texto Markdown.',
+  NOTA_DEMASIADOS_VINCULOS: 'Puedes asociar hasta 100 proyectos y 100 tareas a cada nota.',
   IMPUTACION_ODOO_INVALIDA: 'Indica si este parte está imputado en Odoo con una marca válida.',
   SESION_REQUERIDA: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
   CONFLICTO_VERSION:

@@ -25,11 +25,12 @@ const PercentagesPage = lazy(() => import('../../src/features/calculators/Percen
 const TimeCalculatorPage = lazy(() => import('../../src/features/calculators/TimeCalculatorPage'));
 const FakeDataPage = lazy(() => import('../../src/features/fake-data/FakeDataPage'));
 const DeveloperPage = lazy(() => import('../../src/features/developer/DeveloperPage'));
+const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
 const noop = async () => {};
 const client = new QueryClient();
 function Smoke() {
   const [data, setData] = useState(current);
-  const activeAttendance = data.fichajes.find(attendance => !attendance.fin_en) ?? null;
+  const activeAttendance = data.fichajes.find((attendance) => !attendance.fin_en) ?? null;
   const attendanceElapsedSeconds = activeAttendance
     ? (Date.parse(now) - Date.parse(activeAttendance.inicio_en)) / 1000
     : 0;
@@ -38,30 +39,81 @@ function Smoke() {
     window.addEventListener('chambapp-smoke-workspace', refresh);
     return () => window.removeEventListener('chambapp-smoke-workspace', refresh);
   }, []);
-  return <QueryClientProvider client={client}>
-    <AuthContext.Provider value={{ user: { id: uid } as never, session: null, loading: false, error: null,
-      isPasswordRecovery: false, completePasswordRecovery: () => {} }}>
-      <WorkspaceContext.Provider value={{ data, isLoading: false, error: null, reload: noop }}>
-        <TrackerContext.Provider value={{ active: null, elapsedSeconds: 0, busy: false, pending: false, error: null,
-          pausedTaskId: null, start: noop, stop: noop, pause: noop, resume: noop, retryPending: noop }}>
-          <AttendanceContext.Provider value={{ active: activeAttendance, now, elapsedSeconds: attendanceElapsedSeconds, busy: false, pending: false,
-            error: null, operation: null, perform: noop, start: noop, stop: noop, retry: noop }}>
-            <FeedbackProvider><MemoryRouter initialEntries={[window.location.pathname === '/' ? '/partes-de-horas' : window.location.pathname]}><Suspense fallback={<p>Cargando vista de prueba…</p>}><Routes>
-              <Route element={<WorkspaceLayout />}>
-                <Route path="/partes-de-horas" element={<EntriesPage />} />
-                <Route path="/resumen" element={<DashboardPage />} />
-                <Route path="/porcentajes" element={<PercentagesPage />} />
-                <Route path="/calculadora-de-horas" element={<TimeCalculatorPage />} />
-                <Route path="/datos-ficticios" element={<FakeDataPage />} />
-                <Route path="/utilidades-desarrollo" element={<DeveloperPage />} />
-              </Route>
-            </Routes></Suspense></MemoryRouter>
-              <details><summary>Operaciones de prueba</summary><pre>{JSON.stringify(operations, null, 2)}</pre></details>
-            </FeedbackProvider>
-          </AttendanceContext.Provider>
-        </TrackerContext.Provider>
-      </WorkspaceContext.Provider>
-    </AuthContext.Provider>
-  </QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <AuthContext.Provider
+        value={{
+          user: { id: uid } as never,
+          session: null,
+          loading: false,
+          error: null,
+          isPasswordRecovery: false,
+          completePasswordRecovery: () => {},
+        }}
+      >
+        <WorkspaceContext.Provider value={{ data, isLoading: false, error: null, reload: noop }}>
+          <TrackerContext.Provider
+            value={{
+              active: null,
+              elapsedSeconds: 0,
+              busy: false,
+              pending: false,
+              error: null,
+              pausedTaskId: null,
+              start: noop,
+              stop: noop,
+              pause: noop,
+              resume: noop,
+              retryPending: noop,
+            }}
+          >
+            <AttendanceContext.Provider
+              value={{
+                active: activeAttendance,
+                now,
+                elapsedSeconds: attendanceElapsedSeconds,
+                busy: false,
+                pending: false,
+                error: null,
+                operation: null,
+                perform: noop,
+                start: noop,
+                stop: noop,
+                retry: noop,
+              }}
+            >
+              <FeedbackProvider>
+                <MemoryRouter
+                  initialEntries={[
+                    window.location.pathname === '/'
+                      ? '/partes-de-horas'
+                      : `${window.location.pathname}${window.location.search}`,
+                  ]}
+                >
+                  <Suspense fallback={<p>Cargando vista de prueba…</p>}>
+                    <Routes>
+                      <Route element={<WorkspaceLayout />}>
+                        <Route path="/partes-de-horas" element={<EntriesPage />} />
+                        <Route path="/resumen" element={<DashboardPage />} />
+                        <Route path="/porcentajes" element={<PercentagesPage />} />
+                        <Route path="/calculadora-de-horas" element={<TimeCalculatorPage />} />
+                        <Route path="/datos-ficticios" element={<FakeDataPage />} />
+                        <Route path="/utilidades-desarrollo" element={<DeveloperPage />} />
+                        <Route path="/notas" element={<NotesPage />} />
+                      </Route>
+                    </Routes>
+                  </Suspense>
+                </MemoryRouter>
+                <details>
+                  <summary>Operaciones de prueba</summary>
+                  <pre>{JSON.stringify(operations, null, 2)}</pre>
+                </details>
+              </FeedbackProvider>
+            </AttendanceContext.Provider>
+          </TrackerContext.Provider>
+        </WorkspaceContext.Provider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
 }
 createRoot(document.getElementById('root')!).render(<Smoke />);

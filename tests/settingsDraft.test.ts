@@ -26,6 +26,7 @@ function workspace(): WorkspaceData {
     },
     projects: [],
     tasks: [],
+    notes: [],
     entries: [],
     configurations: [],
     days: [],
