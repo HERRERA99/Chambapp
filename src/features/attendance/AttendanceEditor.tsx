@@ -98,6 +98,7 @@ export function AttendanceEditor({
             : record
               ? 'Fichaje actualizado.'
               : 'Fichaje creado.',
+        'success',
       );
       onClose();
     } catch (cause) {

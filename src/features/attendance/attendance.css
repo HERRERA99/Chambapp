@@ -10,8 +10,11 @@
   justify-content: space-between;
 }
 .attendance-controls__elapsed {
-  color: var(--success);
-  font-size: 20px;
+  font-family: var(--font-body);
+  font-size: 28px;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .attendance-controls__message {
   flex-basis: 100%;
@@ -29,7 +32,7 @@
   font-size: 12px;
 }
 .attendance-controls--compact .button {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 8px 10px;
   white-space: nowrap;
 }
@@ -65,21 +68,21 @@
   flex: 1 0 100px;
   max-width: 170px;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .attendance-chart__values {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 12px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .attendance-chart__value--worked {
-  color: var(--success);
+  color: var(--dim);
 }
 .attendance-chart__value--imputed {
-  color: var(--accent);
+  color: var(--text);
 }
 .attendance-chart__bars {
   display: flex;
@@ -98,31 +101,34 @@
 .attendance-chart__bar {
   width: 100%;
   min-height: 0;
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
   flex-shrink: 0;
 }
 .attendance-chart__bar--worked {
-  background: var(--success);
+  background: var(--chart-secondary);
 }
 .attendance-chart__bar--imputed {
-  background: var(--accent);
+  background: var(--chart-primary);
 }
 .attendance-chart__bar--provisional {
   background: repeating-linear-gradient(
     45deg,
-    var(--success) 0,
-    var(--success) 3px,
+    var(--chart-secondary) 0,
+    var(--chart-secondary) 3px,
     var(--surface-raised) 3px,
     var(--surface-raised) 6px
   );
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
 }
 .attendance-chart-legend {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
   color: var(--muted);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
   margin-top: 20px;
 }
 .attendance-chart-legend span {
@@ -131,21 +137,21 @@
   align-items: center;
 }
 .attendance-chart-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
 }
 .attendance-chart-legend__worked {
-  background: var(--success);
+  background: var(--chart-secondary);
 }
 .attendance-chart-legend__imputed {
-  background: var(--accent);
+  background: var(--chart-primary);
 }
 .attendance-chart-legend__provisional {
   background: repeating-linear-gradient(
     45deg,
-    var(--success) 0,
-    var(--success) 2px,
+    var(--chart-secondary) 0,
+    var(--chart-secondary) 2px,
     var(--surface-raised) 2px,
     var(--surface-raised) 4px
   );

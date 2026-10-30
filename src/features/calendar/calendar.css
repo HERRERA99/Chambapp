@@ -22,22 +22,22 @@
   cursor: pointer;
 }
 .holiday-calendar__day span {
-  font-size: 10px;
+  font-size: var(--text-xs);
   overflow-wrap: anywhere;
 }
 .holiday-calendar__day:hover {
   background: var(--surface-raised);
 }
 .holiday-calendar__day--holiday {
-  background: #e5003f18;
-  border-color: #e5003f55;
+  background: var(--signal-tint);
+  border-color: var(--signal-line);
 }
 .holiday-calendar__day--vacation {
-  background: #88cbb218;
-  border-color: #88cbb255;
+  background: var(--metric-tint);
+  border-color: var(--metric-line);
 }
 .holiday-calendar__day[aria-current='date'] {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--text);
   outline-offset: 2px;
 }
 .holiday-calendar__legend {
@@ -88,7 +88,7 @@
     gap: 8px;
   }
   .holiday-calendar__day span {
-    font-size: 8px;
+    font-size: var(--text-xs);
   }
   .holiday-calendar__heading {
     padding: 4px 0;

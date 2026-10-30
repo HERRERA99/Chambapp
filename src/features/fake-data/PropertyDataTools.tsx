@@ -123,7 +123,7 @@ export function PropertyDataTools({
                 />
                 {variant.title}
               </h3>
-              <Badge tone="accent">Ficticio</Badge>
+              <Badge>Ficticio</Badge>
             </div>
             <ol className="property-code-list">
               {batches[index]!.map((record, position) => (

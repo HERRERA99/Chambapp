@@ -18,7 +18,7 @@ export function AttendanceControls({ compact = false }: { compact?: boolean }) {
         <Badge tone={attendance.active ? 'success' : 'neutral'}>
           {attendance.active ? (
             <>
-              <span className="status-dot" /> Dentro
+              <span className="status-dot status-dot--success" aria-hidden="true" /> Dentro
             </>
           ) : (
             'Fuera'

@@ -28,7 +28,7 @@ export function ProjectCard({
   return (
     <article className="project-card">
       <div className="project-card__top">
-        <Badge tone={project.archivado_en ? 'neutral' : 'accent'}>
+        <Badge tone={project.archivado_en ? 'neutral' : 'success'}>
           {project.archivado_en ? 'Archivado' : 'Activo'}
         </Badge>
         <IconButton

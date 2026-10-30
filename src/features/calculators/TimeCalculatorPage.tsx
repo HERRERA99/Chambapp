@@ -35,8 +35,8 @@ export default function TimeCalculatorPage() {
   return (
     <div className="page-stack calculator-page">
       <PageHeader
-        eyebrow="Herramientas / Calculadora de horas"
-        title="Las cuentas del tiempo, claras."
+        eyebrow="Herramientas"
+        title="Calculadora de horas"
         description="Calcula cuánto ha pasado entre dos horas o retrocede desde una hora concreta."
         actions={
           <ButtonLink to={paths.percentages} icon="percent">
@@ -110,9 +110,7 @@ export default function TimeCalculatorPage() {
           <div className="time-calculator__result">
             <div className="split-label">
               <p className="eyebrow">Tiempo transcurrido</p>
-              <Badge tone="accent">
-                {automaticNextDay || nextDay ? 'Hasta el día siguiente' : 'Mismo día'}
-              </Badge>
+              <Badge>{automaticNextDay || nextDay ? 'Hasta el día siguiente' : 'Mismo día'}</Badge>
             </div>
             <div aria-live="polite" aria-atomic="true">
               <DurationValue minutes={elapsed} />
@@ -175,7 +173,7 @@ export default function TimeCalculatorPage() {
           <div className="time-calculator__result time-calculator__result--accent">
             <div className="split-label">
               <p className="eyebrow">La hora resultante</p>
-              <Badge tone={subtraction && subtraction.dayOffset < 0 ? 'warning' : 'accent'}>
+              <Badge tone={subtraction && subtraction.dayOffset < 0 ? 'warning' : 'neutral'}>
                 {subtraction ? dayLabel(subtraction.dayOffset) : '—'}
               </Badge>
             </div>

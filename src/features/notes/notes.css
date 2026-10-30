@@ -52,8 +52,8 @@
   border-color: var(--border);
 }
 .notes-library__note--active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 7%, var(--surface-low));
+  border-color: var(--text);
+  background: var(--surface-raised);
 }
 .notes-library__note-title {
   display: flex;
@@ -72,7 +72,7 @@
   color: var(--accent-soft);
 }
 .notes-library__note-title .mono {
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 .notes-library__excerpt {
   color: var(--muted);
@@ -86,7 +86,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--dim);
 }
 .notes-library__empty {
@@ -154,11 +154,11 @@
 }
 .note-editor__footer {
   color: var(--dim);
-  font-size: 10px;
+  font-size: var(--text-xs);
   flex-wrap: wrap;
 }
 .note-editor .segmented button {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 7px 10px;
 }
 .note-associations {
@@ -166,7 +166,7 @@
   padding-top: 18px;
 }
 .note-associations summary {
-  font-weight: 600;
+  font-weight: 400;
 }
 .note-associations > .field__hint {
   display: block;
@@ -208,7 +208,7 @@
 .note-associations__option small {
   display: block;
   color: var(--dim);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 .notes-empty {
   min-height: 470px;
@@ -306,7 +306,7 @@
 .markdown-preview blockquote {
   margin-left: 0;
   padding: 4px 16px;
-  border-left: 3px solid var(--accent-soft);
+  border-left: 2px solid var(--border-strong);
   color: var(--muted);
 }
 .markdown-preview blockquote > :last-child {

@@ -107,7 +107,7 @@ export function NoteEditor({
       setBaseline(note);
       setDraft(note);
       onSaved(note);
-      notify('Nota guardada.');
+      notify('Nota guardada.', 'success');
     } catch (cause) {
       setError(readableError(cause));
     }
@@ -139,7 +139,7 @@ export function NoteEditor({
     >
       <div className="note-editor__header">
         <div className="actions">
-          <Badge tone="accent">.md</Badge>
+          <Badge>.md</Badge>
           <span className="field__hint" role="status">
             {pending ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Guardada'}
           </span>
@@ -264,7 +264,7 @@ export function NoteEditor({
           }
           onDirty(false);
           onDeleted();
-          notify('Nota eliminada.');
+          notify('Nota eliminada.', 'success');
         }}
       />
       <ConfirmDialog

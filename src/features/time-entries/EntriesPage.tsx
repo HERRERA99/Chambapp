@@ -79,7 +79,7 @@ export default function EntriesPage() {
   async function remove() {
     if (!deleting) return;
     await run('eliminar_parte', { id: deleting.id, version: deleting.version });
-    notify('Parte eliminado de los informes.');
+    notify('Parte eliminado de los informes.', 'success');
     setDeleting(null);
   }
 
@@ -94,6 +94,7 @@ export default function EntriesPage() {
       });
       notify(
         checked ? 'Parte marcado como imputado en Odoo.' : 'Parte marcado como pendiente en Odoo.',
+        'success',
       );
     } catch (cause) {
       setActionError(
@@ -141,15 +142,14 @@ export default function EntriesPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Operaciones / Registro temporal / Partes de horas"
-        title="Registro & Partes de Horas"
+        title="Partes de horas"
         description="Consulta instantes exactos y compara el tiempo real con la duración imputada de cada parte."
         actions={
           <>
             <Button icon="download" onClick={exportEntries} disabled={!visible.length}>
               Exportar CSV
             </Button>
-            <ButtonLink to="/ajustes#redondeo" icon="settings">
+            <ButtonLink to="/ajustes#redondeo" icon="settings" variant="ghost">
               Reglas de redondeo
             </ButtonLink>
             <Button
@@ -158,7 +158,7 @@ export default function EntriesPage() {
               disabled={!canCreate || busy}
               onClick={() => setModal('new')}
             >
-              Nuevo parte manual
+              Registrar tiempo
             </Button>
           </>
         }
@@ -196,7 +196,7 @@ export default function EntriesPage() {
             icon: 'tasks',
           },
           {
-            label: 'Diferencial de cómputo',
+            label: 'Diferencia por redondeo',
             value: `+${formatDuration(totals.logged - totals.real)}`,
             detail: 'Diferencia entre duración real e imputada',
             icon: 'activity',
@@ -204,7 +204,7 @@ export default function EntriesPage() {
         ]}
       />
       <Panel className="filters-panel">
-        <div className="form-grid">
+        <div className="form-grid filters-grid">
           <InputField
             label="Buscar en partes"
             placeholder="Buscar tarea, ID de Odoo, proyecto o nota…"

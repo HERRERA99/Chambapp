@@ -7,13 +7,14 @@
   min-width: 0;
   box-sizing: border-box;
   margin: 7px 0;
-  padding: 4px 7px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.4;
+  padding: 3px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .odoo-entry-status > .icon {
@@ -26,15 +27,15 @@
 }
 
 .odoo-entry-status--imputed {
-  color: var(--success);
-  background: #88cbb20a;
-  border-color: #88cbb22b;
+  color: var(--metric);
+  background: transparent;
+  border-color: var(--metric-line);
 }
 
 .odoo-entry-status--pending {
-  color: var(--warning);
-  background: #ecb67c08;
-  border-color: #ecb67c24;
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--border-strong);
 }
 
 .entry-summary__duration {

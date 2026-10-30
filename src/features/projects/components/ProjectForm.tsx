@@ -38,7 +38,7 @@ export function ProjectForm({ project, onClose }: { project?: Project; onClose: 
         descripcion: description.trim() || null,
         presupuesto_minutos: budgetMinutes,
       });
-      notify(project ? 'Proyecto actualizado.' : 'Proyecto creado.');
+      notify(project ? 'Proyecto actualizado.' : 'Proyecto creado.', 'success');
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar el proyecto.');

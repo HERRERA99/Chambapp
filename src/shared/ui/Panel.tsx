@@ -43,7 +43,7 @@ export function Badge({
   tone = 'neutral',
 }: {
   children: ReactNode;
-  tone?: 'neutral' | 'accent' | 'success' | 'warning';
+  tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
 }
@@ -71,23 +71,32 @@ export function Progress({
   );
 }
 
+const noticeIcons = {
+  info: 'info',
+  success: 'success',
+  warning: 'alert',
+  danger: 'alert',
+} as const;
+
 export function Notice({
   title,
   children,
-  icon = 'info',
+  icon,
+  tone = 'info',
   className = '',
 }: {
   title: string;
-  children: ReactNode;
+  children?: ReactNode;
   icon?: IconName;
+  tone?: 'info' | 'success' | 'warning' | 'danger';
   className?: string;
 }) {
   return (
-    <div className={`notice ${className}`}>
-      <Icon name={icon} />
+    <div className={`notice notice--${tone} ${className}`}>
+      <Icon name={icon ?? noticeIcons[tone]} />
       <div>
         <strong>{title}</strong>
-        <div className="muted">{children}</div>
+        {children ? <div className="muted">{children}</div> : null}
       </div>
     </div>
   );

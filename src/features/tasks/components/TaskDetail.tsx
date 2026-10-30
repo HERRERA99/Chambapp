@@ -51,7 +51,7 @@ export function TaskDetail({
         version: task.version,
         estado: task.estado === 'completada' ? 'pendiente' : 'completada',
       });
-      notify(task.estado === 'completada' ? 'Tarea reabierta.' : 'Tarea completada.');
+      notify(task.estado === 'completada' ? 'Tarea reabierta.' : 'Tarea completada.', 'success');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el estado.');
     }
@@ -82,6 +82,7 @@ export function TaskDetail({
         : confirmation.task.archivado_en
           ? 'Tarea restaurada.'
           : 'Tarea archivada.',
+      'success',
     );
     setConfirmation(null);
   }
@@ -90,7 +91,7 @@ export function TaskDetail({
     <div className="page-stack">
       <Panel className="task-detail">
         <div className="actions">
-          <Badge tone={task.estado === 'completada' ? 'success' : 'accent'}>
+          <Badge tone={task.estado === 'completada' ? 'success' : 'neutral'}>
             {taskStatusLabels[task.estado]}
           </Badge>
           {task.archivado_en ? <Badge>Archivada</Badge> : null}

@@ -33,14 +33,14 @@
 
 .task-pagination__page strong {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .task-pagination__count {
   margin: 8px 0 0;
   color: var(--dim);
-  font-size: 10px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   text-align: center;
   font-variant-numeric: tabular-nums;

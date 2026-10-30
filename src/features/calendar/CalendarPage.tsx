@@ -47,8 +47,7 @@ export default function CalendarPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Planificación / Días libres"
-        title="Festivos & Vacaciones"
+        title="Festivos y vacaciones"
         description="Excluye los días libres del objetivo semanal sin trasladar sus horas al resto de días."
         actions={
           <>

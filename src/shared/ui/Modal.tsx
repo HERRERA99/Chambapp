@@ -35,10 +35,7 @@ export function Modal({
       }}
     >
       <div className="modal__header">
-        <div>
-          <p className="eyebrow">Chambapp</p>
-          <h2 id={id}>{title}</h2>
-        </div>
+        <h2 id={id}>{title}</h2>
         <IconButton icon="close" label="Cerrar diálogo" onClick={onClose} />
       </div>
       {description ? (

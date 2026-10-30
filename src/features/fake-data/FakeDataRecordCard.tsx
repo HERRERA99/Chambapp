@@ -161,7 +161,7 @@ export function FakeDataRecordCard({
         <div className="fake-record__identity-sticky">
           <div className="fake-record__top">
             <span className="eyebrow">Ficha {String(index + 1).padStart(2, '0')}</span>
-            <Badge tone="accent">Ficticio</Badge>
+            <Badge>Ficticio</Badge>
           </div>
           {record.category === 'banking' ? (
             <BankCardPreview record={record} />

@@ -1,6 +1,9 @@
 import { createContext, useContext } from 'react';
 
-export const FeedbackContext = createContext<((message: string) => void) | null>(null);
+export type FeedbackTone = 'info' | 'success' | 'error';
+export type Notify = (message: string, tone?: FeedbackTone) => void;
+
+export const FeedbackContext = createContext<Notify | null>(null);
 
 export function useFeedback() {
   const notify = useContext(FeedbackContext);

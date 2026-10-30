@@ -101,7 +101,7 @@ export function UserProfileCard({ record, index, onCopy, onRegenerate }: Profile
         <div className="fake-user-profile__heading">
           <span className="eyebrow">Ficha {String(index + 1).padStart(2, '0')}</span>
           <h3>Perfil de usuario</h3>
-          <Badge tone="accent">Ficticio</Badge>
+          <Badge>Ficticio</Badge>
         </div>
         <div className="fake-user-profile__actions">
           <Button

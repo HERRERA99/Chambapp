@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 import { WorkspaceLayout } from './layouts/WorkspaceLayout';
 import { FeedbackProvider } from '../shared/feedback/FeedbackProvider';
 import { AuthProvider } from '../features/auth/AuthProvider';
@@ -36,7 +37,7 @@ const routeTitles: Record<string, string> = {
   '/registro': 'Crear cuenta',
   '/recuperar-contrasena': 'Recuperar acceso',
   '/onboarding': 'Configuración inicial',
-  '/resumen': 'Resumen',
+  '/resumen': 'Hoy',
   '/proyectos': 'Proyectos y clientes',
   '/tareas': 'Tareas',
   '/tablero': 'Tablero de tareas',
@@ -65,54 +66,57 @@ function RouteEffects() {
 export function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <WorkspaceProvider>
-          <TrackerProvider>
-            <AttendanceProvider>
-              <FeedbackProvider>
-                <RouteEffects />
-                <Suspense
-                  fallback={
-                    <div className="route-loading" role="status">
-                      Cargando Chambapp…
-                    </div>
-                  }
-                >
-                  <Routes>
-                    <Route path={paths.home} element={<LandingPage />} />
-                    <Route path={paths.login} element={<AuthPage />} />
-                    <Route path={paths.authCallback} element={<OAuthCallbackPage />} />
-                    <Route path={paths.register} element={<AuthPage />} />
-                    <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
-                    <Route element={<RequireAuth onboarding />}>
-                      <Route path={paths.onboarding} element={<OnboardingPage />} />
-                    </Route>
-                    <Route element={<RequireAuth />}>
-                      <Route element={<WorkspaceLayout />}>
-                        <Route path={paths.dashboard} element={<DashboardPage />} />
-                        <Route path={paths.projects} element={<ProjectsPage />} />
-                        <Route path={paths.tasks} element={<TasksPage />} />
-                        <Route path={paths.board} element={<TasksPage defaultView="board" />} />
-                        <Route path={paths.notes} element={<NotesPage />} />
-                        <Route path={paths.calendar} element={<CalendarPage />} />
-                        <Route path={paths.entries} element={<EntriesPage />} />
-                        <Route path={paths.attendance} element={<AttendancePage />} />
-                        <Route path={paths.week} element={<WeekPage />} />
-                        <Route path={paths.percentages} element={<PercentagesPage />} />
-                        <Route path={paths.timeCalculator} element={<TimeCalculatorPage />} />
-                        <Route path={paths.fakeData} element={<FakeDataPage />} />
-                        <Route path={paths.developer} element={<DeveloperPage />} />
-                        <Route path={paths.settings} element={<SettingsPage />} />
+      {/* Motion follows the operating system's reduced-motion preference everywhere. */}
+      <MotionConfig reducedMotion="user">
+        <AuthProvider>
+          <WorkspaceProvider>
+            <TrackerProvider>
+              <AttendanceProvider>
+                <FeedbackProvider>
+                  <RouteEffects />
+                  <Suspense
+                    fallback={
+                      <div className="route-loading" role="status">
+                        Cargando Chambapp…
+                      </div>
+                    }
+                  >
+                    <Routes>
+                      <Route path={paths.home} element={<LandingPage />} />
+                      <Route path={paths.login} element={<AuthPage />} />
+                      <Route path={paths.authCallback} element={<OAuthCallbackPage />} />
+                      <Route path={paths.register} element={<AuthPage />} />
+                      <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
+                      <Route element={<RequireAuth onboarding />}>
+                        <Route path={paths.onboarding} element={<OnboardingPage />} />
                       </Route>
-                    </Route>
-                    <Route path="*" element={<NotFoundPage />} />
-                  </Routes>
-                </Suspense>
-              </FeedbackProvider>
-            </AttendanceProvider>
-          </TrackerProvider>
-        </WorkspaceProvider>
-      </AuthProvider>
+                      <Route element={<RequireAuth />}>
+                        <Route element={<WorkspaceLayout />}>
+                          <Route path={paths.dashboard} element={<DashboardPage />} />
+                          <Route path={paths.projects} element={<ProjectsPage />} />
+                          <Route path={paths.tasks} element={<TasksPage />} />
+                          <Route path={paths.board} element={<TasksPage defaultView="board" />} />
+                          <Route path={paths.notes} element={<NotesPage />} />
+                          <Route path={paths.calendar} element={<CalendarPage />} />
+                          <Route path={paths.entries} element={<EntriesPage />} />
+                          <Route path={paths.attendance} element={<AttendancePage />} />
+                          <Route path={paths.week} element={<WeekPage />} />
+                          <Route path={paths.percentages} element={<PercentagesPage />} />
+                          <Route path={paths.timeCalculator} element={<TimeCalculatorPage />} />
+                          <Route path={paths.fakeData} element={<FakeDataPage />} />
+                          <Route path={paths.developer} element={<DeveloperPage />} />
+                          <Route path={paths.settings} element={<SettingsPage />} />
+                        </Route>
+                      </Route>
+                      <Route path="*" element={<NotFoundPage />} />
+                    </Routes>
+                  </Suspense>
+                </FeedbackProvider>
+              </AttendanceProvider>
+            </TrackerProvider>
+          </WorkspaceProvider>
+        </AuthProvider>
+      </MotionConfig>
     </BrowserRouter>
   );
 }

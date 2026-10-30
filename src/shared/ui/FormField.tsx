@@ -1,11 +1,35 @@
 import { useId } from 'react';
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 
-type FieldProps = { label: string; hint?: string; className?: string };
+type FieldProps = { label: string; hint?: ReactNode; error?: string; className?: string };
+
+function describedBy(id: string, hint: unknown, error: unknown) {
+  return (
+    [error ? `${id}-error` : '', hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined
+  );
+}
+
+function FieldMessages({ id, hint, error }: { id: string; hint?: ReactNode; error?: string }) {
+  return (
+    <>
+      {error ? (
+        <span id={`${id}-error`} className="field__error">
+          {error}
+        </span>
+      ) : null}
+      {hint ? (
+        <span id={`${id}-hint`} className="field__hint">
+          {hint}
+        </span>
+      ) : null}
+    </>
+  );
+}
 
 export function InputField({
   label,
   hint,
+  error,
   className = '',
   id: suppliedId,
   ...props
@@ -15,12 +39,13 @@ export function InputField({
   return (
     <div className={`field ${className}`}>
       <label htmlFor={id}>{label}</label>
-      <input id={id} aria-describedby={hint ? `${id}-hint` : undefined} {...props} />
-      {hint ? (
-        <span id={`${id}-hint`} className="field__hint">
-          {hint}
-        </span>
-      ) : null}
+      <input
+        id={id}
+        aria-describedby={describedBy(id, hint, error)}
+        aria-invalid={error ? true : undefined}
+        {...props}
+      />
+      <FieldMessages id={id} hint={hint} error={error} />
     </div>
   );
 }
@@ -28,6 +53,7 @@ export function InputField({
 export function SelectField({
   label,
   hint,
+  error,
   children,
   className = '',
   ...props
@@ -36,14 +62,15 @@ export function SelectField({
   return (
     <div className={`field ${className}`}>
       <label htmlFor={id}>{label}</label>
-      <select id={id} aria-describedby={hint ? `${id}-hint` : undefined} {...props}>
+      <select
+        id={id}
+        aria-describedby={describedBy(id, hint, error)}
+        aria-invalid={error ? true : undefined}
+        {...props}
+      >
         {children}
       </select>
-      {hint ? (
-        <span id={`${id}-hint`} className="field__hint">
-          {hint}
-        </span>
-      ) : null}
+      <FieldMessages id={id} hint={hint} error={error} />
     </div>
   );
 }

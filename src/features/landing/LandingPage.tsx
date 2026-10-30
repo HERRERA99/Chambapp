@@ -150,7 +150,6 @@ function LandingContent() {
             animate={{ opacity: 1, y: 0, rotate: 0 }}
             transition={{ duration: 1, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="landing-preview-glow" aria-hidden="true" />
             <ProductPreview />
             <div className="landing-floating-note" aria-hidden="true">
               <span>
@@ -291,8 +290,7 @@ function LandingContent() {
           </div>
         </section>
         <Reveal className="landing-container">
-          <section className="landing-cta">
-            <div className="landing-cta__orb" aria-hidden="true" />
+          <section className="landing-cta surface-bone">
             <span className="landing-kicker">
               <span className="landing-kicker__dot" /> Tu espacio. Tu tiempo.
             </span>

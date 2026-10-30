@@ -37,7 +37,7 @@ export function DeveloperGenerators() {
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      notify('Copiado.');
+      notify('Copiado.', 'success');
     } catch {
       notify('No se pudo copiar. Puedes seleccionar el texto.');
     }

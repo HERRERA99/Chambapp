@@ -51,7 +51,7 @@ export default function DeveloperPage() {
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      notify('Copiado.');
+      notify('Copiado.', 'success');
     } catch {
       notify('No se pudo copiar. Selecciona el texto para copiarlo.');
     }
@@ -121,8 +121,8 @@ export default function DeveloperPage() {
   return (
     <div className="page-stack dev-page">
       <PageHeader
-        eyebrow="Herramientas / Desarrollo"
-        title="Tu JSON, más claro."
+        eyebrow="Herramientas"
+        title="Utilidades de desarrollo"
         description="Explora estructuras, da formato y encuentra diferencias. Todo se procesa en tu navegador."
       />
       <SegmentedControl

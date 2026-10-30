@@ -48,8 +48,8 @@ export default function PercentagesPage() {
   return (
     <div className="page-stack calculator-page">
       <PageHeader
-        eyebrow="Herramientas / Porcentajes"
-        title="Cada porcentaje, a su tiempo."
+        eyebrow="Herramientas"
+        title="Porcentajes"
         description="Convierte un porcentaje de tu jornada en horas y minutos. Sin hacer cuentas."
         actions={
           <ButtonLink to={paths.timeCalculator} icon="calculator">

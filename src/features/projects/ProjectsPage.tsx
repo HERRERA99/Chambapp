@@ -67,6 +67,7 @@ export default function ProjectsPage() {
         : action.project.archivado_en
           ? 'Proyecto restaurado.'
           : 'Proyecto archivado.',
+      'success',
     );
     setAction(null);
     setSelected(null);
@@ -75,8 +76,7 @@ export default function ProjectsPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Cartera de clientes & operaciones / CRM"
-        title="Proyectos y Clientes"
+        title="Proyectos y clientes"
         description="Organiza entregables, presupuestos y horas imputadas de tus proyectos."
         actions={
           <>
@@ -216,7 +216,7 @@ export default function ProjectsPage() {
                   <span className="cell-detail">{project.cliente || 'Sin cliente'}</span>
                 </td>
                 <td>
-                  <Badge tone={project.archivado_en ? 'neutral' : 'accent'}>
+                  <Badge tone={project.archivado_en ? 'neutral' : 'success'}>
                     {project.archivado_en ? 'Archivado' : 'Activo'}
                   </Badge>
                 </td>

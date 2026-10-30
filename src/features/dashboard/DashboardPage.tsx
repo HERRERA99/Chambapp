@@ -1,27 +1,139 @@
-import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { DateTime } from 'luxon';
 import { Link } from 'react-router-dom';
-import { PageHeader } from '../../shared/ui/PageHeader';
-import { StatGrid } from '../../shared/ui/StatGrid';
-import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
-import { Panel, Badge } from '../../shared/ui/Panel';
+import { Button, IconButton } from '../../shared/ui/Button';
+import { Panel, Badge, Notice, Progress } from '../../shared/ui/Panel';
 import { Icon } from '../../shared/ui/Icon';
-import { TimerDisplay } from '../tracker/TimerDisplay';
-import { AttendanceControls } from '../attendance/AttendanceControls';
-import { AttendanceComparison } from '../attendance/AttendanceComparison';
-import { useAttendance } from '../attendance/useAttendance';
-import { OdooLink } from '../tasks/components/OdooLink';
+import { useFeedback } from '../../shared/feedback/FeedbackContext';
+import { StartTimerButton } from '../tracker/StartTimerButton';
 import { useTracker } from '../tracker/useTracker';
-import { WeekChart } from '../week/components/WeekChart';
+import { useAttendance } from '../attendance/useAttendance';
+import { ManualAttendanceButton } from '../attendance/ManualAttendanceButton';
+import { formatImputedPercent } from '../attendance/attendanceLabels';
+import { OdooLink } from '../tasks/components/OdooLink';
+import { TaskForm } from '../tasks/components/TaskForm';
+import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
 import { EntryModal } from '../time-entries/components/EntryModal';
 import { useWorkspace } from '../workspace/useWorkspace';
-import { useFeedback } from '../../shared/feedback/FeedbackContext';
-import { dashboardSummary } from './dashboardSelectors';
-import { formatDate, formatDuration, formatTime, mondayForDate } from '../../domain/time';
-import { readableError } from '../../lib/supabase/errors';
-import type { TimeEntry } from '../../domain/models';
+import { paths } from '../../app/paths';
 import { attendanceDays, attendanceTotal } from '../../domain/attendance';
+import { formatClock, formatDate, formatDuration } from '../../domain/time';
+import { readableError } from '../../lib/supabase/errors';
+import type { TimeEntry, WorkspaceData } from '../../domain/models';
+import { dashboardSummary } from './dashboardSelectors';
+import { entriesForDay, relevantTasks, todayMetrics } from './today.model';
+import type { RelevantReason } from './today.model';
+import './today.css';
+
+const reasonLabels: Partial<Record<RelevantReason, string>> = {
+  active: 'En marcha',
+  paused: 'Pausada',
+  in_progress: 'En curso',
+};
+
+function hourMinute(iso: string, zone: string) {
+  return DateTime.fromISO(iso, { zone }).toFormat('HH:mm');
+}
+
+function lastWorkedLabel(iso: string, today: string, zone: string) {
+  const at = DateTime.fromISO(iso, { zone });
+  const days = DateTime.fromISO(today, { zone }).diff(at.startOf('day'), 'days').days;
+  if (days < 1) return `Hoy, ${at.toFormat('HH:mm')}`;
+  if (days < 2) return 'Ayer';
+  return at.setLocale('es').toFormat('d LLL');
+}
+
+function Metric({
+  label,
+  value,
+  title,
+  children,
+  tone,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  children?: ReactNode;
+  tone?: 'accent';
+}) {
+  return (
+    <div className={`today-metric ${tone ? `today-metric--${tone}` : ''}`}>
+      <p className="today-metric__label">{label}</p>
+      <p className="today-metric__value" title={title}>
+        {value}
+      </p>
+      <div className="today-metric__detail">{children}</div>
+    </div>
+  );
+}
+
+function WeekDetails({ data, today, now }: { data: WorkspaceData; today: string; now: string }) {
+  const { week, total, missingDays } = dashboardSummary(data, today);
+  const days = attendanceDays(
+    data.fichajes,
+    data.entries,
+    week.map((day) => day.date),
+    data.profile.zona_horaria,
+    now,
+  );
+  const weekTotal = attendanceTotal(days);
+  const workedToDate = days.reduce(
+    (sum, day) => sum + (day.date <= today ? day.workedSeconds : 0),
+    0,
+  );
+  const balance = workedToDate - total.due;
+  return (
+    <details className="today-week">
+      <summary>
+        <Icon name="chevron" size={16} className="today-week__chevron" />
+        <span>Esta semana</span>
+        <span className="today-week__summary mono">
+          {formatDuration(weekTotal.workedSeconds)} fichadas
+          {weekTotal.imputedPercent === null
+            ? ''
+            : ` · ${formatImputedPercent(weekTotal.imputedPercent)} imputado`}
+        </span>
+      </summary>
+      <div className="today-week__body">
+        <dl className="today-week__stats">
+          <div>
+            <dt>Fichado</dt>
+            <dd className="mono">{formatDuration(weekTotal.workedSeconds)}</dd>
+          </div>
+          <div>
+            <dt>Imputado</dt>
+            <dd className="mono">{formatDuration(weekTotal.imputedSeconds)}</dd>
+          </div>
+          <div>
+            <dt>% imputado</dt>
+            <dd className="mono">{formatImputedPercent(weekTotal.imputedPercent)}</dd>
+          </div>
+          <div>
+            <dt>Saldo frente al objetivo hasta hoy</dt>
+            <dd className="mono">
+              {balance >= 0 ? '+' : '−'}
+              {formatDuration(Math.abs(balance))}
+            </dd>
+          </div>
+        </dl>
+        {missingDays ? (
+          <Notice title="Hay jornadas sin generar esta semana" tone="warning">
+            Genera la semana para fijar los objetivos diarios.
+          </Notice>
+        ) : null}
+        <div className="actions">
+          <Link className="text-link" to={paths.week}>
+            Abrir Mi semana <Icon name="arrow" size={14} />
+          </Link>
+          <Link className="text-link" to={`${paths.attendance}?fecha=${today}`}>
+            Ver fichajes y gráfico semanal <Icon name="arrow" size={14} />
+          </Link>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 export default function DashboardPage() {
   const { data } = useWorkspace();
@@ -29,268 +141,453 @@ export default function DashboardPage() {
   const attendance = useAttendance();
   const notify = useFeedback();
   const [editor, setEditor] = useState<TimeEntry | 'new' | null>(null);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
   if (!data) return null;
-  const { profile, entries, tasks, projects } = data;
-  const today = DateTime.fromISO(attendance.now, { zone: profile.zona_horaria }).toISODate()!;
-  const { week, day, total, missingDays } = dashboardSummary(data, today);
-  const workedDays = attendanceDays(
-    data.fichajes,
-    [],
-    week.map((item) => item.date),
-    profile.zona_horaria,
-    attendance.now,
+  const { profile, tasks, projects } = data;
+  const zone = profile.zona_horaria;
+  const now = attendance.now;
+  const today = DateTime.fromISO(now, { zone }).toISODate()!;
+  const metrics = todayMetrics(data, today, now);
+  // The running entry may not be in the cached list yet; show it as soon as the tracker knows it.
+  const liveEntry = tracker.active;
+  const activity = entriesForDay(
+    liveEntry && !data.entries.some((entry) => entry.id === liveEntry.id)
+      ? [...data.entries, liveEntry]
+      : data.entries,
+    today,
+    zone,
+    now,
   );
-  const workedTotal = attendanceTotal(workedDays);
-  const workedByDate = new Map(workedDays.map((item) => [item.date, item.workedSeconds]));
-  const activeTask = tasks.find((task) => task.id === tracker.active?.tarea_id);
-  const activeProject = projects.find((project) => project.id === activeTask?.proyecto_id);
-  const available = tasks.filter(
-    (task) =>
-      !task.archivado_en &&
-      task.estado !== 'completada' &&
-      projects.some((project) => project.id === task.proyecto_id && !project.archivado_en),
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const suggestions = relevantTasks(data, {
+    activeTaskId: tracker.active?.tarea_id,
+    pausedTaskId: tracker.pausedTaskId,
+  });
+  const currentTask = taskById.get(tracker.active?.tarea_id ?? tracker.pausedTaskId ?? '');
+  const currentProject = projectById.get(currentTask?.proyecto_id ?? '');
+  const activeProjects = projects.filter(
+    (project) => !project.archivado_en && !project.eliminado_en,
   );
-  const priority = [...available]
-    .sort((a, b) => Number(b.id === activeTask?.id) - Number(a.id === activeTask?.id))
-    .slice(0, 4);
-  const taskTotals = new Map<string, number>();
-  for (const entry of entries)
-    if (entry.fin_en)
-      taskTotals.set(
-        entry.tarea_id,
-        (taskTotals.get(entry.tarea_id) ?? 0) + (entry.duracion_imputada_segundos ?? 0),
-      );
-  const todayEntries = entries.filter((entry) => entry.fecha === today && entry.fin_en);
-  const balance =
-    workedDays.reduce((sum, item) => sum + (item.date <= today ? item.workedSeconds : 0), 0) -
-    total.due;
-  async function toggleTask(id: string) {
+  const canRegister = suggestions.length > 0;
+  const timerBlocked = tracker.busy || tracker.pending;
+  const attendanceBlocked = attendance.busy || attendance.pending;
+  const percent = metrics.imputedPercent;
+  const firstName = profile.nombre.split(' ')[0];
+
+  async function run(work: () => Promise<void>) {
     try {
-      if (tracker.active?.tarea_id === id) await tracker.stop();
-      else await tracker.start(id);
+      await work();
     } catch (cause) {
-      notify(readableError(cause));
+      notify(readableError(cause), 'error');
     }
   }
+
   return (
-    <div className="page-stack">
-      <PageHeader
-        eyebrow="Tu jornada"
-        title={`Hola, ${profile.nombre.split(' ')[0] || 'de nuevo'}`}
-        description={formatDate(today, profile.zona_horaria)}
-        actions={
-          <>
-            <ButtonLink to="/ajustes#redondeo" icon="settings">
-              {profile.intervalo_redondeo_minutos
-                ? `Redondeo R${profile.intervalo_redondeo_minutos}`
-                : 'Tiempo exacto'}
-            </ButtonLink>
-            <Button icon="plus" onClick={() => setEditor('new')}>
-              Nuevo registro
-            </Button>
-          </>
-        }
-      />
-      <Panel title="Entrada y salida de jornada" icon="clock">
-        <AttendanceControls />
-      </Panel>
-      <StatGrid
-        stats={[
-          {
-            label: 'Objetivo de hoy',
-            value: formatDuration(day.targetSeconds),
-            detail: 'Según tu jornada planificada',
-            icon: 'calendar',
-          },
-          {
-            label: 'Tiempo imputado hoy',
-            value: formatDuration(day.logged),
-            detail: `Real: ${formatDuration(day.real)} · ${day.count} partes cerrados`,
-            icon: 'timer',
-            accent: true,
-            progress: day.targetSeconds ? (day.logged / day.targetSeconds) * 100 : 0,
-          },
-          {
-            label: 'Saldo hasta hoy',
-            value: `${balance >= 0 ? '+' : '−'}${formatDuration(Math.abs(balance))}`,
-            detail: 'Tiempo fichado frente al objetivo acumulado',
-            icon: 'gauge',
-            accent: balance >= 0,
-          },
-          {
-            label: 'Tareas pendientes',
-            value: String(available.length),
-            detail: `${projects.filter((project) => !project.archivado_en).length} proyectos activos`,
-            icon: 'tasks',
-          },
-        ]}
-      />
-      {missingDays ? (
-        <p className="muted">
-          Hay jornadas pendientes de generar esta semana.{' '}
-          <Link className="text-link" to="/mi-semana">
-            Abrir calendario
-          </Link>
-        </p>
-      ) : null}
-      <section className="tracker-hero">
-        <div className="tracker-hero__details">
-          <Badge tone={tracker.active ? 'accent' : 'neutral'}>
-            {tracker.active ? (
-              <>
-                <span className="status-dot" /> En curso
-              </>
-            ) : tracker.pausedTaskId ? (
-              'Pausado'
-            ) : (
-              'Listo para empezar'
-            )}
-          </Badge>
-          <p className="eyebrow">{activeProject?.nombre ?? 'Tu espacio de trabajo'}</p>
-          <h2>{activeTask?.titulo ?? 'Selecciona una tarea y registra tu tiempo'}</h2>
-          <OdooLink task={activeTask} />
-          <p className="mono muted">
-            <Icon name="clock" size={13} />{' '}
-            {tracker.active
-              ? `Inicio exacto: ${formatTime(tracker.active.inicio_en, tracker.active.zona_horaria)}`
-              : 'Cada sesión conserva su inicio y fin exactos.'}
+    <div className="today">
+      <header className="today__header">
+        <div>
+          <h1>Hoy</h1>
+          <p className="page-description today__date">
+            {formatDate(today, zone)}
+            {firstName ? ` · Hola, ${firstName}` : ''}
           </p>
         </div>
-        <TimerDisplay />
-      </section>
-      <AttendanceComparison monday={mondayForDate(today)} today={today} compact />
-      <Panel
-        eyebrow="Comparativa semanal"
-        title="Horas fichadas y objetivo"
-        action={
-          <div className="chart-legend">
-            <span>
-              <i /> Fichado
-            </span>
-            <span>
-              <i className="chart-legend__target" /> Objetivo
-            </span>
-            <strong className="mono">
-              {formatDuration(workedTotal.workedSeconds)} / {formatDuration(total.target)}
-            </strong>
-          </div>
-        }
-      >
-        <WeekChart
-          hoursLabel="fichadas"
-          days={week.map((item) => ({
-            date: item.date,
-            label: DateTime.fromISO(item.date).setLocale('es').toFormat('ccc dd'),
-            loggedSeconds: workedByDate.get(item.date) ?? 0,
-            targetSeconds: item.targetSeconds,
-            isToday: item.date === today,
-          }))}
-        />
-        {workedTotal.provisionalSeconds > 0 ? (
-          <p className="field__hint">Incluye el fichaje en curso como tiempo provisional.</p>
-        ) : null}
-      </Panel>
-      <div className="two-columns">
-        <Panel
-          title="Tareas pendientes"
-          icon="tasks"
-          action={<span className="mono dim">{available.length} tareas</span>}
+        <div className="page-actions">
+          <Button
+            icon="tasks"
+            disabled={!activeProjects.length}
+            title={activeProjects.length ? undefined : 'Crea un proyecto activo primero'}
+            onClick={() => setTaskFormOpen(true)}
+          >
+            Nueva tarea
+          </Button>
+          <Button
+            variant="primary"
+            icon="plus"
+            disabled={!canRegister}
+            onClick={() => setEditor('new')}
+          >
+            Registrar tiempo
+          </Button>
+        </div>
+      </header>
+
+      <section className="today-metrics" aria-label="Resumen de hoy">
+        <Metric
+          label="Fichado hoy"
+          value={formatDuration(metrics.workedSeconds)}
+          title={`${formatClock(metrics.workedSeconds)} exactas`}
         >
-          <div className="task-list">
-            {priority.length ? (
-              priority.map((task) => (
-                <div className="task-row" key={task.id}>
-                  <IconButton
-                    icon={task.id === activeTask?.id ? 'stop' : 'play'}
-                    label={`${task.id === activeTask?.id ? 'Detener' : 'Iniciar'}: ${task.titulo}`}
-                    disabled={
-                      tracker.busy ||
-                      tracker.pending ||
-                      (!!tracker.active && task.id !== activeTask?.id)
-                    }
-                    onClick={() => void toggleTask(task.id)}
-                    className={task.id === activeTask?.id ? 'icon-button--accent' : ''}
-                  />
-                  <div className="task-row__text">
-                    {task.id === activeTask?.id ? (
-                      <span className="eyebrow accent">En curso</span>
-                    ) : null}
-                    <Link to="/tareas">
-                      <strong>{task.titulo}</strong>
-                    </Link>
-                    <OdooLink task={task} />
-                    <span className="muted mono">
-                      {projects.find((project) => project.id === task.proyecto_id)?.nombre}
-                    </span>
-                  </div>
-                  <span className="mono">{formatDuration(taskTotals.get(task.id) ?? 0)}</span>
-                </div>
-              ))
+          {attendance.active ? (
+            <span className="today-tag today-tag--live">
+              <span className="status-dot status-dot--success" aria-hidden="true" />
+              Incluye {formatDuration(metrics.provisionalSeconds)} en curso (provisional)
+            </span>
+          ) : metrics.workedSeconds ? (
+            'Jornada fuera · tramos cerrados'
+          ) : (
+            'Todavía no has fichado hoy'
+          )}
+        </Metric>
+        <Metric
+          label="Imputado a tareas"
+          value={formatDuration(metrics.imputedSeconds)}
+          tone="accent"
+        >
+          <span>
+            {metrics.finishedEntries === 1
+              ? '1 parte finalizado'
+              : `${metrics.finishedEntries} partes finalizados`}
+            {tracker.active
+              ? ` · ${formatDuration(tracker.elapsedSeconds)} en curso sin contar`
+              : ''}
+          </span>
+          {metrics.finishedEntries ? (
+            <span className="today-metric__odoo">
+              <Icon
+                name={metrics.odooMarked === metrics.finishedEntries ? 'check' : 'clock'}
+                size={14}
+              />
+              Marcados en Odoo: {metrics.odooMarked} de {metrics.finishedEntries}
+            </span>
+          ) : null}
+        </Metric>
+        <Metric label="% imputado" value={percent === null ? '—' : formatImputedPercent(percent)}>
+          {percent === null ? (
+            'Se calcula cuando fiches la entrada'
+          ) : (
+            <>
+              <Progress
+                value={percent}
+                label="Porcentaje del tiempo fichado imputado a tareas"
+                tone={percent > 100 ? 'warning' : 'accent'}
+              />
+              <span>
+                {percent > 100
+                  ? 'Supera el 100 % por el redondeo de los partes'
+                  : 'Imputado ÷ fichado hoy'}
+              </span>
+            </>
+          )}
+        </Metric>
+      </section>
+
+      <section className="today-now" aria-label="Ahora">
+        <div className={`now-card ${attendance.active ? 'now-card--attendance' : ''}`}>
+          <div className="now-card__head">
+            <h2>Jornada</h2>
+            <Badge tone={attendance.active ? 'success' : 'neutral'}>
+              {attendance.active ? 'Dentro' : 'Fuera'}
+            </Badge>
+          </div>
+          <div className="now-card__main">
+            {attendance.active ? (
+              <>
+                <span className="now-card__clock mono" aria-label="Tiempo desde la entrada">
+                  {formatClock(attendance.elapsedSeconds)}
+                </span>
+                <span className="now-card__meta">
+                  Entrada a las {hourMinute(attendance.active.inicio_en, zone)}
+                </span>
+              </>
             ) : (
-              <div className="empty-state">
-                <Icon name="tasks" size={30} />
-                <p className="muted">Crea un proyecto y una tarea para empezar.</p>
-                <ButtonLink to="/tareas">Abrir tareas</ButtonLink>
-              </div>
+              <span className="now-card__meta">
+                {metrics.workedSeconds
+                  ? 'Has fichado la salida. Ficha de nuevo al volver.'
+                  : 'Ficha la entrada cuando empieces tu jornada.'}
+              </span>
             )}
           </div>
-          <Link className="text-link" to="/tareas">
-            Ver todas las tareas <Icon name="arrow" size={14} />
-          </Link>
-        </Panel>
-        <Panel
-          title="Partes registrados hoy"
-          icon="clock"
-          action={<span className="mono accent">Total: {formatDuration(day.logged)}</span>}
-        >
-          {todayEntries.length ? (
-            todayEntries.slice(0, 4).map((entry) => (
-              <div className="entry-summary" key={entry.id}>
-                <div>
-                  <strong className="mono">
-                    {formatTime(entry.inicio_en, entry.zona_horaria)} —{' '}
-                    {formatTime(entry.fin_en!, entry.zona_horaria)}
-                  </strong>
-                  <span className="muted">
-                    {projects.find((project) => project.id === entry.proyecto_id)?.nombre}
+          <div className="now-card__actions">
+            {attendance.pending ? (
+              <Button
+                variant="primary"
+                loading={attendance.busy}
+                disabled={attendance.busy}
+                onClick={() => void attendance.retry().catch(() => undefined)}
+              >
+                Reintentar fichaje
+              </Button>
+            ) : (
+              <Button
+                variant={attendance.active ? 'secondary' : 'primary'}
+                icon={attendance.active ? 'logout' : 'login'}
+                loading={attendance.busy}
+                disabled={attendanceBlocked}
+                onClick={() =>
+                  void (attendance.active ? attendance.stop() : attendance.start()).catch(
+                    () => undefined,
+                  )
+                }
+              >
+                {attendance.active ? 'Fichar salida' : 'Fichar entrada'}
+              </Button>
+            )}
+            <ManualAttendanceButton variant="ghost" size="sm" />
+          </div>
+        </div>
+
+        <div className={`now-card ${tracker.active ? 'now-card--live surface-bone' : ''}`}>
+          <div className="now-card__head">
+            <h2>Tarea en curso</h2>
+            {tracker.pending ? (
+              <Badge tone="warning">Pendiente de confirmar</Badge>
+            ) : tracker.active ? (
+              <Badge tone="accent">
+                <span className="status-dot status-dot--live" aria-hidden="true" /> Grabando
+              </Badge>
+            ) : tracker.pausedTaskId ? (
+              <Badge>Pausada</Badge>
+            ) : null}
+          </div>
+          {currentTask || tracker.pending ? (
+            <>
+              <div className="now-card__main now-card__main--task">
+                <div className="now-card__task">
+                  <strong>{currentTask?.titulo ?? 'Tarea'}</strong>
+                  <span className="now-card__meta">
+                    {currentProject?.nombre}
+                    {tracker.active
+                      ? ` · desde las ${hourMinute(tracker.active.inicio_en, tracker.active.zona_horaria)}`
+                      : ''}
                   </span>
-                  <p>{tasks.find((task) => task.id === entry.tarea_id)?.titulo}</p>
-                  <OdooEntryStatus entry={entry} />
-                  <OdooLink task={tasks.find((task) => task.id === entry.tarea_id)} />
-                  <span className="mono dim entry-summary__duration">
-                    Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
-                    <span className="accent">
-                      → Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
-                    </span>
-                  </span>
+                  <OdooLink task={currentTask} />
                 </div>
-                <IconButton icon="edit" label="Editar parte" onClick={() => setEditor(entry)} />
+                <span className="now-card__clock mono" aria-label="Duración de la sesión">
+                  {formatClock(tracker.elapsedSeconds)}
+                </span>
               </div>
-            ))
+              <div className="now-card__actions">
+                {tracker.pending ? (
+                  <Button
+                    variant="primary"
+                    icon="refresh"
+                    disabled={tracker.busy}
+                    onClick={() => void run(tracker.retryPending)}
+                  >
+                    Reintentar
+                  </Button>
+                ) : tracker.active ? (
+                  <>
+                    <Button
+                      variant="primary"
+                      icon="stop"
+                      loading={tracker.busy}
+                      disabled={timerBlocked}
+                      onClick={() => void run(tracker.stop)}
+                    >
+                      Detener y guardar
+                    </Button>
+                    <Button
+                      icon="pause"
+                      disabled={timerBlocked}
+                      onClick={() => void run(tracker.pause)}
+                    >
+                      Pausar
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="primary"
+                      icon="play"
+                      loading={tracker.busy}
+                      disabled={timerBlocked}
+                      onClick={() => void run(tracker.resume)}
+                    >
+                      Reanudar
+                    </Button>
+                    <StartTimerButton taskId={tracker.pausedTaskId ?? undefined} />
+                  </>
+                )}
+              </div>
+              {tracker.active ? (
+                <p className="now-card__hint">
+                  Tiempo provisional: se convierte en parte al detener.
+                </p>
+              ) : null}
+            </>
           ) : (
-            <p className="muted section-intro">Todavía no hay partes cerrados hoy.</p>
-          )}
-          {tracker.active ? (
-            <div className="entry-summary entry-summary--live">
-              <span className="status-dot" />
-              <div>
-                <strong>Tramo en curso</strong>
-                <OdooEntryStatus entry={tracker.active} />
-                <p className="muted">Duración provisional; se consolida al detener.</p>
+            <>
+              <div className="now-card__main">
+                <span className="now-card__meta">
+                  {canRegister
+                    ? 'No hay ninguna tarea en marcha. Empieza una desde “Retomar trabajo”.'
+                    : 'Crea un proyecto y una tarea para empezar a registrar tiempo.'}
+                </span>
               </div>
-              <Badge tone="accent">{formatDuration(tracker.elapsedSeconds)}</Badge>
+              <div className="now-card__actions">
+                <StartTimerButton disabled={!canRegister} />
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <div className="today-grid">
+        <Panel
+          title="Retomar trabajo"
+          action={
+            <Link className="text-link" to={paths.tasks}>
+              Todas las tareas <Icon name="arrow" size={14} />
+            </Link>
+          }
+        >
+          {suggestions.length ? (
+            <ul className="resume-list">
+              {suggestions.map(({ task, project, reason, lastWorkedAt }) => {
+                const isActive = reason === 'active';
+                return (
+                  <li
+                    key={task.id}
+                    className={`resume-row ${isActive ? 'resume-row--active' : ''}`}
+                  >
+                    <IconButton
+                      icon={isActive ? 'stop' : 'play'}
+                      label={`${isActive ? 'Detener' : 'Empezar'}: ${task.titulo}`}
+                      className={isActive ? 'icon-button--accent' : 'resume-row__play'}
+                      disabled={timerBlocked || (!!tracker.active && !isActive)}
+                      onClick={() =>
+                        void run(() => (isActive ? tracker.stop() : tracker.start(task.id)))
+                      }
+                    />
+                    <div className="resume-row__text">
+                      <Link to={`${paths.tasks}?proyecto=${task.proyecto_id}`}>{task.titulo}</Link>
+                      <span>
+                        {project?.nombre}
+                        {lastWorkedAt && !isActive
+                          ? ` · ${lastWorkedLabel(lastWorkedAt, today, zone)}`
+                          : ''}
+                      </span>
+                    </div>
+                    {reasonLabels[reason] ? (
+                      <Badge tone={isActive ? 'accent' : 'neutral'}>{reasonLabels[reason]}</Badge>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              <Icon name="tasks" size={28} />
+              <p>
+                {activeProjects.length
+                  ? 'No tienes tareas abiertas.'
+                  : 'Crea un proyecto y una tarea para empezar.'}
+              </p>
+              {activeProjects.length ? (
+                <Button icon="plus" onClick={() => setTaskFormOpen(true)}>
+                  Nueva tarea
+                </Button>
+              ) : (
+                <Link className="button button--secondary" to={paths.projects}>
+                  Ir a proyectos
+                </Link>
+              )}
             </div>
-          ) : null}
-          <Link className="text-link" to="/partes-de-horas">
-            Abrir partes de horas <Icon name="arrow" size={14} />
-          </Link>
+          )}
+        </Panel>
+
+        <Panel
+          title="Actividad de hoy"
+          action={
+            <Link className="text-link" to={paths.entries}>
+              Todos los partes <Icon name="arrow" size={14} />
+            </Link>
+          }
+        >
+          {activity.length ? (
+            <ul className="activity-list">
+              {activity.map((entry) => {
+                const task = taskById.get(entry.tarea_id);
+                const live = !entry.fin_en;
+                const crossesDay = !live && entry.fecha !== today;
+                return (
+                  <li key={entry.id} className={`activity-row ${live ? 'activity-row--live' : ''}`}>
+                    <span className="activity-row__time mono">
+                      {hourMinute(entry.inicio_en, entry.zona_horaria)}
+                      <span aria-hidden="true">–</span>
+                      <span className="sr-only"> a </span>
+                      {live ? 'ahora' : hourMinute(entry.fin_en!, entry.zona_horaria)}
+                    </span>
+                    <div className="activity-row__text">
+                      <strong>{task?.titulo ?? 'Tarea no disponible'}</strong>
+                      <span className="activity-row__meta">
+                        {projectById.get(entry.proyecto_id)?.nombre}
+                        {crossesDay ? ' · cruza medianoche' : ''}
+                      </span>
+                      {entry.descripcion ? (
+                        <span className="activity-row__note">{entry.descripcion}</span>
+                      ) : null}
+                    </div>
+                    <div className="activity-row__duration">
+                      {live ? (
+                        <>
+                          <strong className="mono">
+                            {formatDuration(
+                              tracker.active?.id === entry.id
+                                ? tracker.elapsedSeconds
+                                : (Date.parse(now) - Date.parse(entry.inicio_en)) / 1000,
+                            )}
+                          </strong>
+                          <span>Provisional</span>
+                        </>
+                      ) : (
+                        <>
+                          <strong className="mono" title="Duración imputada (con redondeo)">
+                            {formatDuration(entry.duracion_imputada_segundos ?? 0)}
+                          </strong>
+                          <span title="Duración real exacta">
+                            Real {formatDuration(entry.duracion_real_segundos ?? 0)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="activity-row__status">
+                      {live ? (
+                        <Badge tone="accent">En curso</Badge>
+                      ) : (
+                        <OdooEntryStatus entry={entry} />
+                      )}
+                    </div>
+                    {live ? (
+                      <span className="activity-row__action" />
+                    ) : (
+                      <IconButton
+                        icon="edit"
+                        label={`Editar parte: ${task?.titulo ?? 'tarea'}`}
+                        className="activity-row__action"
+                        onClick={() => setEditor(entry)}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              <Icon name="clock" size={28} />
+              <p>Todavía no hay registros hoy.</p>
+              <Button icon="plus" disabled={!canRegister} onClick={() => setEditor('new')}>
+                Registrar tiempo
+              </Button>
+            </div>
+          )}
         </Panel>
       </div>
+
+      <WeekDetails data={data} today={today} now={now} />
+
       <EntryModal
         open={editor !== null}
         entry={editor && editor !== 'new' ? editor : null}
+        date={today}
         onClose={() => setEditor(null)}
       />
+      {taskFormOpen ? (
+        <TaskForm projects={projects} onClose={() => setTaskFormOpen(false)} />
+      ) : null}
     </div>
   );
 }

@@ -162,6 +162,43 @@ export let data: WorkspaceData = {
   receivedAt: Date.now(),
 };
 export const operations: { action: string; payload: Record<string, Json | undefined> }[] = [];
+const entryTemplate = data.entries[0]!;
+const notify = () => window.dispatchEvent(new Event('chambapp-smoke-workspace'));
+
+/** Synthetic scenarios for manual review: `?escenario=vacio` removes all activity. */
+export function applyScenario(name: string | null) {
+  if (name === 'vacio') data = { ...data, entries: [], fichajes: [] };
+}
+
+export function setFichajes(fichajes: WorkspaceData['fichajes']) {
+  data = { ...data, fichajes };
+  notify();
+}
+
+export function addEntry(entry: WorkspaceData['entries'][number]) {
+  data = { ...data, entries: [...data.entries.filter((item) => item.id !== entry.id), entry] };
+  notify();
+}
+
+export function newEntry(taskId: string, start: string): WorkspaceData['entries'][number] {
+  const task = data.tasks.find((item) => item.id === taskId)!;
+  return {
+    ...entryTemplate,
+    id: crypto.randomUUID(),
+    tarea_id: taskId,
+    proyecto_id: task.proyecto_id,
+    odoo_id: task.odoo_id,
+    odoo_url: task.odoo_url,
+    inicio_en: start,
+    fin_en: null,
+    inicio_imputado_en: start,
+    fin_imputado_en: null,
+    duracion_real_segundos: null,
+    duracion_imputada_segundos: null,
+    descripcion: null,
+    imputado_en_odoo: false,
+  };
+}
 export async function executeCommand(action: string, payload: Record<string, Json | undefined>) {
   operations.push({ action, payload });
   if (action === 'guardar_nota' || action === 'eliminar_nota') {
@@ -214,12 +251,75 @@ export async function executeCommand(action: string, payload: Record<string, Jso
     window.dispatchEvent(new Event('chambapp-smoke-workspace'));
     return note;
   }
+  if (action === 'editar_perfil') {
+    if (payload.version !== data.profile.version)
+      throw new Error('El perfil ha cambiado en otra sesión.');
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    if (payload.nombre === 'error') throw new Error('Error de prueba al guardar el perfil.');
+    data = {
+      ...data,
+      profile: {
+        ...data.profile,
+        nombre: String(payload.nombre),
+        zona_horaria: String(payload.zona_horaria),
+        intervalo_redondeo_minutos: Number(payload.intervalo_redondeo_minutos),
+        preferencias: (payload.preferencias ?? {}) as WorkspaceData['profile']['preferencias'],
+        version: data.profile.version + 1,
+      },
+    };
+    notify();
+    return data.profile;
+  }
+  if (action === 'crear_configuracion_semanal') {
+    const id = crypto.randomUUID();
+    const allocation = (payload.reparto ?? {}) as Record<string, number>;
+    data = {
+      ...data,
+      configurations: [
+        ...data.configurations,
+        {
+          id,
+          usuario_id: uid,
+          minutos_semanales: Number(payload.minutos_semanales),
+          vigente_desde: String(payload.vigente_desde),
+          creado_en: now,
+        },
+      ],
+      days: [
+        ...data.days,
+        ...Object.entries(allocation).map(([day, minutes]) => ({
+          configuracion_id: id,
+          dia_semana: Number(day),
+          minutos_objetivo: Number(minutes),
+        })),
+      ],
+    };
+    notify();
+    return { id };
+  }
+  if (action === 'crear_tarea') {
+    const task = {
+      ...data.tasks[0]!,
+      id: crypto.randomUUID(),
+      proyecto_id: String(payload.proyecto_id),
+      titulo: String(payload.titulo),
+      descripcion: (payload.descripcion as string | null) ?? null,
+      estado: 'pendiente' as const,
+      odoo_id: (payload.odoo_id as string | null) ?? null,
+      odoo_url: (payload.odoo_url as string | null) ?? null,
+      estimacion_minutos: null,
+      actualizado_en: new Date().toISOString(),
+    };
+    data = { ...data, tasks: [...data.tasks, task] };
+    notify();
+    return task;
+  }
   if (action !== 'editar_parte' && action !== 'crear_parte')
     throw new Error('Operación fuera de esta prueba.');
   const previous = data.entries.find((entry) => entry.id === payload.id);
   if (previous && previous.version !== payload.version)
     throw new Error('Conflicto de versión de prueba.');
-  const base = previous ?? data.entries[0]!;
+  const base = previous ?? newEntry(String(payload.tarea_id ?? entryTemplate.tarea_id), now);
   const start = String(payload.inicio_en ?? base.inicio_en);
   const end = String(payload.fin_en ?? base.fin_en);
   const real = (Date.parse(end) - Date.parse(start)) / 1000;

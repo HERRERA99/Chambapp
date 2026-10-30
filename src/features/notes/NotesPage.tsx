@@ -144,7 +144,6 @@ function NotesWorkspace() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Mi espacio / Documentación"
         title="Notas"
         description="Ideas, decisiones y documentación en Markdown, conectadas con tu trabajo."
         actions={

@@ -62,8 +62,7 @@ export default function TasksPage({ defaultView = 'list' }: { defaultView?: 'lis
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Operaciones / Proyectos / Tareas & entregables"
-        title={view === 'board' ? 'Tablero de tareas' : 'Tareas & Imputaciones por Jornada'}
+        title="Tareas"
         description="Planifica tareas y consulta el tiempo real e imputado de sus sesiones de trabajo."
         actions={
           <>

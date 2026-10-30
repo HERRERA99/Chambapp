@@ -15,9 +15,7 @@ export function RoundingPreview({
     <div className={`rounding-preview ${compact ? 'rounding-preview--compact' : ''}`}>
       <div className="rounding-preview__heading">
         <span className="eyebrow">Ejemplo de duración total</span>
-        <Badge tone="accent">
-          {interval === '0' ? 'Sin redondeo' : `R${interval.padStart(2, '0')}`}
-        </Badge>
+        <Badge>{interval === '0' ? 'Sin redondeo' : `R${interval.padStart(2, '0')}`}</Badge>
       </div>
       <div className="rounding-flow">
         <div>

@@ -11,7 +11,7 @@
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 .calculator-caption > span:first-child {
@@ -25,8 +25,7 @@
   color: var(--accent-soft);
 }
 .calculator-caption .mono {
-  font-size: 9px;
-  letter-spacing: 0.07em;
+  font-size: var(--text-xs);
 }
 
 .percentage-workbench {
@@ -61,9 +60,9 @@
   flex-shrink: 0;
   font: 11px var(--font-mono);
   color: var(--accent-soft);
-  border: 1px solid #ff2e5630;
+  border: 1px solid #eeeeee18;
   border-radius: 5px;
-  background: #ff2e5608;
+  background: #eeeeee04;
 }
 
 .calculator-description {
@@ -107,7 +106,7 @@
 .calculator-error {
   margin-top: 12px;
   color: var(--danger);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.65;
 }
 .percentage-base__total {
@@ -128,7 +127,7 @@
   gap: 8px;
   margin-top: 20px;
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.7;
 }
 .calculator-footnote > .icon {
@@ -151,7 +150,6 @@
   height: 5px;
   border-radius: 50%;
   background: var(--success);
-  box-shadow: 0 0 9px #88cbb250;
 }
 .percentage-presets {
   display: grid;
@@ -167,7 +165,7 @@
 }
 .percentage-preset__label {
   font: 28px var(--font-heading);
-  font-weight: 600;
+  font-weight: 400;
 }
 .percentage-preset__label small {
   font-size: 16px;
@@ -181,7 +179,7 @@
   display: inline-block;
   max-width: 100%;
   font: 36px var(--font-mono);
-  font-weight: 500;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.065em;
   line-height: 1.5;
@@ -206,11 +204,11 @@
   font-size: clamp(24px, 2.7vw, 36px);
 }
 .percentage-preset .calculator-value small {
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-left: 3px;
 }
 .percentage-preset .calculator-description {
-  font-size: 10px;
+  font-size: var(--text-xs);
   margin-top: 9px;
 }
 .percentage-track {
@@ -226,13 +224,13 @@
   background: var(--accent-soft);
 }
 .percentage-preset:last-child .percentage-track > span {
-  background: var(--accent);
+  background: var(--chart-primary);
 }
 .percentage-custom {
   margin-top: 18px;
   padding: 22px;
-  background: linear-gradient(120deg, #ff2e5609, #ff2e5602);
-  border: 1px solid #ff2e5645;
+  background: transparent;
+  border: 1px solid #eeeeee22;
   border-radius: var(--radius);
 }
 .percentage-custom__heading {
@@ -278,7 +276,7 @@
   display: flex;
   justify-content: space-between;
   color: var(--dim);
-  font-size: 9px;
+  font-size: var(--text-xs);
 }
 .percentage-custom__result {
   display: flex;
@@ -292,7 +290,7 @@
   color: var(--accent-soft);
 }
 .percentage-custom__result .button {
-  font-size: 10px;
+  font-size: var(--text-xs);
   margin-right: -10px;
 }
 
@@ -319,8 +317,8 @@
   place-items: center;
   width: 46px;
   height: 46px;
-  background: #ff2e5609;
-  border: 1px solid #ff2e5630;
+  background: #eeeeee04;
+  border: 1px solid #eeeeee18;
   border-radius: var(--radius);
   color: var(--accent-soft);
 }
@@ -353,7 +351,7 @@
   gap: 10px;
 }
 .time-calculator__day-choice .calculator-description {
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .time-calculator__base-time {
   max-width: 220px;
@@ -388,11 +386,11 @@
 }
 .time-calculator__result > .button {
   margin: 14px 0 -8px -12px;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .time-calculator__result--accent {
-  background: linear-gradient(130deg, #ff2e560c, var(--surface-low));
-  border-color: #ff2e5638;
+  background: transparent;
+  border-color: #eeeeee1c;
 }
 .calculator-clock-result {
   font: 52px var(--font-mono);
@@ -421,7 +419,7 @@
   flex-wrap: wrap;
   gap: 9px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .calculator-equation > span {
   color: var(--dim);
@@ -443,11 +441,11 @@
 }
 .calculator-tips strong {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
 }
 .calculator-tips p {
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1.7;
   margin-top: 5px;
   max-width: 360px;
@@ -577,7 +575,7 @@
     font-size: 21px;
   }
   .percentage-preset .calculator-value small {
-    font-size: 9px;
+    font-size: var(--text-xs);
   }
   .percentage-custom__heading {
     flex-wrap: wrap;

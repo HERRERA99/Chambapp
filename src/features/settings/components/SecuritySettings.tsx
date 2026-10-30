@@ -1,22 +1,29 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../shared/ui/Button';
-import { Panel, Notice } from '../../../shared/ui/Panel';
+import { Notice } from '../../../shared/ui/Panel';
 import { getSupabase } from '../../../lib/supabase/client';
 import { paths } from '../../../app/paths';
 import { useAuth } from '../../auth/useAuth';
 import { authErrorMessage } from '../../auth/errors';
+import { SettingRow, SettingsSection } from './SettingRow';
 
-export function SecuritySettings({ disabled = false }: { disabled?: boolean }) {
+export function SecuritySettings({
+  disabled = false,
+  hidden = false,
+}: {
+  disabled?: boolean;
+  hidden?: boolean;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<'password' | 'signout' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function requestPasswordChange() {
     if (pending || disabled || !user?.email) return;
-    setPending(true);
+    setPending('password');
     setError(null);
     setMessage(null);
     try {
@@ -30,13 +37,13 @@ export function SecuritySettings({ disabled = false }: { disabled?: boolean }) {
     } catch (cause) {
       setError(authErrorMessage(cause));
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
 
   async function signOut() {
     if (pending || disabled) return;
-    setPending(true);
+    setPending('signout');
     setError(null);
     try {
       const { error: authError } = await getSupabase().auth.signOut({ scope: 'local' });
@@ -44,40 +51,57 @@ export function SecuritySettings({ disabled = false }: { disabled?: boolean }) {
       navigate(paths.login, { replace: true });
     } catch (cause) {
       setError(authErrorMessage(cause));
-      setPending(false);
+      setPending(null);
     }
   }
 
   return (
-    <Panel id="seguridad" title="Seguridad & Accesos" icon="lock">
-      <p className="section-intro muted">Sesión asociada a {user?.email ?? 'tu cuenta'}.</p>
-      <div className="page-actions">
+    <SettingsSection
+      id="seguridad"
+      title="Seguridad"
+      description={`Acceso a tu cuenta${user?.email ? ` (${user.email})` : ''}. Cada acción se ejecuta al momento.`}
+      hidden={hidden}
+    >
+      <SettingRow
+        label="Contraseña"
+        description="Te enviaremos un enlace por correo para elegir una nueva."
+      >
         <Button
           icon="shield"
-          disabled={pending || disabled || !user?.email}
+          loading={pending === 'password'}
+          disabled={!!pending || disabled || !user?.email}
           onClick={() => void requestPasswordChange()}
         >
-          Cambiar contraseña por correo
+          Enviar enlace de cambio
         </Button>
-        <Button icon="logout" disabled={pending || disabled} onClick={() => void signOut()}>
-          Cerrar sesión en este navegador
+      </SettingRow>
+      <SettingRow
+        label="Sesión en este navegador"
+        description="Cierra la sesión solo aquí; las demás sesiones siguen abiertas."
+      >
+        <Button
+          icon="logout"
+          loading={pending === 'signout'}
+          disabled={!!pending || disabled}
+          onClick={() => void signOut()}
+        >
+          Cerrar sesión
         </Button>
-      </div>
-      {pending ? (
-        <p role="status" className="field__hint">
-          Conectando…
-        </p>
-      ) : null}
+      </SettingRow>
       {error ? (
-        <p role="alert" className="accent">
-          {error}
-        </p>
+        <div role="alert">
+          <Notice title="No se pudo completar la acción" tone="danger">
+            {error}
+          </Notice>
+        </div>
       ) : null}
       {message ? (
         <div role="status">
-          <Notice title="Revisa tu correo">{message}</Notice>
+          <Notice title="Revisa tu correo" tone="success">
+            {message}
+          </Notice>
         </div>
       ) : null}
-    </Panel>
+    </SettingsSection>
   );
 }

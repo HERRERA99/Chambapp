@@ -1,211 +1,205 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Brand } from '../../shared/brand/Brand';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { Button, IconButton } from '../../shared/ui/Button';
-import { Icon } from '../../shared/ui/Icon';
-import type { IconName } from '../../shared/ui/Icon';
-import { Badge, Notice } from '../../shared/ui/Panel';
+import { Notice } from '../../shared/ui/Panel';
+import { useFocusTrap } from '../../shared/ui/useFocusTrap';
 import { paths } from '../paths';
-import { TimerDisplay } from '../../features/tracker/TimerDisplay';
+import { pageTitle } from '../navigation';
 import { useWorkspace } from '../../features/workspace/useWorkspace';
 import { useTracker } from '../../features/tracker/useTracker';
-import { AttendanceControls } from '../../features/attendance/AttendanceControls';
 import { useAttendance } from '../../features/attendance/useAttendance';
 import { useAuth } from '../../features/auth/useAuth';
 import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
+import { SidebarContent } from './Sidebar';
+import { HeaderStatus } from './HeaderStatus';
+import { useIsMobile, useSidebarPreference } from './useSidebar';
+import './shell.css';
 
-const navigation: readonly { to: string; label: string; icon: IconName }[] = [
-  { to: paths.dashboard, label: 'Resumen', icon: 'grid' },
-  { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
-  { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
-  { to: paths.board, label: 'Tablero de tareas', icon: 'grid' },
-  { to: paths.notes, label: 'Notas', icon: 'file' },
-  { to: paths.entries, label: 'Partes de horas', icon: 'clock' },
-  { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
-  { to: paths.week, label: 'Mi semana', icon: 'calendar' },
-  { to: paths.calendar, label: 'Festivos & vacaciones', icon: 'calendar' },
-  { to: paths.percentages, label: 'Porcentajes', icon: 'percent' },
-  { to: paths.timeCalculator, label: 'Calculadora de horas', icon: 'calculator' },
-  { to: paths.fakeData, label: 'Datos ficticios', icon: 'dice' },
-  { to: paths.developer, label: 'Utilidades de desarrollo', icon: 'file' },
-  { to: paths.settings, label: 'Ajustes', icon: 'settings' },
-];
+const drawerTransition = { type: 'tween', duration: 0.22, ease: [0.22, 1, 0.36, 1] } as const;
 
 export function WorkspaceLayout() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  // The drawer belongs to the page where it was opened: navigating closes it.
+  const [drawer, setDrawer] = useState<{ open: boolean; path: string }>({ open: false, path: '' });
   const [signingOut, setSigningOut] = useState(false);
+  const [preference, updatePreference] = useSidebarPreference();
+  const mobile = useIsMobile();
   const { pathname } = useLocation();
   const { data, error, reload } = useWorkspace();
   const { user } = useAuth();
   const tracker = useTracker();
   const attendance = useAttendance();
   const notify = useFeedback();
-  const title = navigation.find((item) => item.to === pathname)?.label ?? 'Mi espacio';
-  const profile = data?.profile;
-  const initials = (profile?.nombre ?? 'Usuario')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase();
+  const drawerRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
+  const drawerOpen = mobile && drawer.open && drawer.path === pathname;
+  const closeDrawer = useCallback(() => setDrawer((current) => ({ ...current, open: false })), []);
+  useFocusTrap(drawerRef, drawerOpen, closeDrawer);
+  // After choosing a destination in the drawer, focus moves to the new page content.
+  // This effect runs after the focus trap has restored focus to the menu button.
+  const focusAfterNavigation = useRef(false);
+  const focusContent = useCallback(() => {
+    if (mobile) focusAfterNavigation.current = true;
+  }, [mobile]);
+  useEffect(() => {
+    if (!focusAfterNavigation.current) return;
+    focusAfterNavigation.current = false;
+    contentRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
+
+  const title = pageTitle(pathname);
   const pendingTasks =
-    data?.tasks.filter((task) => !task.archivado_en && task.estado !== 'completada').length ?? 0;
+    data?.tasks.filter(
+      (task) => !task.archivado_en && !task.eliminado_en && task.estado !== 'completada',
+    ).length ?? 0;
+  const desktopHidden = !mobile && preference.hidden;
+  const rail = !mobile && preference.rail;
+  const menuVisible = mobile ? drawerOpen : !preference.hidden;
+
   async function signOut() {
     setSigningOut(true);
     try {
       const { error: cause } = await getSupabase().auth.signOut();
       if (cause) throw cause;
     } catch (cause) {
-      notify(readableError(cause));
+      notify(readableError(cause), 'error');
     } finally {
       setSigningOut(false);
     }
   }
+
+  const sidebar = (
+    <SidebarContent
+      rail={rail}
+      mobile={mobile}
+      pendingTasks={pendingTasks}
+      name={data?.profile.nombre ?? ''}
+      email={user?.email}
+      signingOut={signingOut}
+      onSignOut={() => void signOut()}
+      onNavigate={focusContent}
+      onToggleRail={() => updatePreference({ rail: !preference.rail })}
+      onClose={closeDrawer}
+    />
+  );
+
   return (
-    <div className="workspace">
+    <div
+      className={`workspace ${desktopHidden ? 'workspace--menu-hidden' : ''} ${rail ? 'workspace--rail' : ''}`}
+    >
       <a href="#workspace-content" className="skip-link">
         Saltar al contenido
       </a>
-      {menuOpen ? (
-        <button
-          className="sidebar-backdrop"
-          aria-label="Cerrar navegación"
-          onClick={() => setMenuOpen(false)}
-        />
+      {mobile ? (
+        <AnimatePresence>
+          {drawerOpen ? (
+            <>
+              <motion.div
+                key="backdrop"
+                className="sidebar-backdrop"
+                aria-hidden="true"
+                onClick={closeDrawer}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+              />
+              <motion.aside
+                key="drawer"
+                ref={drawerRef}
+                id="workspace-navigation"
+                className="sidebar sidebar--drawer"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Menú de navegación"
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={drawerTransition}
+              >
+                {sidebar}
+              </motion.aside>
+            </>
+          ) : null}
+        </AnimatePresence>
+      ) : !preference.hidden ? (
+        <aside
+          id="workspace-navigation"
+          className={`sidebar ${rail ? 'sidebar--rail' : ''}`}
+          aria-label="Menú de navegación"
+        >
+          {sidebar}
+        </aside>
       ) : null}
-      <aside
-        id="workspace-navigation"
-        className={`sidebar ${menuOpen ? 'sidebar--open' : ''}`}
-        aria-label="Panel de navegación"
-      >
-        <div className="sidebar__brand">
-          <Brand compact to={paths.dashboard} label="Chambapp · Resumen" />
-          <IconButton
-            className="sidebar__close"
-            icon="close"
-            label="Cerrar menú"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div className="sidebar__metadata">
-            <Badge tone="accent">
-              <span className="status-dot" /> Mi espacio
-            </Badge>
-            <span className="mono dim">0.1</span>
-          </div>
-        </div>
-        <p className="eyebrow sidebar__label">Navegación</p>
-        <nav aria-label="Navegación principal">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) => `nav-item ${isActive ? 'nav-item--active' : ''}`}
-            >
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-              {item.to === paths.tasks && pendingTasks ? (
-                <span className="nav-count">{pendingTasks}</span>
-              ) : null}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar__bottom">
-          <div className="preview-note">
-            <Icon name="globe" size={15} />
-            <span>
-              Zona horaria
-              <br />
-              <span className="dim">{profile?.zona_horaria}</span>
-            </span>
-          </div>
-          <div className="sidebar__profile">
-            <span className="avatar">{initials}</span>
-            <div>
-              <strong>{profile?.nombre}</strong>
-              <span className="dim" title={user?.email}>
-                {user?.email}
-              </span>
-            </div>
-            <IconButton
-              icon="logout"
-              label="Cerrar sesión"
-              disabled={signingOut}
-              onClick={() => void signOut()}
-            />
-          </div>
-        </div>
-      </aside>
-      <div className="workspace__body">
+      <div className="workspace__body" inert={mobile && drawerOpen ? true : undefined}>
         <header className="workspace-header">
-          <div className="workspace-header__breadcrumb">
+          <div className="workspace-header__title">
             <IconButton
-              className="mobile-menu"
-              icon="menu"
-              label="Abrir navegación"
-              aria-expanded={menuOpen}
-              aria-controls="workspace-navigation"
-              onClick={() => setMenuOpen(true)}
+              className="menu-toggle"
+              icon={menuVisible ? 'sidebarClose' : 'sidebarOpen'}
+              label={menuVisible ? 'Ocultar menú' : 'Mostrar menú'}
+              aria-expanded={menuVisible}
+              aria-controls={menuVisible ? 'workspace-navigation' : undefined}
+              onClick={() =>
+                mobile
+                  ? setDrawer({ open: true, path: pathname })
+                  : updatePreference({ hidden: !preference.hidden })
+              }
             />
-            <span className="eyebrow">Mi espacio</span>
-            <span className="dim">/</span>
-            <strong>{title}</strong>
+            <span className="workspace-header__page">{title}</span>
           </div>
-          <div className="workspace-header__actions">
-            <AttendanceControls compact />
-            <div className="header-tracker">
-              <TimerDisplay compact />
-            </div>
-            <Badge>
-              {profile?.intervalo_redondeo_minutos
-                ? `R${profile.intervalo_redondeo_minutos}`
-                : 'Exacto'}
-            </Badge>
-            <NavLink to={paths.settings} className="avatar avatar--accent" aria-label="Mi perfil">
-              {initials}
-            </NavLink>
-          </div>
+          {pathname !== paths.dashboard ? (
+            // Hoy and Fichajes already show these controls in the page.
+            <HeaderStatus showAttendance={pathname !== paths.attendance} />
+          ) : null}
         </header>
-        <main id="workspace-content" tabIndex={-1} className="workspace-content">
+        <main id="workspace-content" ref={contentRef} tabIndex={-1} className="workspace-content">
           {error ? (
-            <div className="page-stack">
-              <Notice title="No se pudieron actualizar los datos">
-                {readableError(error)} Se muestran los últimos datos cargados.
-              </Notice>
-              <Button onClick={() => void reload()}>Actualizar</Button>
-            </div>
+            <Notice title="No se pudieron actualizar los datos" tone="warning">
+              {readableError(error)} Se muestran los últimos datos cargados.{' '}
+              <Button size="sm" icon="refresh" onClick={() => void reload()}>
+                Actualizar
+              </Button>
+            </Notice>
           ) : null}
           {tracker.error ? (
-            <div role="alert" className="form-error">
-              {tracker.error}
-              {tracker.pending
-                ? ' Usa Reintentar en el cronómetro para confirmar la operación.'
-                : ''}
+            <div role="alert">
+              <Notice title="El cronómetro necesita tu atención" tone="danger">
+                {tracker.error}
+                {tracker.pending
+                  ? ' Usa Reintentar en el cronómetro para confirmar la operación.'
+                  : ''}
+              </Notice>
             </div>
           ) : null}
           {attendance.error ? (
-            <div role="alert" className="form-error">
-              {attendance.error}
-              {attendance.pending
-                ? ' Reintenta el fichaje pendiente para confirmar el resultado.'
-                : ''}
+            <div role="alert">
+              <Notice title="El fichaje necesita tu atención" tone="danger">
+                {attendance.error}
+                {attendance.pending
+                  ? ' Reintenta el fichaje pendiente para confirmar el resultado.'
+                  : ''}
+              </Notice>
             </div>
           ) : null}
           {attendance.pending && !attendance.error ? (
-            <Notice title="Fichaje pendiente de confirmar">
+            <Notice title="Fichaje pendiente de confirmar" tone="warning">
               Usa Reintentar fichaje para comprobar el resultado. Se conservan los instantes del
               intento original.
             </Notice>
           ) : null}
-          <Outlet />
+          <motion.div
+            key={pathname}
+            className="workspace-page"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Outlet />
+          </motion.div>
         </main>
-        <footer className="workspace-footer">
-          <span>Chambapp</span>
-          <span>Tiempos exactos · Duración imputada configurable</span>
-        </footer>
       </div>
     </div>
   );

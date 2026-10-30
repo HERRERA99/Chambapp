@@ -398,13 +398,13 @@ export default function AuthPage() {
                 <p className="eyebrow">Tiempo real · Ejemplo</p>
                 <strong>Desarrollo del proyecto</strong>
               </div>
-              <Badge tone="accent">R15</Badge>
+              <Badge>R15</Badge>
             </div>
             <div className="auth-chrono mono">
               04:08:00<span>Real</span>
             </div>
             <div className="split-label">
-              <Badge tone="accent">Imputado: 4h 15min</Badge>
+              <Badge>Imputado: 4h 15min</Badge>
               <span className="mono muted">+7min</span>
             </div>
             <svg className="telemetry-line" viewBox="0 0 500 65" fill="none" aria-hidden="true">
@@ -428,7 +428,7 @@ export default function AuthPage() {
             </p>
           </div>
         </section>
-        <section id="auth-form" className="auth-console">
+        <section id="auth-form" className="auth-console surface-bone">
           <AuthConsole
             key={location.pathname}
             register={register}

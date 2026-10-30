@@ -65,7 +65,7 @@ export function TaskForm({
         estado: status,
         estimacion_minutos: minutes,
       });
-      notify(task ? 'Tarea actualizada.' : 'Tarea creada.');
+      notify(task ? 'Tarea actualizada.' : 'Tarea creada.', 'success');
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar la tarea.');

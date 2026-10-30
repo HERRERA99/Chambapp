@@ -78,7 +78,7 @@ export function CopyResult({ value }: { value: string | null }) {
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      notify('Resultado copiado.');
+      notify('Resultado copiado.', 'success');
     } catch {
       notify('No se pudo copiar. Puedes seleccionar el resultado y copiarlo.');
     }

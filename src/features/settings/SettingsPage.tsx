@@ -1,9 +1,12 @@
-import { OdooSettings } from './components/OdooSettings';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { DateTime } from 'luxon';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
+import type { IconName } from '../../shared/ui/Icon';
 import { Panel, Notice } from '../../shared/ui/Panel';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
@@ -11,42 +14,126 @@ import { WorkdaySettings } from './components/WorkdaySettings';
 import { RoundingSettings } from './components/RoundingSettings';
 import { RegionalSettings } from './components/RegionalSettings';
 import { SecuritySettings } from './components/SecuritySettings';
+import { OdooSettings } from './components/OdooSettings';
 import { initialSchedule, minimumScheduleMonday, profileDraft } from './settingsDraft';
+import type { ProfileDraft } from './settingsDraft';
 import type { Profile, WorkspaceData } from '../../domain/models';
+import './settings.css';
+
+type CategoryId = 'regional' | 'jornada' | 'redondeo' | 'odoo' | 'seguridad';
+
+const categories: readonly {
+  id: CategoryId;
+  label: string;
+  hint: string;
+  icon: IconName;
+  independent?: boolean;
+}[] = [
+  { id: 'regional', label: 'Perfil y región', hint: 'Nombre y zona horaria', icon: 'user' },
+  { id: 'jornada', label: 'Jornada laboral', hint: 'Reparto semanal', icon: 'calendar' },
+  { id: 'redondeo', label: 'Redondeo', hint: 'Duración imputada', icon: 'timer' },
+  { id: 'odoo', label: 'Odoo', hint: 'API key', icon: 'key', independent: true },
+  {
+    id: 'seguridad',
+    label: 'Seguridad',
+    hint: 'Contraseña y sesión',
+    icon: 'lock',
+    independent: true,
+  },
+];
+
+function isCategory(value: string): value is CategoryId {
+  return categories.some((category) => category.id === value);
+}
+
+function regionalChanged(a: ProfileDraft, b: ProfileDraft) {
+  return (
+    a.nombre !== b.nombre ||
+    a.workspace !== b.workspace ||
+    a.especialidad !== b.especialidad ||
+    a.zonaHoraria !== b.zonaHoraria
+  );
+}
+
+type SaveState =
+  | { kind: 'idle' }
+  | { kind: 'saved' | 'discarded'; message: string }
+  | { kind: 'error'; message: string };
 
 function SettingsEditor({ data }: { data: WorkspaceData }) {
   const { run } = useCommand();
+  const { hash } = useLocation();
+  const navigate = useNavigate();
+  const active: CategoryId = isCategory(hash.slice(1)) ? (hash.slice(1) as CategoryId) : 'regional';
   const [profile, setProfile] = useState(() => profileDraft(data));
   const [baseline, setBaseline] = useState(() => profileDraft(data));
   const [version, setVersion] = useState(data.profile.version);
   const [schedule, setSchedule] = useState(() => initialSchedule(data));
-  const [scheduleDirty, setScheduleDirty] = useState(false);
+  const [scheduleBaseline, setScheduleBaseline] = useState(() => initialSchedule(data));
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+  const [state, setState] = useState<SaveState>({ kind: 'idle' });
   const profileDirty = JSON.stringify(profile) !== JSON.stringify(baseline);
+  // Compared with the loaded values, so undoing an edit by hand clears the pending state.
+  const scheduleDirty =
+    schedule.effectiveDate !== scheduleBaseline.effectiveDate ||
+    schedule.minutes.some((minutes, index) => minutes !== scheduleBaseline.minutes[index]);
   const dirty = profileDirty || scheduleDirty;
   const changedElsewhere = data.profile.version !== version;
   const minimumDate = minimumScheduleMonday(data);
+  const dirtyCategories = new Set<CategoryId>([
+    ...(regionalChanged(profile, baseline) ? (['regional'] as const) : []),
+    ...(scheduleDirty ? (['jornada'] as const) : []),
+    ...(profile.intervaloRedondeo !== baseline.intervaloRedondeo ? (['redondeo'] as const) : []),
+  ]);
+
+  // Warn before leaving the page with unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  // The success confirmation fades away; errors stay until the next change.
+  useEffect(() => {
+    if (state.kind !== 'saved' && state.kind !== 'discarded') return;
+    const id = setTimeout(() => setState({ kind: 'idle' }), 5000);
+    return () => clearTimeout(id);
+  }, [state]);
+
+  function edited() {
+    if (state.kind !== 'idle') setState({ kind: 'idle' });
+  }
 
   function reset() {
     const current = profileDraft(data);
     setProfile(current);
     setBaseline(current);
     setVersion(data.profile.version);
-    setSchedule(initialSchedule(data));
-    setScheduleDirty(false);
-    setError(null);
-    setMessage('Se han cargado los valores guardados. Los cambios pendientes se han descartado.');
+    const currentSchedule = initialSchedule(data);
+    setSchedule(currentSchedule);
+    setScheduleBaseline(currentSchedule);
+    setShowErrors(false);
+    setState({
+      kind: 'discarded',
+      message: changedElsewhere
+        ? 'Se han cargado los valores actuales.'
+        : 'Cambios descartados. Se muestran los valores guardados.',
+    });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving || !dirty) return;
-    setError(null);
-    setMessage(null);
+    setState({ kind: 'idle' });
+    const fail = (message: string, category?: CategoryId) => {
+      setState({ kind: 'error', message });
+      if (category && category !== active) navigate({ hash: category }, { replace: true });
+    };
     if (!profile.nombre.trim() || !profile.workspace.trim()) {
-      setError('Completa tu nombre y el nombre del Workspace.');
+      setShowErrors(true);
+      fail('Completa tu nombre y el nombre del espacio de trabajo.', 'regional');
       return;
     }
 
@@ -67,11 +154,14 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     if (scheduleDirty) {
       const date = DateTime.fromISO(schedule.effectiveDate, { zone: 'UTC' });
       if (!date.isValid || date.weekday !== 1) {
-        setError('La jornada debe entrar en vigor un lunes.');
+        fail('La jornada debe entrar en vigor un lunes.', 'jornada');
         return;
       }
       if (!sameSchedule && schedule.effectiveDate < minimumDate) {
-        setError('La semana actual ya tiene una jornada configurada. Selecciona un lunes futuro.');
+        fail(
+          'La semana actual ya tiene una jornada configurada. Selecciona un lunes futuro.',
+          'jornada',
+        );
         return;
       }
       if (
@@ -81,12 +171,16 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
         ) ||
         weeklyMinutes < 1
       ) {
-        setError('Define al menos un día laborable. Cada día puede tener entre 0 y 1440 minutos.');
+        fail(
+          'Define al menos un día laborable. Cada día puede tener entre 0 y 1440 minutos.',
+          'jornada',
+        );
         return;
       }
       if (existing && !sameSchedule) {
-        setError(
+        fail(
           'Ese lunes ya tiene una configuración. Elige otra fecha para conservar el reparto guardado.',
+          'jornada',
         );
         return;
       }
@@ -130,16 +224,18 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           reparto: allocation,
         });
       }
-      setScheduleDirty(false);
-      setMessage(
-        scheduleDirty
-          ? `Ajustes guardados. El reparto semanal entrará en vigor el ${schedule.effectiveDate}.`
-          : 'Perfil y preferencias guardados.',
-      );
+      setScheduleBaseline(schedule);
+      setShowErrors(false);
+      setState({
+        kind: 'saved',
+        message: scheduleDirty
+          ? `Guardado. El nuevo reparto entrará en vigor el ${schedule.effectiveDate}.`
+          : 'Guardado.',
+      });
     } catch (cause) {
       const details =
         cause instanceof Error ? cause.message : 'No se pudo guardar. Inténtalo de nuevo.';
-      setError(
+      fail(
         savedProfile
           ? `El perfil se ha guardado, pero la jornada sigue pendiente: ${details}`
           : details,
@@ -149,91 +245,154 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     }
   }
 
+  const pendingLabels = categories
+    .filter((category) => dirtyCategories.has(category.id))
+    .map((category) => category.label);
+  const barVisible = dirty || saving || state.kind !== 'idle';
+
   return (
-    <form className="page-stack" onSubmit={submit} aria-busy={saving}>
+    <form className="settings" onSubmit={submit} aria-busy={saving} noValidate>
       <PageHeader
-        eyebrow="Operaciones / Sistema & Cuenta / Preferencias globales"
-        title="Ajustes y Preferencias"
-        description="Tu perfil, jornada laboral, redondeo y zona horaria."
-        actions={
-          <>
-            <Button icon="left" disabled={saving || (!dirty && !changedElsewhere)} onClick={reset}>
-              {changedElsewhere ? 'Cargar valores actuales' : 'Descartar cambios'}
-            </Button>
-            <Button type="submit" variant="primary" icon="check" disabled={saving || !dirty}>
-              {saving ? 'Guardando…' : 'Guardar cambios'}
-            </Button>
-          </>
-        }
+        title="Ajustes"
+        description="Perfil, jornada, redondeo, Odoo y seguridad. Los cambios del perfil, la jornada y el redondeo se guardan juntos."
       />
-      <nav className="section-nav" aria-label="Secciones de ajustes">
-        {[
-          { id: 'jornada', label: 'Jornada semanal' },
-          { id: 'redondeo', label: 'Redondeo de duración' },
-          { id: 'regional', label: 'Perfil y zona horaria' },
-          { id: 'odoo', label: 'Odoo' },
-          { id: 'seguridad', label: 'Seguridad' },
-        ].map((section) => (
-          <a key={section.id} href={`#${section.id}`}>
-            {section.label}
-          </a>
-        ))}
-      </nav>
       {changedElsewhere ? (
-        <Notice title="El perfil ha cambiado en otra sesión">
-          Carga los valores actuales antes de guardar para revisar esos cambios.
+        <Notice title="Tu perfil ha cambiado en otra sesión" tone="warning">
+          Carga los valores actuales antes de guardar para revisar esos cambios.{' '}
+          <Button size="sm" icon="refresh" disabled={saving} onClick={reset}>
+            Cargar valores actuales
+          </Button>
         </Notice>
       ) : null}
-      {error ? (
-        <div role="alert">
-          <Notice title="No se han guardado todos los cambios">{error}</Notice>
-        </div>
-      ) : null}
-      {message ? (
-        <div role="status">
-          <Notice title="Configuración" icon="check">
-            {message}
-          </Notice>
-        </div>
-      ) : null}
-      <WorkdaySettings
-        value={schedule}
-        onChange={(next) => {
-          setSchedule(next);
-          setScheduleDirty(true);
-          setMessage(null);
-        }}
-        minimumDate={minimumDate}
-        dirty={scheduleDirty}
-        disabled={saving}
-        data={data}
-      />
-      <RoundingSettings
-        interval={profile.intervaloRedondeo}
-        onChange={(intervaloRedondeo) => {
-          setProfile((current) => ({ ...current, intervaloRedondeo }));
-          setMessage(null);
-        }}
-        disabled={saving}
-      />
-      <RegionalSettings
-        value={profile}
-        onChange={(next) => {
-          setProfile(next);
-          setMessage(null);
-        }}
-        disabled={saving}
-      />
-      <OdooSettings disabled={saving} />
-      <SecuritySettings disabled={saving} />
-      <div className="settings-footer">
-        <Notice title="El histórico se conserva" icon="shield">
-          Las nuevas preferencias afectan a los registros y jornadas que se creen a partir de ahora.
-        </Notice>
-        <Button type="submit" variant="primary" icon="check" disabled={saving || !dirty}>
-          {saving ? 'Guardando…' : 'Aplicar cambios'}
-        </Button>
+      <div className="settings__layout">
+        <nav className="settings-nav" aria-label="Categorías de ajustes">
+          <ul>
+            {categories.map((category) => (
+              <li key={category.id}>
+                <a
+                  href={`#${category.id}`}
+                  aria-current={active === category.id ? 'page' : undefined}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate({ hash: category.id }, { replace: true });
+                  }}
+                >
+                  <Icon name={category.icon} size={18} />
+                  <span className="settings-nav__text">
+                    <span>{category.label}</span>
+                    <span className="settings-nav__hint">{category.hint}</span>
+                  </span>
+                  {dirtyCategories.has(category.id) ? (
+                    <span className="settings-nav__dirty" title="Cambios sin guardar">
+                      <span className="sr-only">(cambios sin guardar)</span>
+                    </span>
+                  ) : null}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <motion.div
+          key={active}
+          className="settings__panels"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.16 }}
+        >
+          <RegionalSettings
+            value={profile}
+            baseline={baseline}
+            hidden={active !== 'regional'}
+            showErrors={showErrors}
+            onChange={(next) => {
+              setProfile(next);
+              edited();
+            }}
+            disabled={saving}
+          />
+          <WorkdaySettings
+            value={schedule}
+            baseline={scheduleBaseline}
+            hidden={active !== 'jornada'}
+            onChange={(next) => {
+              setSchedule(next);
+              edited();
+            }}
+            minimumDate={minimumDate}
+            dirty={scheduleDirty}
+            disabled={saving}
+            data={data}
+          />
+          <RoundingSettings
+            interval={profile.intervaloRedondeo}
+            baseline={baseline.intervaloRedondeo}
+            hidden={active !== 'redondeo'}
+            onChange={(intervaloRedondeo) => {
+              setProfile((current) => ({ ...current, intervaloRedondeo }));
+              edited();
+            }}
+            disabled={saving}
+          />
+          <OdooSettings disabled={saving} hidden={active !== 'odoo'} />
+          <SecuritySettings disabled={saving} hidden={active !== 'seguridad'} />
+        </motion.div>
       </div>
+      <AnimatePresence>
+        {barVisible ? (
+          <motion.div
+            className={`save-bar save-bar--${saving ? 'saving' : state.kind === 'idle' ? 'dirty' : state.kind}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="save-bar__status" role="status" aria-live="polite">
+              {saving ? (
+                <>
+                  <Icon name="loader" className="spin" />
+                  <span>Guardando cambios…</span>
+                </>
+              ) : state.kind === 'error' ? (
+                <>
+                  <Icon name="alert" />
+                  <span>
+                    <strong>No se han guardado los cambios.</strong> {state.message}
+                  </span>
+                </>
+              ) : state.kind === 'saved' || state.kind === 'discarded' ? (
+                <>
+                  <Icon name={state.kind === 'saved' ? 'success' : 'undo'} />
+                  <span>{state.message}</span>
+                </>
+              ) : (
+                <>
+                  <span className="save-bar__dot" aria-hidden="true" />
+                  <span>
+                    <strong>Cambios sin guardar</strong>
+                    {pendingLabels.length ? ` en ${pendingLabels.join(', ')}` : ''}
+                  </span>
+                </>
+              )}
+            </div>
+            {dirty || saving ? (
+              <div className="save-bar__actions">
+                <Button variant="ghost" icon="undo" disabled={saving} onClick={reset}>
+                  Descartar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  icon="check"
+                  loading={saving}
+                  disabled={saving}
+                >
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </Button>
+              </div>
+            ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </form>
   );
 }

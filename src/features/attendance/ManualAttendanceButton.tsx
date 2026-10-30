@@ -6,7 +6,13 @@ import { useWorkspace } from '../workspace/useWorkspace';
 import { useAttendance } from './useAttendance';
 import { AttendanceEditor } from './AttendanceEditor';
 
-export function ManualAttendanceButton() {
+export function ManualAttendanceButton({
+  variant = 'secondary',
+  size = 'md',
+}: {
+  variant?: 'secondary' | 'ghost';
+  size?: 'sm' | 'md';
+} = {}) {
   const attendance = useAttendance();
   const { data, error } = useWorkspace();
   const [editor, setEditor] = useState<
@@ -21,6 +27,8 @@ export function ManualAttendanceButton() {
     <>
       <Button
         icon="edit"
+        variant={variant}
+        size={size}
         disabled={attendance.busy || attendance.pending || !!error}
         onClick={() =>
           setEditor(
@@ -32,6 +40,8 @@ export function ManualAttendanceButton() {
       </Button>
       <Button
         icon="plus"
+        variant={variant}
+        size={size}
         disabled={attendance.busy || attendance.pending || !!error}
         onClick={() => setEditor({ mode: 'interval' })}
       >

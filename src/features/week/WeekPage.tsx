@@ -120,8 +120,7 @@ export default function WeekPage() {
   return (
     <div className="page-stack week-page">
       <PageHeader
-        eyebrow="Operaciones / Planificación / Mi semana"
-        title="Mi Semana Laboral & Balances"
+        title="Mi semana"
         description="Objetivos diarios y horas fichadas de tu jornada laboral."
         actions={
           <>

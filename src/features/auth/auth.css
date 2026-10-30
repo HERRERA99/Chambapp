@@ -1,6 +1,6 @@
 .auth-page {
   min-height: 100vh;
-  background: radial-gradient(ellipse at 18% 44%, rgb(255 46 86 / 4%), transparent 48%), var(--bg);
+  background: var(--bg);
 }
 
 .auth-header,
@@ -30,8 +30,8 @@
 }
 .auth-showcase h1 {
   margin: 0;
-  font: 600 clamp(30px, 3.2vw, 44px)/1.18 var(--font-heading);
-  letter-spacing: -0.05em;
+  font: 400 clamp(32px, 3.4vw, var(--text-heading-lg)) / 1.12 var(--font-heading);
+  letter-spacing: var(--tracking-heading-lg);
 }
 .auth-showcase h1 span {
   display: inline-block;
@@ -45,8 +45,7 @@
 }
 .auth-telemetry.panel {
   padding: 24px;
-  background: linear-gradient(130deg, var(--surface), var(--surface-low));
-  box-shadow: 0 15px 48px rgb(0 0 0 / 16%);
+  background: var(--surface);
 }
 .auth-telemetry .split-label > div {
   min-width: 0;
@@ -69,7 +68,7 @@
   margin: 28px 0 26px;
   font-size: clamp(34px, 4vw, 56px);
   line-height: 1;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.06em;
 }
 .auth-chrono > span {
@@ -86,7 +85,7 @@
   height: 65px;
   display: block;
   margin: 20px 0;
-  color: var(--accent);
+  color: var(--signal);
 }
 .auth-trust {
   display: flex;
@@ -97,13 +96,13 @@
 .auth-trust > svg {
   flex-shrink: 0;
   margin-top: 3px;
-  color: var(--accent-soft);
+  color: var(--dim);
 }
 .auth-trust p {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.8;
-  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
 }
 .auth-logos {
   display: flex;
@@ -112,52 +111,54 @@
   gap: 16px;
   margin-top: 28px;
   color: var(--dim);
-  font: 600 12px var(--font-heading);
+  font: 400 12px var(--font-heading);
 }
+/* The sign-in console is the Bone figure on the Obsidian ground. */
 .auth-console {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-cards);
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 24px 64px rgb(0 0 0 / 18%);
 }
 .auth-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-bottom: 1px solid var(--border);
-  background: var(--surface-low);
+  background: transparent;
 }
 .auth-tabs a {
   padding: 21px 12px;
   text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  border-bottom: 2px solid transparent;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  border-bottom: 1px solid transparent;
+  margin-bottom: -1px;
   transition:
     color 150ms,
     background 150ms;
 }
 .auth-tabs a:hover {
   color: var(--text);
-  background: var(--surface);
 }
 .auth-tabs a.active {
-  color: var(--accent-soft);
-  border-bottom-color: var(--accent);
-  background: rgb(255 46 86 / 5%);
+  color: var(--text);
+  border-bottom-color: var(--text);
 }
 .auth-console__body {
   padding: 34px;
 }
 .auth-console__body h2 {
   margin: 10px 0;
-  font: 600 27px/1.2 var(--font-heading);
-  letter-spacing: -0.04em;
+  font: 400 var(--text-heading) / 1.1 var(--font-heading);
+  letter-spacing: var(--tracking-heading);
 }
 .auth-console__body > .muted {
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: var(--text-md);
+  line-height: 1.5;
 }
 .auth-sso {
   display: grid;
@@ -187,7 +188,7 @@
 .auth-provider-icon--monogram {
   border: 1px solid currentColor;
   border-radius: 4px;
-  font: 600 9px var(--font-heading);
+  font: 400 9px var(--font-heading);
 }
 .auth-oauth-hint {
   display: block;
@@ -360,7 +361,7 @@
   background: #fff;
   color: #1f1f1f;
   border-color: #dadce0;
-  font-weight: 500;
+  font-weight: 400;
 }
 .auth-sso .auth-provider--google:hover:not(:disabled) {
   background: #f2f2f2;

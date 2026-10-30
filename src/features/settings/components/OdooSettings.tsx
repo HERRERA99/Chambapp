@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { InputField } from '../../../shared/ui/FormField';
-import { Panel } from '../../../shared/ui/Panel';
+import { Badge, Notice } from '../../../shared/ui/Panel';
 import { Button } from '../../../shared/ui/Button';
 import { configureOdoo } from '../odooCredentials';
 import { useAuth } from '../../auth/useAuth';
+import { SettingsSection } from './SettingRow';
 
 export function OdooApiKeyField({
   value,
@@ -30,7 +31,13 @@ export function OdooApiKeyField({
   );
 }
 
-export function OdooSettings({ disabled = false }: { disabled?: boolean }) {
+export function OdooSettings({
+  disabled = false,
+  hidden = false,
+}: {
+  disabled?: boolean;
+  hidden?: boolean;
+}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const queryKey = ['odoo-credentials', user?.id];
@@ -57,38 +64,63 @@ export function OdooSettings({ disabled = false }: { disabled?: boolean }) {
     }
   }
   return (
-    <section id="odoo">
-      <Panel title="Odoo" icon="settings">
-        <p className="muted">
-          {status.isPending
-            ? 'Consultando configuración…'
-            : status.isError
-              ? 'No se pudo consultar la configuración.'
-              : status.data
-                ? 'Tienes una API key configurada. Introduce otra para sustituirla.'
-                : 'Añade tu API key de Odoo.'}
-        </p>
+    <SettingsSection
+      id="odoo"
+      title="Odoo"
+      description="Credencial para conectar con Odoo. La marca «Imputado en Odoo» de cada parte es manual y no depende de esta clave."
+      hidden={hidden}
+      badge={
+        status.isPending ? (
+          <Badge>Consultando…</Badge>
+        ) : status.isError ? (
+          <Badge tone="warning">Estado desconocido</Badge>
+        ) : status.data ? (
+          <Badge tone="success">Clave configurada</Badge>
+        ) : (
+          <Badge>Sin clave</Badge>
+        )
+      }
+    >
+      <Notice title="Se guarda por separado">
+        Los botones de esta sección guardan o eliminan la clave al momento. No forman parte de
+        «Guardar cambios».
+      </Notice>
+      <div className="settings-section__form">
         <OdooApiKeyField value={key} onChange={setKey} disabled={busy} />
         <div className="actions">
-          <Button disabled={busy || !key.trim()} onClick={() => void save()}>
-            {saving ? 'Guardando…' : 'Guardar API key'}
+          <Button
+            variant="primary"
+            loading={saving}
+            disabled={busy || !key.trim()}
+            onClick={() => void save()}
+          >
+            {status.data ? 'Sustituir API key' : 'Guardar API key'}
           </Button>
           <Button variant="danger" disabled={busy || !status.data} onClick={() => void save(true)}>
             Eliminar API key
           </Button>
           {status.isError ? (
-            <Button disabled={busy} onClick={() => void status.refetch()}>
+            <Button icon="refresh" disabled={busy} onClick={() => void status.refetch()}>
               Reintentar
             </Button>
           ) : null}
         </div>
-        {error ? (
-          <p role="alert" className="warning">
-            {error}
-          </p>
+        {status.isError ? (
+          <p className="field__hint">No se pudo consultar si ya tienes una clave guardada.</p>
         ) : null}
-        {message ? <p role="status">{message}</p> : null}
-      </Panel>
-    </section>
+        {error ? (
+          <div role="alert">
+            <Notice title="No se pudo guardar la clave" tone="danger">
+              {error}
+            </Notice>
+          </div>
+        ) : null}
+        {message ? (
+          <div role="status">
+            <Notice title={message} tone="success" />
+          </div>
+        ) : null}
+      </div>
+    </SettingsSection>
   );
 }

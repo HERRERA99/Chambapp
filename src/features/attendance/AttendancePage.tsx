@@ -8,6 +8,7 @@ import { downloadCsv } from '../../lib/export';
 import { readableError } from '../../lib/supabase/errors';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, IconButton } from '../../shared/ui/Button';
+import { SegmentedControl } from '../../shared/ui/SegmentedControl';
 import { InputField } from '../../shared/ui/FormField';
 import { StatGrid } from '../../shared/ui/StatGrid';
 import { Badge, Notice, Panel } from '../../shared/ui/Panel';
@@ -97,7 +98,7 @@ export default function AttendancePage() {
       action: 'eliminar_fichaje',
       payload: { id: deleting.id, version: deleting.version },
     });
-    notify('Fichaje eliminado.');
+    notify('Fichaje eliminado.', 'success');
   }
 
   if (isLoading && !data)
@@ -117,8 +118,7 @@ export default function AttendancePage() {
   return (
     <div className="page-stack attendance-page">
       <PageHeader
-        eyebrow="Control de jornada"
-        title="Entradas, salidas y balance de horas"
+        title="Fichajes"
         description="Ficha ahora o registra las horas manualmente. Compara tu jornada con los partes imputados a tareas."
         actions={
           <Button icon="plus" variant="primary" disabled={blocked} onClick={() => setEditor('new')}>
@@ -149,22 +149,15 @@ export default function AttendancePage() {
         }
       >
         <div className="attendance-period-controls">
-          <div className="actions" role="group" aria-label="Periodo del balance">
-            <Button
-              variant={period === 'day' ? 'primary' : 'secondary'}
-              aria-pressed={period === 'day'}
-              onClick={() => setPeriod('day')}
-            >
-              Día
-            </Button>
-            <Button
-              variant={period === 'week' ? 'primary' : 'secondary'}
-              aria-pressed={period === 'week'}
-              onClick={() => setPeriod('week')}
-            >
-              Semana
-            </Button>
-          </div>
+          <SegmentedControl
+            label="Periodo del balance"
+            options={[
+              { value: 'day', label: 'Día' },
+              { value: 'week', label: 'Semana' },
+            ]}
+            value={period}
+            onChange={setPeriod}
+          />
           <InputField
             type="date"
             label="Fecha del balance"

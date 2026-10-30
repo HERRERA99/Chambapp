@@ -21,7 +21,7 @@ function LiveTimer({ compact }: { compact: boolean }) {
     try {
       await work();
     } catch (cause) {
-      notify(readableError(cause));
+      notify(readableError(cause), 'error');
     }
   }
   if (!tracker.active && !tracker.pausedTaskId && !tracker.pending)

@@ -153,8 +153,8 @@ export default function FakeDataPage() {
   return (
     <div className="page-stack fake-data-page">
       <PageHeader
-        eyebrow="Herramientas / Datos ficticios"
-        title="Datos de prueba, en un clic."
+        eyebrow="Herramientas"
+        title="Datos ficticios"
         description="Perfiles completos, documentos e identificadores para tus formularios, prototipos y pruebas."
         actions={
           <Badge>

@@ -45,7 +45,8 @@
   cursor: grab;
 }
 .task-board__card--active {
-  border-color: var(--accent);
+  border-color: var(--signal-line);
+  box-shadow: inset 2px 0 var(--signal);
 }
 .task-board__card p {
   margin: 0;
@@ -57,12 +58,13 @@
   padding: 0;
   text-align: left;
   font: inherit;
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 .task-board__title:hover {
-  color: var(--accent-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .task-board__description {
   display: -webkit-box;
@@ -74,7 +76,7 @@
   flex-wrap: wrap;
 }
 .task-board__controls .button {
-  font-size: 10px;
+  font-size: var(--text-xs);
   padding: 8px;
 }
 .task-board__empty {

@@ -96,7 +96,7 @@ export function useEntryEditor({
         imputado_en_odoo: imputedInOdoo,
         ...(targetZone && acceptZone ? { confirmar_zona: targetZone } : {}),
       });
-      notify(entry ? 'Parte actualizado.' : 'Parte de horas creado.');
+      notify(entry ? 'Parte actualizado.' : 'Parte de horas creado.', 'success');
       onClose();
     } catch (cause) {
       const raw =

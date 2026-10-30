@@ -1,25 +1,186 @@
+/*
+ * Chambapp design tokens — "Factory" system (see DESIGN.md).
+ *
+ * Stark black control surface, weight-400 Geist pressed tight, and two functional
+ * accents that only ever carry data: Signal Orange (live / attention) and Metric Green
+ * (positive metric / done). Everything else is monochrome. Depth comes from contrast
+ * and spacing, never from shadows or blur.
+ *
+ * Contrast (WCAG 2.2) on --bg #101010:
+ *   --text 16.4:1 · --muted 9.2:1 · --dim 5.1:1 · --signal 5.7:1 · --metric 10.3:1
+ *   --border-control 3.3:1 (non-text UI ≥ 3:1).
+ * Inside .surface-bone (#eeeeee): --text 16.4:1 · --muted 7.7:1 · --dim 5.9:1.
+ */
 :root {
   color-scheme: dark;
-  --bg: #131316;
-  --surface: #1b1b1e;
-  --surface-raised: #252529;
-  --surface-low: #0e0e11;
-  --text: #e4e1e6;
-  --muted: #aaa3aa;
-  --dim: #8b858e;
-  --border: #353038;
-  --border-subtle: #28252c;
-  --accent: #ff2e56;
-  --accent-soft: #ffb3b6;
-  --accent-deep: #cc003c;
-  --success: #88cbb2;
-  --danger: #ef6464;
-  --warning: #ecb67c;
-  --font-heading: 'Space Grotesk', sans-serif;
-  --font-body: 'Geist', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius: 6px;
-  --sidebar-width: 244px;
-  --header-height: 68px;
-  --content-width: 1600px;
+
+  /* Palette (DESIGN.md names). */
+  --color-obsidian-canvas: #101010;
+  --color-carbon-lift: #1d1a18;
+  --color-ash-stroke: #3d3a39;
+  --color-graphite-mid: #4d4947;
+  --color-warm-granite: #8a8380;
+  --color-pale-stone: #b8b3b0;
+  --color-bone: #eeeeee;
+  --color-chalk: #fafafa;
+  --color-signal-orange: #ee6018;
+  --color-metric-green: #a0ca92;
+
+  /* Semantic surfaces. */
+  --bg: var(--color-obsidian-canvas);
+  --surface: var(--color-obsidian-canvas);
+  --surface-low: #0c0c0c;
+  --surface-raised: var(--color-carbon-lift);
+  --surface-hover: #25211f;
+
+  /* Text. */
+  --text: var(--color-bone);
+  --text-strong: var(--color-chalk);
+  --muted: var(--color-pale-stone);
+  --dim: var(--color-warm-granite);
+
+  /* Lines. */
+  --border: #2a2725;
+  --border-subtle: var(--color-carbon-lift);
+  --border-strong: var(--color-ash-stroke);
+  --border-control: #6b6562;
+  --border-control-hover: var(--color-warm-granite);
+
+  /* Functional accents: data voice only — never chrome, never a button fill. */
+  --signal: var(--color-signal-orange);
+  --signal-text: #f07a3c;
+  --signal-tint: #ee601814;
+  --signal-line: #ee601847;
+  --metric: var(--color-metric-green);
+  --metric-tint: #a0ca9212;
+  --metric-line: #a0ca9240;
+
+  /* Legacy aliases kept so every feature stylesheet resolves to the new system. */
+  --accent: var(--signal);
+  --accent-strong: var(--color-chalk);
+  --accent-strong-hover: #ffffff;
+  --accent-soft: var(--text);
+  --accent-tint: var(--surface-raised);
+  --accent-deep: var(--signal);
+  --success: var(--metric);
+  --success-tint: var(--metric-tint);
+  --danger: var(--signal);
+  --danger-text: var(--signal-text);
+  --danger-tint: var(--signal-tint);
+  --warning: var(--signal-text);
+  --warning-tint: var(--signal-tint);
+  --focus: var(--color-bone);
+
+  /* Buttons. Primary = Chalk (one high-emphasis action), secondary = Carbon Lift. */
+  --button-primary-bg: var(--color-chalk);
+  --button-primary-bg-hover: #ffffff;
+  --button-primary-fg: var(--color-obsidian-canvas);
+  --button-secondary-bg: var(--color-carbon-lift);
+  --button-secondary-bg-hover: var(--surface-hover);
+  --button-secondary-fg: var(--text);
+
+  /* Data visualisation. */
+  --chart-primary: var(--color-bone);
+  --chart-secondary: var(--color-graphite-mid);
+  --chart-track: var(--color-carbon-lift);
+
+  /* Typography. Geist and Geist Mono only; 400 everywhere, 500 for rare emphasis. */
+  --font-geist:
+    'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-geist-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-heading: var(--font-geist);
+  --font-body: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-caption: 12px;
+  --text-body-sm: 14px;
+  --text-body: 16px;
+  --text-heading: 36px;
+  --text-heading-lg: 44px;
+  --text-display: 72px;
+  --tracking-caption: -0.24px;
+  --tracking-tight: -0.02em;
+  --tracking-heading: -1.12px;
+  --tracking-heading-lg: -1.1px;
+  --tracking-display: -2.88px;
+
+  /* Shape: the system is not soft. */
+  --radius-sm: 3px;
+  --radius: 10px;
+  --radius-lg: 10px;
+  --radius-2xl: 20px;
+  --radius-buttons: 3px;
+  --radius-cards: 10px;
+
+  /* Space: 8px base. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  /* Layout. */
+  --sidebar-width: 240px;
+  --sidebar-rail: 64px;
+  --header-height: 56px;
+  --content-width: 1280px;
+
+  /* Motion: short and mechanical. */
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration: 150ms;
+}
+
+/*
+ * The signature figure/ground move: a Bone card landing on the Obsidian canvas.
+ * Reserve it for the single most important object on a screen. Tokens are redefined
+ * here so every nested control (buttons, badges, inputs, progress) inverts by itself.
+ */
+.surface-bone {
+  --surface: var(--color-bone);
+  --surface-low: var(--color-chalk);
+  --surface-raised: #e2dfdd;
+  --surface-hover: #d8d4d2;
+  --text: var(--color-obsidian-canvas);
+  --text-strong: #060505;
+  --muted: var(--color-graphite-mid);
+  --dim: #5f5a57;
+  --border: #d6d2d0;
+  --border-subtle: #dedad8;
+  --border-strong: #c9c4c1;
+  --border-control: #8a8380;
+  --border-control-hover: #4d4947;
+  --signal-text: #b5430c;
+  --signal-tint: #ee60181a;
+  --metric: #3f6b33;
+  --metric-tint: #a0ca9233;
+  --metric-line: #3f6b3340;
+  --success: var(--metric);
+  --success-tint: var(--metric-tint);
+  --danger-text: var(--signal-text);
+  --warning: var(--signal-text);
+  --focus: var(--color-obsidian-canvas);
+  --button-primary-bg: var(--color-obsidian-canvas);
+  --button-primary-bg-hover: #000000;
+  --button-primary-fg: var(--color-bone);
+  --button-secondary-bg: #e2dfdd;
+  --button-secondary-bg-hover: #d8d4d2;
+  --button-secondary-fg: var(--color-obsidian-canvas);
+  --chart-primary: var(--color-obsidian-canvas);
+  --chart-secondary: #b8b3b0;
+  --chart-track: #dedad8;
+  color: var(--text);
+  background: var(--surface);
+  border-color: transparent;
+  color-scheme: light;
 }
