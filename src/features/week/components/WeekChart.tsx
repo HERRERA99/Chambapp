@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react';
 import { formatDuration } from '../../../domain/time';
+import { BarChart } from '../../../shared/ui/BarChart';
+import type { BarSeries } from '../../../shared/ui/BarChart';
 import { weekDays } from '../data/week.fixtures';
 
 export type WeekChartDay = {
@@ -22,18 +25,20 @@ export function WeekChart({
   days = emptyDays,
   preview = false,
   hoursLabel = 'imputadas',
+  legendAside,
 }: {
   days?: readonly WeekChartDay[];
   preview?: boolean;
   hoursLabel?: 'imputadas' | 'fichadas';
+  legendAside?: ReactNode;
 }) {
   const values = preview ? previewDays : days;
   if (!values.length)
     return <p className="muted empty-state">Todavía no hay jornadas para comparar.</p>;
-  const maximum = Math.max(
-    3600,
-    ...values.map((day) => Math.max(day.targetSeconds, day.loggedSeconds)),
-  );
+  const series: readonly BarSeries[] = [
+    { key: 'target', label: 'Objetivo', tone: 'neutral' },
+    { key: 'logged', label: hoursLabel === 'fichadas' ? 'Fichado' : 'Imputado', tone: 'accent' },
+  ];
   const description = values
     .map(
       (day) =>
@@ -41,37 +46,27 @@ export function WeekChart({
     )
     .join('; ');
   return (
-    <div
-      className="week-chart"
-      style={{ gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` }}
-      role="img"
-      aria-label={description}
-    >
-      {values.map((day) => (
-        <div
-          className={`week-chart__day ${day.isToday ? 'week-chart__day--active' : ''}`}
-          key={day.date}
-        >
-          {day.isToday ? <span className="week-chart__today">Hoy</span> : null}
-          <div className="week-chart__bars">
-            <span
-              className="week-chart__target"
-              style={{ height: `${(day.targetSeconds / maximum) * 100}%` }}
-            />
-            <span
-              className="week-chart__logged"
-              style={{ height: `${(day.loggedSeconds / maximum) * 100}%` }}
-            />
-          </div>
-          <strong className="mono">{day.label}</strong>
-          <span className="week-chart__balance">
-            {day.targetSeconds > 0
-              ? `${day.loggedSeconds >= day.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(day.loggedSeconds - day.targetSeconds))}`
-              : 'Sin objetivo'}
-          </span>
-          <span className="mono muted">{formatDuration(day.loggedSeconds)}</span>
-        </div>
-      ))}
-    </div>
+    <BarChart
+      series={series}
+      ariaLabel={description}
+      legendAside={legendAside}
+      columns={values.map((day) => ({
+        key: day.date,
+        label: day.label,
+        values: { target: day.targetSeconds, logged: day.loggedSeconds },
+        active: day.isToday,
+        badge: day.isToday ? 'Hoy' : undefined,
+        footer: (
+          <>
+            <span className="week-chart__balance">
+              {day.targetSeconds > 0
+                ? `${day.loggedSeconds >= day.targetSeconds ? '+' : '−'}${formatDuration(Math.abs(day.loggedSeconds - day.targetSeconds))}`
+                : 'Sin objetivo'}
+            </span>
+            <span className="week-chart__logged-total">{formatDuration(day.loggedSeconds)}</span>
+          </>
+        ),
+      }))}
+    />
   );
 }

@@ -215,20 +215,7 @@ export default function AttendancePage() {
             },
           ]}
         />
-        <div className="attendance-chart-legend">
-          <span>
-            <i className="attendance-chart-legend__worked" /> Fichado
-          </span>
-          <span>
-            <i className="attendance-chart-legend__imputed" /> Imputado
-          </span>
-          {total.provisionalSeconds ? (
-            <span>
-              <i className="attendance-chart-legend__provisional" /> Fichaje en curso
-            </span>
-          ) : null}
-        </div>
-        <AttendanceChart days={days} />
+        <AttendanceChart days={days} today={today} />
         <DataTable
           caption="Balance de horas por fecha"
           headers={['Fecha', 'Fichado', 'En curso', 'Imputado', '% imputado']}

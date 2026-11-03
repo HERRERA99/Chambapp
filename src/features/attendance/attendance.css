@@ -52,104 +52,6 @@
 .attendance-comparison .stat__value {
   font-size: clamp(12px, 12cqi, 29px);
 }
-.attendance-chart {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  border-bottom: 1px solid var(--border);
-  padding: 12px;
-  margin: 12px 0 20px;
-  overflow-x: auto;
-}
-.attendance-chart__day {
-  flex: 1 0 100px;
-  max-width: 170px;
-  text-align: center;
-  font-size: 11px;
-}
-.attendance-chart__values {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-  font-size: 10px;
-  white-space: nowrap;
-}
-.attendance-chart__value--worked {
-  color: var(--success);
-}
-.attendance-chart__value--imputed {
-  color: var(--accent);
-}
-.attendance-chart__bars {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  height: 160px;
-  margin-bottom: 10px;
-}
-.attendance-chart__column {
-  display: flex;
-  flex-direction: column-reverse;
-  width: 32px;
-  height: 100%;
-  position: relative;
-}
-.attendance-chart__bar {
-  width: 100%;
-  min-height: 0;
-  border-radius: 3px 3px 0 0;
-  flex-shrink: 0;
-}
-.attendance-chart__bar--worked {
-  background: var(--success);
-}
-.attendance-chart__bar--imputed {
-  background: var(--accent);
-}
-.attendance-chart__bar--provisional {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--success) 0,
-    var(--success) 3px,
-    var(--surface-raised) 3px,
-    var(--surface-raised) 6px
-  );
-  border-radius: 3px 3px 0 0;
-}
-.attendance-chart-legend {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  color: var(--muted);
-  font-size: 11px;
-  margin-top: 20px;
-}
-.attendance-chart-legend span {
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-}
-.attendance-chart-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-.attendance-chart-legend__worked {
-  background: var(--success);
-}
-.attendance-chart-legend__imputed {
-  background: var(--accent);
-}
-.attendance-chart-legend__provisional {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--success) 0,
-    var(--success) 2px,
-    var(--surface-raised) 2px,
-    var(--surface-raised) 4px
-  );
-}
 .attendance-comparison__hint {
   margin-top: 18px;
   display: block;
@@ -168,14 +70,6 @@
   }
 }
 @media (max-width: 650px) {
-  .attendance-chart {
-    padding-left: 0;
-    padding-right: 0;
-    gap: 5px;
-  }
-  .attendance-chart__day {
-    flex-basis: 100px;
-  }
   .attendance-navigation {
     gap: 5px;
   }
@@ -183,9 +77,13 @@
     display: none;
   }
 }
-@media print {
-  .attendance-chart__bar,
-  .attendance-chart-legend i {
-    print-color-adjust: exact;
-  }
+.attendance-chart__value--worked {
+  color: #c3b2c8;
+}
+.attendance-chart__value--imputed {
+  color: #ff82b1;
+}
+.attendance-comparison .bar-chart,
+.attendance-page .bar-chart {
+  margin-top: 20px;
 }

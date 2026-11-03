@@ -153,7 +153,7 @@
     white-space: normal;
     padding: 8px;
   }
-  .week-page .week-chart {
+  .week-page .bar-chart {
     print-color-adjust: exact;
   }
 }
