@@ -21,6 +21,17 @@ import { entryTotals } from './entryTotals';
 type StatusFilter = 'all' | 'live' | 'finished';
 type OdooFilter = 'all' | 'pending' | 'imputed';
 
+const PAGE_SIZE = 5;
+const FILTERS_HIDDEN_KEY = 'chambapp:entries-filters-hidden';
+
+function readFiltersHidden() {
+  try {
+    return localStorage.getItem(FILTERS_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function EntriesPage() {
   const { data, isLoading, error, reload } = useWorkspace();
   const { run, pending } = useCommand();
@@ -37,6 +48,7 @@ export default function EntriesPage() {
   const [deleting, setDeleting] = useState<TimeEntry | null>(null);
   const [actionError, setActionError] = useState('');
   const [pageIndex, setPageIndex] = useState(1);
+  const [filtersHidden, setFiltersHidden] = useState(readFiltersHidden);
   const projects = data?.projects.filter((item) => !item.eliminado_en) ?? [];
   const tasks = data?.tasks.filter((item) => !item.eliminado_en) ?? [];
   const entries = data?.entries.filter((item) => !item.eliminado_en) ?? [];
@@ -56,9 +68,36 @@ export default function EntriesPage() {
     )
     .sort((a, b) => b.inicio_en.localeCompare(a.inicio_en));
   const totals = entryTotals(visible);
-  const pages = Math.max(1, Math.ceil(visible.length / 25));
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const page = Math.min(pageIndex, pages);
-  const pageEntries = visible.slice((page - 1) * 25, page * 25);
+  const pageEntries = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const activeFilters = [
+    query !== '',
+    project !== 'all',
+    status !== 'all',
+    odooStatus !== 'all',
+    from !== '',
+    to !== '',
+  ].filter(Boolean).length;
+
+  function toggleFilters() {
+    const next = !filtersHidden;
+    setFiltersHidden(next);
+    try {
+      localStorage.setItem(FILTERS_HIDDEN_KEY, next ? '1' : '0');
+    } catch {
+      /* The preference just is not remembered. */
+    }
+  }
+  function clearFilters() {
+    setQuery('');
+    setProject('all');
+    setStatus('all');
+    setOdooStatus('all');
+    setFrom('');
+    setTo('');
+    setPageIndex(1);
+  }
   const liveCount = visible.filter((entry) => !entry.fin_en).length;
   const busy = pending || tracker.busy || tracker.pending;
   const canCreate = tasks.some(
@@ -203,7 +242,24 @@ export default function EntriesPage() {
           },
         ]}
       />
-      <Panel className="filters-panel">
+      <div className="filters-bar">
+        <Button
+          icon="search"
+          variant="ghost"
+          aria-expanded={!filtersHidden}
+          aria-controls="entries-filters"
+          onClick={toggleFilters}
+        >
+          {filtersHidden ? 'Mostrar filtros' : 'Ocultar filtros'}
+          {activeFilters ? <span className="filters-bar__count">{activeFilters}</span> : null}
+        </Button>
+        {activeFilters ? (
+          <Button variant="ghost" icon="close" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        ) : null}
+      </div>
+      <Panel className="filters-panel" id="entries-filters" hidden={filtersHidden}>
         <div className="form-grid">
           <InputField
             label="Buscar en partes"
@@ -305,25 +361,14 @@ export default function EntriesPage() {
                 : 'Todavía no has registrado horas'}
             </h3>
             <p className="muted">Inicia una tarea o añade un intervalo de trabajo manual.</p>
-            {entries.length ? (
-              <Button
-                onClick={() => {
-                  setQuery('');
-                  setProject('all');
-                  setStatus('all');
-                  setOdooStatus('all');
-                  setFrom('');
-                  setTo('');
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            ) : null}
+            {entries.length ? <Button onClick={clearFilters}>Limpiar filtros</Button> : null}
           </div>
         ) : null}
         <div className="table-footer">
           <span className="mono dim">
-            {visible.length ? `${(page - 1) * 25 + 1}–${Math.min(page * 25, visible.length)}` : '0'}{' '}
+            {visible.length
+              ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, visible.length)}`
+              : '0'}{' '}
             de {visible.length} partes filtrados · {entries.length} en total
           </span>
           <div className="actions">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { Button } from '../../shared/ui/Button';
 import { SelectField } from '../../shared/ui/FormField';
@@ -150,6 +150,27 @@ export default function FakeDataPage() {
     }
   }
 
+  // «G» regenerates (outside text fields), so new data is one key away.
+  useEffect(() => {
+    if (development) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'g' || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], dialog[open]'))
+        return;
+      event.preventDefault();
+      document.getElementById('fake-data-generate')?.click();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [development]);
+
+  const typeOptions =
+    showTextCase ||
+    batch.category === 'documents' ||
+    batch.category === 'europeanTaxIds' ||
+    batch.category === 'isin';
+
   return (
     <div className="page-stack fake-data-page">
       <PageHeader
@@ -180,16 +201,12 @@ export default function FakeDataPage() {
             </button>
           ))}
           <button type="button" aria-pressed={development} onClick={() => setDevelopment(true)}>
-            <Icon name="file" size={16} />
+            <Icon name="code" size={16} />
             <span>Desarrollo</span>
           </button>
         </div>
         {!development && group.categories.length > 1 ? (
-          <div
-            className={`fake-data-categories ${group.categories.length === 2 ? 'fake-data-categories--two' : ''}`}
-            role="group"
-            aria-label="Tipo de datos ficticios"
-          >
+          <div className="fake-data-categories" role="group" aria-label="Tipo de datos ficticios">
             {FAKE_DATA_CATEGORIES.filter((category) => group.categories.includes(category.id)).map(
               (category) => (
                 <button
@@ -197,18 +214,15 @@ export default function FakeDataPage() {
                   type="button"
                   className="fake-data-category"
                   aria-pressed={batch.category === category.id}
-                  onClick={() => generate(category.id)}
+                  title={category.description}
+                  onClick={() => {
+                    generate(category.id);
+                  }}
                 >
-                  <span className="fake-data-category__top">
-                    <span className="fake-data-category__icon">
-                      <Icon name={categoryIcons[category.id]} size={22} />
-                    </span>
-                    <span className="fake-data-category__selected" aria-hidden="true">
-                      <Icon name="check" size={13} />
-                    </span>
+                  <span className="fake-data-category__icon">
+                    <Icon name={categoryIcons[category.id]} size={18} />
                   </span>
                   <strong>{category.label}</strong>
-                  <span>{category.description}</span>
                 </button>
               ),
             )}
@@ -220,48 +234,20 @@ export default function FakeDataPage() {
         <DeveloperGenerators />
       ) : (
         <>
-          <section className="panel fake-data-controls" aria-label="Opciones de generación">
-            <div className="fake-data-controls__intro">
-              <span className="fake-data-controls__icon">
-                <Icon name="dice" size={23} />
+          <section className="fake-data-bar" aria-label="Generar y copiar datos">
+            <div className="fake-data-bar__title">
+              <h2 id="fake-data-results-title">
+                {batch.category === 'personal' ? 'Usuarios' : selected.label}
+              </h2>
+              <span className="fake-data-count mono">
+                {isPropertyTool ? quantity * 2 : quantity}
               </span>
-              <div>
-                <p className="eyebrow">Un dato o un lote completo</p>
-                <h2>Prepara tus ejemplos</h2>
-                <p>Elige cuántas fichas necesitas y genera nuevas combinaciones.</p>
-              </div>
             </div>
-            <div className="fake-data-controls__actions">
-              <SelectField
-                label={isPropertyTool ? 'Cantidad por tipo' : 'Cantidad de fichas'}
-                value={quantity}
-                onChange={(event) => generate(batch.category, Number(event.target.value))}
-              >
-                {[1, 5, 10, 20].map((count) => (
-                  <option key={count} value={count}>
-                    {count}{' '}
-                    {isPropertyTool
-                      ? count === 1
-                        ? 'código'
-                        : 'códigos'
-                      : count === 1
-                        ? 'ficha'
-                        : 'fichas'}
-                  </option>
-                ))}
-              </SelectField>
-              <Button variant="primary" icon="refresh" onClick={() => generate()}>
-                {isPropertyTool ? 'Generar ambos tipos' : 'Generar de nuevo'}
-              </Button>
-            </div>
-            {showTextCase ||
-            batch.category === 'documents' ||
-            batch.category === 'europeanTaxIds' ||
-            batch.category === 'isin' ? (
-              <div className="fake-data-options">
+            {typeOptions ? (
+              <div className="fake-data-bar__options">
                 {hasEmail ? (
                   <SelectField
-                    label="Dominio del correo"
+                    label="Correo"
                     value={emailDomain}
                     onChange={(event) => {
                       const value = event.target.value as NonNullable<
@@ -271,13 +257,13 @@ export default function FakeDataPage() {
                       generate(batch.category, quantity, { emailDomain: value });
                     }}
                   >
-                    <option value="yopmail.com">Yopmail · yopmail.com</option>
-                    <option value="example.com">Ejemplo · example.com</option>
+                    <option value="yopmail.com">yopmail.com</option>
+                    <option value="example.com">example.com</option>
                   </SelectField>
                 ) : null}
                 {batch.category === 'documents' ? (
                   <SelectField
-                    label="Tipo de documento"
+                    label="Documento"
                     value={documentType}
                     onChange={(event) => {
                       const value = event.target.value as DocumentType;
@@ -294,14 +280,14 @@ export default function FakeDataPage() {
                 ) : null}
                 {batch.category === 'europeanTaxIds' || batch.category === 'isin' ? (
                   <SelectField
-                    label={batch.category === 'isin' ? 'País del ISIN' : 'País del identificador'}
-                    hint={
+                    label="País"
+                    value={taxCountry}
+                    title={
                       batch.category === 'isin'
                         ? 'Prefijo de país del identificador de prueba.'
                         : EUROPEAN_TAX_COUNTRIES.find((country) => country.value === taxCountry)
                             ?.description
                     }
-                    value={taxCountry}
                     onChange={(event) => {
                       const value = event.target.value as TaxCountry;
                       setTaxCountry(value);
@@ -316,22 +302,69 @@ export default function FakeDataPage() {
                   </SelectField>
                 ) : null}
                 {showTextCase ? (
-                  <div className="fake-data-case">
-                    <span className="eyebrow">Formato del texto</span>
+                  <div
+                    className="fake-data-case"
+                    title="Se aplica a nombres y direcciones; los códigos conservan su formato."
+                  >
                     <SegmentedControl
                       label="Formato del texto generado"
                       options={textCases}
                       value={textCase}
                       onChange={setTextCase}
                     />
-                    <p className="field__hint">
-                      Se aplica a nombres y direcciones; los códigos y las claves conservan su
-                      formato.
-                    </p>
                   </div>
                 ) : null}
               </div>
             ) : null}
+            <div className="fake-data-bar__actions">
+              <SelectField
+                className="fake-data-quantity"
+                label={isPropertyTool ? 'Por tipo' : 'Cantidad'}
+                value={quantity}
+                onChange={(event) => generate(batch.category, Number(event.target.value))}
+              >
+                {[1, 5, 10, 20].map((count) => (
+                  <option key={count} value={count}>
+                    ×{count}
+                  </option>
+                ))}
+              </SelectField>
+              {isPropertyTool ? null : (
+                <>
+                  <Button
+                    icon="copy"
+                    onClick={() => void copy(fakeDataToText(records), 'Todas las fichas copiadas.')}
+                  >
+                    Copiar todo
+                  </Button>
+                  <div className="fake-data-downloads" role="group" aria-label="Descargar fichas">
+                    <Button
+                      icon="download"
+                      aria-label="Descargar fichas en JSON"
+                      onClick={() => downloadData(fakeDataToJson(records), 'json', batch.category)}
+                    >
+                      JSON
+                    </Button>
+                    <Button
+                      icon="download"
+                      aria-label="Descargar fichas en CSV"
+                      onClick={() => downloadData(fakeDataToCsv(records), 'csv', batch.category)}
+                    >
+                      CSV
+                    </Button>
+                  </div>
+                </>
+              )}
+              <Button
+                id="fake-data-generate"
+                variant="primary"
+                icon="refresh"
+                title="Atajo: tecla G"
+                onClick={() => generate()}
+              >
+                {isPropertyTool ? 'Generar ambos tipos' : 'Generar de nuevo'}
+              </Button>
+            </div>
           </section>
 
           {batch.category === 'lei' || batch.category === 'isin' ? (
@@ -358,42 +391,6 @@ export default function FakeDataPage() {
             />
           ) : (
             <section className="fake-data-results" aria-labelledby="fake-data-results-title">
-              <div className="fake-data-results__toolbar">
-                <div>
-                  <p className="eyebrow">Listos para copiar</p>
-                  <h2 id="fake-data-results-title">
-                    {batch.category === 'personal' ? 'Usuarios' : selected.label}
-                    <span className="fake-data-count mono">
-                      {String(quantity).padStart(2, '0')}
-                    </span>
-                  </h2>
-                </div>
-                <div className="fake-data-results__exports">
-                  <Button
-                    icon="copy"
-                    onClick={() => void copy(fakeDataToText(records), 'Todas las fichas copiadas.')}
-                  >
-                    Copiar todo
-                  </Button>
-                  <div className="fake-data-downloads" role="group" aria-label="Descargar fichas">
-                    <Button
-                      icon="download"
-                      aria-label="Descargar fichas en JSON"
-                      onClick={() => downloadData(fakeDataToJson(records), 'json', batch.category)}
-                    >
-                      JSON
-                    </Button>
-                    <Button
-                      icon="download"
-                      aria-label="Descargar fichas en CSV"
-                      onClick={() => downloadData(fakeDataToCsv(records), 'csv', batch.category)}
-                    >
-                      CSV
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <div className="fake-data-records">
                 {records.map((record, index) =>
                   batch.category === 'personal' ? (

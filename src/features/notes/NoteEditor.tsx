@@ -10,7 +10,12 @@ import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { readableError } from '../../lib/supabase/errors';
 import { MarkdownPreview } from './MarkdownPreview';
 import { NoteAssociations } from './NoteAssociations';
-import { MAX_NOTE_BYTES, MAX_NOTE_TITLE_LENGTH, noteFileName } from './notes.model';
+import {
+  MAX_NOTE_BYTES,
+  MAX_NOTE_TITLE_LENGTH,
+  noteFileName,
+  syncScrollTarget,
+} from './notes.model';
 import type { NoteSession } from './notesDraft';
 
 function sameLinks(a: string[], b: string[]) {
@@ -28,6 +33,8 @@ export function NoteEditor({
   locked,
   onSaved,
   onDeleted,
+  fullscreen,
+  onFullscreen,
 }: {
   session: NoteSession;
   latest: Note | undefined;
@@ -39,6 +46,9 @@ export function NoteEditor({
   locked: boolean;
   onSaved: (note: Note) => void;
   onDeleted: () => void;
+  /** Section fullscreen: the editor fills the content area (menu and top bar stay visible). */
+  fullscreen: boolean;
+  onFullscreen: (value: boolean) => void;
 }) {
   const [baseline, setBaseline] = useState(session.baseline);
   const [draft, setDraft] = useState(session.draft);
@@ -50,6 +60,10 @@ export function NoteEditor({
   const pending = saving || locked;
   const notify = useFeedback();
   const form = useRef<HTMLFormElement>(null);
+  const source = useRef<HTMLTextAreaElement>(null);
+  const previewPane = useRef<HTMLElement>(null);
+  // Programmatic scrolls echo a scroll event; ignore it on the pane we just moved.
+  const ignoreUntil = useRef({ source: 0, preview: 0 });
   const preview = useDeferredValue(draft.contenido_md);
   const dirty =
     baseline.version === 0 ||
@@ -83,6 +97,34 @@ export function NoteEditor({
       /* Editing and server saves remain available when browser storage is full. */
     }
   }, [baseline, draft, dirty, draftKey]);
+
+  function mirror(from: 'source' | 'preview') {
+    const origin = from === 'source' ? source.current : previewPane.current;
+    const target = from === 'source' ? previewPane.current : source.current;
+    if (mode !== 'split' || !origin || !target) return;
+    if (performance.now() < ignoreUntil.current[from]) return;
+    const top = syncScrollTarget(origin, target);
+    if (Math.abs(target.scrollTop - top) < 1) return;
+    ignoreUntil.current[from === 'source' ? 'preview' : 'source'] = performance.now() + 80;
+    target.scrollTop = top;
+  }
+  // Keep the preview aligned while typing (its height changes after rendering).
+  useEffect(() => {
+    const origin = source.current;
+    const target = previewPane.current;
+    if (mode !== 'split' || !origin || !target) return;
+    ignoreUntil.current.preview = performance.now() + 80;
+    target.scrollTop = syncScrollTarget(origin, target);
+  }, [preview, mode]);
+  useEffect(() => {
+    if (!fullscreen) return;
+    function exit(event: KeyboardEvent) {
+      // An open dialog handles Escape itself.
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) onFullscreen(false);
+    }
+    document.addEventListener('keydown', exit);
+    return () => document.removeEventListener('keydown', exit);
+  }, [fullscreen, onFullscreen]);
 
   async function save() {
     if (pending || locked || !dirty || conflict || !form.current?.reportValidity()) return;
@@ -125,7 +167,7 @@ export function NoteEditor({
   return (
     <form
       ref={form}
-      className="note-editor"
+      className={`note-editor ${fullscreen ? 'note-editor--fullscreen' : ''}`}
       onSubmit={(event) => {
         event.preventDefault();
         void save();
@@ -200,16 +242,27 @@ export function NoteEditor({
       />
       <div className="note-editor__toolbar">
         <span className="eyebrow">Contenido Markdown</span>
-        <SegmentedControl
-          label="Vista de la nota"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: 'edit', label: 'Editar' },
-            { value: 'split', label: 'Dividida' },
-            { value: 'preview', label: 'Vista previa' },
-          ]}
-        />
+        <div className="actions">
+          <SegmentedControl
+            label="Vista de la nota"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'edit', label: 'Editar' },
+              { value: 'split', label: 'Dividida' },
+              { value: 'preview', label: 'Vista previa' },
+            ]}
+          />
+          <Button
+            icon={fullscreen ? 'minimize' : 'maximize'}
+            variant="ghost"
+            aria-pressed={fullscreen}
+            title={fullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            onClick={() => onFullscreen(!fullscreen)}
+          >
+            {fullscreen ? 'Salir' : 'Pantalla completa'}
+          </Button>
+        </div>
       </div>
       <div className={`note-editor__panes note-editor__panes--${mode}`}>
         {mode !== 'preview' ? (
@@ -218,6 +271,8 @@ export function NoteEditor({
               Contenido de la nota en Markdown
             </label>
             <textarea
+              ref={source}
+              onScroll={() => mirror('source')}
               id="note-markdown"
               value={draft.contenido_md}
               disabled={pending}
@@ -230,7 +285,12 @@ export function NoteEditor({
           </div>
         ) : null}
         {mode !== 'edit' ? (
-          <section className="note-editor__preview" aria-label="Vista previa Markdown">
+          <section
+            ref={previewPane}
+            onScroll={() => mirror('preview')}
+            className="note-editor__preview"
+            aria-label="Vista previa Markdown"
+          >
             <MarkdownPreview content={preview} />
           </section>
         ) : null}
@@ -239,14 +299,16 @@ export function NoteEditor({
         <span># Títulos · **negrita** · - listas · - [ ] tareas · ``` código</span>
         <span>{bytes.toLocaleString('es')} / 1.000.000 bytes · Ctrl / ⌘ + S</span>
       </div>
-      <NoteAssociations
-        projects={projects}
-        tasks={tasks}
-        projectIds={draft.proyecto_ids}
-        taskIds={draft.tarea_ids}
-        disabled={pending}
-        onChange={(proyecto_ids, tarea_ids) => setDraft({ ...draft, proyecto_ids, tarea_ids })}
-      />
+      {fullscreen ? null : (
+        <NoteAssociations
+          projects={projects}
+          tasks={tasks}
+          projectIds={draft.proyecto_ids}
+          taskIds={draft.tarea_ids}
+          disabled={pending}
+          onChange={(proyecto_ids, tarea_ids) => setDraft({ ...draft, proyecto_ids, tarea_ids })}
+        />
+      )}
       <ConfirmDialog
         open={deleting}
         onClose={() => setDeleting(false)}

@@ -48,3 +48,12 @@
   margin-top: 7px;
   line-height: 1.8;
 }
+/* Automatic Odoo logging button (placeholder until it is implemented). */
+.odoo-send-button.icon-button {
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  padding: 0;
+  opacity: 0.55;
+  cursor: not-allowed;
+}

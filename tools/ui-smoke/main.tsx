@@ -10,7 +10,7 @@ import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
 import DashboardPage from '../../src/features/dashboard/DashboardPage';
-import { data as current, operations, uid, now } from './repository';
+import { data as current, operations, uid, now, bumpProfileElsewhere } from './repository';
 import '@fontsource/geist/latin-400.css';
 import '@fontsource/geist/latin-500.css';
 import '@fontsource/geist/latin-600.css';
@@ -26,17 +26,79 @@ const TimeCalculatorPage = lazy(() => import('../../src/features/calculators/Tim
 const FakeDataPage = lazy(() => import('../../src/features/fake-data/FakeDataPage'));
 const DeveloperPage = lazy(() => import('../../src/features/developer/DeveloperPage'));
 const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
+const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
+const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
+const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
+const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const noop = async () => {};
 const client = new QueryClient();
 function Smoke() {
   const [data, setData] = useState(current);
-  const activeAttendance = data.fichajes.find((attendance) => !attendance.fin_en) ?? null;
+  // Stateful, recording mocks so header popups can be verified (`?fail=attendance` rejects).
+  const [activeAttendance, setActiveAttendance] = useState(
+    () => current.fichajes.find((attendance) => !attendance.fin_en) ?? null,
+  );
+  // Like the real provider, an attendance call is `pending` while its request is in flight.
+  const [attendancePending, setAttendancePending] = useState(false);
+  async function inFlight(work: () => void) {
+    setAttendancePending(true);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    setAttendancePending(false);
+    if (failAttendance) throw new Error('Fallo de prueba al fichar.');
+    work();
+  }
+  const [activeTimer, setActiveTimer] = useState<(typeof current.entries)[number] | null>(null);
+  const [, setTick] = useState(0);
+  const failAttendance = new URLSearchParams(window.location.search).get('fail') === 'attendance';
+  function record(action: string, payload: Record<string, string | null>) {
+    operations.push({ action, payload });
+    setTick((value) => value + 1);
+  }
+  const tracker = {
+    start: async (taskId: string, startAt?: string) => {
+      record('tracker.start', { taskId, startAt: startAt === undefined ? '(ahora)' : startAt });
+      setActiveTimer({
+        ...current.entries[0]!,
+        id: 'timer',
+        tarea_id: taskId,
+        inicio_en: startAt ?? now,
+        fin_en: null,
+      });
+    },
+    stop: async () => {
+      record('tracker.stop', {});
+      setActiveTimer(null);
+    },
+  };
+  const attendanceMock = {
+    start: () =>
+      inFlight(() => {
+        record('attendance.start', {});
+        setActiveAttendance({ ...current.fichajes[0]!, id: 'quick', inicio_en: now, fin_en: null });
+      }),
+    stop: () =>
+      inFlight(() => {
+        record('attendance.stop', {});
+        setActiveAttendance(null);
+      }),
+    perform: async (operation: { action: string; payload: Record<string, unknown> }) => {
+      record(operation.action, { payload: JSON.stringify(operation.payload) });
+    },
+  };
   const attendanceElapsedSeconds = activeAttendance
     ? (Date.parse(now) - Date.parse(activeAttendance.inicio_en)) / 1000
     : 0;
   useEffect(() => {
     const refresh = () => setData(current);
     window.addEventListener('chambapp-smoke-workspace', refresh);
+    // `?bump=perfil`: another session changes the profile shortly after loading.
+    if (new URLSearchParams(window.location.search).get('bump') === 'perfil') {
+      const waitForEditor = setInterval(() => {
+        if (!document.querySelector('.settings-nav')) return;
+        clearInterval(waitForEditor);
+        setTimeout(bumpProfileElsewhere, 300);
+      }, 100);
+    }
     return () => window.removeEventListener('chambapp-smoke-workspace', refresh);
   }, []);
   return (
@@ -54,14 +116,14 @@ function Smoke() {
         <WorkspaceContext.Provider value={{ data, isLoading: false, error: null, reload: noop }}>
           <TrackerContext.Provider
             value={{
-              active: null,
+              active: activeTimer,
               elapsedSeconds: 0,
               busy: false,
               pending: false,
               error: null,
               pausedTaskId: null,
-              start: noop,
-              stop: noop,
+              start: tracker.start,
+              stop: tracker.stop,
               pause: noop,
               resume: noop,
               retryPending: noop,
@@ -72,13 +134,13 @@ function Smoke() {
                 active: activeAttendance,
                 now,
                 elapsedSeconds: attendanceElapsedSeconds,
-                busy: false,
-                pending: false,
+                busy: attendancePending,
+                pending: attendancePending,
                 error: null,
                 operation: null,
-                perform: noop,
-                start: noop,
-                stop: noop,
+                perform: attendanceMock.perform as never,
+                start: attendanceMock.start,
+                stop: attendanceMock.stop,
                 retry: noop,
               }}
             >
@@ -87,7 +149,7 @@ function Smoke() {
                   initialEntries={[
                     window.location.pathname === '/'
                       ? '/partes-de-horas'
-                      : `${window.location.pathname}${window.location.search}`,
+                      : `${window.location.pathname}${window.location.search}${window.location.hash}`,
                   ]}
                 >
                   <Suspense fallback={<p>Cargando vista de prueba…</p>}>
@@ -100,11 +162,27 @@ function Smoke() {
                         <Route path="/datos-ficticios" element={<FakeDataPage />} />
                         <Route path="/utilidades-desarrollo" element={<DeveloperPage />} />
                         <Route path="/notas" element={<NotesPage />} />
+                        <Route path="/proyectos" element={<ProjectsPage />} />
+                        <Route path="/ajustes" element={<SettingsPage />} />
+                        <Route path="/tareas" element={<TasksPage />} />
+                        <Route path="/parte-semanal" element={<TimesheetPage />} />
                       </Route>
                     </Routes>
                   </Suspense>
                 </MemoryRouter>
-                <details>
+                {/* Fixed overlay: keeps diagnostics out of the document flow (scroll checks). */}
+                <details
+                  style={{
+                    position: 'fixed',
+                    right: 8,
+                    bottom: 8,
+                    zIndex: 100,
+                    maxHeight: '40vh',
+                    overflow: 'auto',
+                    background: '#000c',
+                    fontSize: 11,
+                  }}
+                >
                   <summary>Operaciones de prueba</summary>
                   <pre>{JSON.stringify(operations, null, 2)}</pre>
                 </details>

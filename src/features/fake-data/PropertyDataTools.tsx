@@ -1,3 +1,4 @@
+import { copyOnClick } from './copyOnClick';
 import { useState } from 'react';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
@@ -128,7 +129,12 @@ export function PropertyDataTools({
             <ol className="property-code-list">
               {batches[index]!.map((record, position) => (
                 <li key={position}>
-                  <span className="mono">{record.title}</span>
+                  <span
+                    {...copyOnClick(() => void onCopy(record.title, 'Código copiado.'))}
+                    className="fake-copyable mono"
+                  >
+                    {record.title}
+                  </span>
                   <IconButton
                     icon="copy"
                     label={`Copiar ${variant.title.toLowerCase()} ${position + 1}`}

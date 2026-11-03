@@ -89,3 +89,17 @@ export function todayWorkedSeconds(
   });
   return attendanceDays(clippedAttendance, [], [date], zone, nowIso)[0]!.workedSeconds;
 }
+
+export const MAX_SUBTRACTIONS = 20;
+
+/** Total minutes of every duration row; null if any row is invalid or there are none. */
+export function sumDurations(rows: readonly { hours: string; minutes: string }[]): number | null {
+  if (!rows.length || rows.length > MAX_SUBTRACTIONS) return null;
+  let total = 0;
+  for (const row of rows) {
+    const minutes = parseDurationMinutes(row.hours, row.minutes);
+    if (minutes === null) return null;
+    total += minutes;
+  }
+  return total;
+}

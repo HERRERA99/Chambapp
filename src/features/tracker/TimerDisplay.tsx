@@ -1,7 +1,6 @@
 import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
 import { StartTimerButton } from './StartTimerButton';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Badge } from '../../shared/ui/Panel';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
@@ -27,10 +26,12 @@ function LiveTimer({ compact }: { compact: boolean }) {
   if (!tracker.active && !tracker.pausedTaskId && !tracker.pending)
     return (
       <div className="actions">
-        <Link className="text-link" to="/tareas">
-          Iniciar cronómetro
-        </Link>
-        <StartTimerButton />
+        <StartTimerButton
+          label="Iniciar cronómetro"
+          defaultWhen="now"
+          variant="primary"
+          className={compact ? 'header-chip header-chip--timer' : undefined}
+        />
       </div>
     );
   const disabled = tracker.busy || tracker.pending;

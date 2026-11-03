@@ -1,0 +1,92 @@
+/* Completed/archived tasks as compact horizontal cards (same language as the weekly timesheet). */
+.archived-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.archived-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.archived-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 9px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--success);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.archived-card--archived {
+  border-left-color: var(--dim);
+}
+.archived-card:hover,
+.archived-card:focus-visible {
+  border-color: var(--border);
+}
+.archived-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.archived-card__head strong {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.archived-card__odoo {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  color: var(--accent-soft);
+  background: #ff2e5614;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.archived-card__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+}
+.archived-card__meta > .dim {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.archived-card__meta > .mono {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+@media (max-width: 1190px) {
+  .archived-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .archived-cards {
+    grid-template-columns: 1fr;
+  }
+}

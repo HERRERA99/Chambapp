@@ -717,3 +717,114 @@
     font-size: 15px;
   }
 }
+
+/* Compact type cards (families and Development tools), always visible. */
+.fake-data-groups > button {
+  padding-block: 8px;
+}
+.fake-data-picker .fake-data-categories,
+.fake-data-categories--compact {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.fake-data-picker .fake-data-category,
+.fake-data-categories--compact .fake-data-category {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.fake-data-picker .fake-data-category__icon,
+.fake-data-categories--compact .fake-data-category__icon {
+  display: inline-flex;
+}
+.fake-data-picker .fake-data-category > strong,
+.fake-data-categories--compact .fake-data-category > strong {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+}
+/* One sticky bar: what is shown, its options and generate/copy/export. */
+.fake-data-bar {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px 18px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: #1b1b1ef2;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.fake-data-bar__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+}
+.fake-data-bar__title h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.fake-data-bar__options {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fake-data-bar__options .field {
+  width: auto;
+  min-width: 140px;
+}
+.fake-data-bar .fake-data-case {
+  align-self: flex-end;
+}
+.fake-data-bar .field label {
+  font-size: 9px;
+}
+.fake-data-bar select {
+  height: 36px;
+  padding-block: 0;
+  font-size: 12px;
+}
+.fake-data-bar__actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.fake-data-quantity {
+  width: 74px;
+}
+.fake-data-quantity select {
+  color: var(--muted);
+}
+.fake-data-bar .button {
+  min-height: 36px;
+}
+.fake-data-bar__options .field {
+  min-width: 124px;
+}
+.fake-data-bar .fake-data-case > .segmented button {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.fake-data-bar .fake-data-downloads .button {
+  padding-inline: 8px;
+}
+.fake-data-bar__actions {
+  gap: 6px;
+}
+/* Generated values copy on click (the copy icon stays for keyboard users). */
+.fake-copyable {
+  cursor: copy;
+  border-radius: 3px;
+  transition: background 0.15s ease;
+}
+.fake-copyable:hover {
+  background: #ff2e5614;
+}

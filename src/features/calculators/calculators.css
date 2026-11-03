@@ -586,3 +586,25 @@
     font-size: 17px;
   }
 }
+/* Several subtractions. */
+.time-calculator__subtractions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.time-calculator__remove.icon-button {
+  align-self: end;
+  margin-bottom: 10px;
+}
+.time-calculator__add {
+  justify-self: start;
+}
+.calculator-equation__term {
+  display: inline-flex;
+  gap: 9px;
+}
+.calculator-equation__term > span {
+  color: var(--dim);
+}

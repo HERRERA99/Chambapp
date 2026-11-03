@@ -37,8 +37,7 @@ export function WorkdaySettings({ value, onChange, minimumDate, dirty, disabled,
       }
     >
       <p className="muted section-intro">
-        Programa un nuevo reparto a partir de un lunes. Las jornadas ya creadas conservan su
-        objetivo.
+        Elige un modelo o reparte los minutos por día. Se aplica desde el lunes que indiques.
       </p>
       <fieldset className="choice-fieldset" disabled={disabled}>
         <legend>Convenio / Modalidad base</legend>
@@ -66,11 +65,12 @@ export function WorkdaySettings({ value, onChange, minimumDate, dirty, disabled,
           ))}
         </div>
       </fieldset>
-      <div className="form-grid form-grid--three">
+      <div className="settings-days">
         {weekdays.map((day, index) => (
           <InputField
             key={day}
-            label={`${day} · minutos`}
+            label={day}
+            aria-label={`${day}, minutos`}
             type="number"
             min={0}
             max={1440}
@@ -103,7 +103,7 @@ export function WorkdaySettings({ value, onChange, minimumDate, dirty, disabled,
         disabled={disabled}
         onChange={(event) => onChange({ ...value, effectiveDate: event.target.value })}
         required
-        hint="Selecciona un lunes disponible. El nuevo reparto se aplicará a las jornadas que se creen desde esa fecha."
+        hint="Las jornadas ya creadas conservan su objetivo."
       />
       {upcoming.length ? (
         <Notice title="Jornadas futuras ya programadas">

@@ -1,103 +1,103 @@
-import { TaskPagination } from './components/TaskPagination';
-import { TaskBoard } from './components/TaskBoard';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { Task } from '../../domain/models';
 import { downloadCsv } from '../../lib/export';
-import { formatDuration } from '../../domain/time';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, ButtonLink } from '../../shared/ui/Button';
-import { Panel, Progress, Notice } from '../../shared/ui/Panel';
-import { InputField, SelectField } from '../../shared/ui/FormField';
-import { SegmentedControl } from '../../shared/ui/SegmentedControl';
+import { Notice } from '../../shared/ui/Panel';
+import { Modal } from '../../shared/ui/Modal';
 import { useWorkspace } from '../workspace/useWorkspace';
+import { useTracker } from '../tracker/useTracker';
 import { entryTotalsBy } from '../time-entries/entryTotals';
 import { TaskForm } from './components/TaskForm';
 import { TaskDetail } from './components/TaskDetail';
+import { TaskQueue } from './components/TaskQueue';
+import { TaskPagination } from './components/TaskPagination';
+import { ArchivedTaskCards } from './components/ArchivedTaskCards';
+import { TaskNotes } from './components/TaskNotes';
 import { taskStatusLabels } from './taskLabels';
-import { OdooLink } from './components/OdooLink';
+import { archivePageSize, paginate, pickFocus, taskQueue } from './taskQueue';
 
-type Filter = 'all' | Task['estado'];
-
-export default function TasksPage({ defaultView = 'list' }: { defaultView?: 'list' | 'board' }) {
+export default function TasksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get('proyecto');
-  const view =
-    searchParams.get('vista') === 'lista'
-      ? 'list'
-      : searchParams.get('vista') === 'tablero'
-        ? 'board'
-        : defaultView;
   const { data, isLoading, error, reload } = useWorkspace();
+  const tracker = useTracker();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [includeArchived, setIncludeArchived] = useState(false);
+  const [archiveMode, setArchiveMode] = useState(false);
   const [query, setQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [pagination, setPagination] = useState({ key: '', page: 1 });
+  const [popupId, setPopupId] = useState<string | null>(null);
+  const [archivePage, setArchivePage] = useState({ key: '', page: 1 });
   const projects = data?.projects.filter((project) => !project.eliminado_en) ?? [];
   const tasks = data?.tasks.filter((task) => !task.eliminado_en) ?? [];
   const entries = data?.entries.filter((entry) => !entry.eliminado_en) ?? [];
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  const visible = tasks.filter(
-    (task) =>
-      (!projectId || task.proyecto_id === projectId) &&
-      (includeArchived ||
-        (!task.archivado_en && !projectById.get(task.proyecto_id)?.archivado_en)) &&
-      (filter === 'all' || task.estado === filter) &&
-      `${task.titulo} ${task.odoo_id ?? ''} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`
-        .toLocaleLowerCase('es')
-        .includes(query.toLocaleLowerCase('es')),
-  );
-  const pageSize = 6;
-  const filterKey = JSON.stringify([projectId, filter, includeArchived, query]);
-  const pages = Math.max(1, Math.ceil(visible.length / pageSize));
-  const page = Math.min(pages, pagination.key === filterKey ? pagination.page : 1);
-  const pageTasks = visible.slice((page - 1) * pageSize, page * pageSize);
-  const selected = pageTasks.find((task) => task.id === selectedId) ?? pageTasks[0];
+  const queue = taskQueue({ tasks, projects, query, projectId });
+  const activeTaskId = tracker.active?.tarea_id ?? null;
+  const focus = pickFocus({ queue, selectedId, activeTaskId, tasks });
   const canCreate = projects.some((project) => !project.archivado_en);
   const taskTotals = entryTotalsBy(entries, 'tarea_id');
   const totals = (id: string) => taskTotals.get(id) ?? { real: 0, logged: 0, count: 0 };
+  // The focused task is shown on the left, so the queue omits it (not in archive mode).
+  const others = (list: typeof tasks) =>
+    archiveMode ? list : list.filter((task) => task.id !== focus?.id);
+  // The archive page resets whenever the search, project or mode changes.
+  const filterKey = JSON.stringify([query, projectId, archiveMode]);
+  if (archivePage.key !== filterKey) setArchivePage({ key: filterKey, page: 1 });
+  const archive = paginate(
+    queue.hidden,
+    archivePage.key === filterKey ? archivePage.page : 1,
+    archivePageSize,
+  );
+  // Hidden matches only appear in the queue while searching outside archive mode.
+  const hiddenPreview = !archiveMode && query.trim() ? queue.hidden : [];
+  const listed = archiveMode ? queue.hidden : queue.active;
+  // A task that disappears (e.g. deleted from the popup) closes the popup.
+  const popupTask = tasks.find((task) => task.id === popupId);
+
+  function setProject(value: string | null) {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('proyecto', value);
+    else next.delete('proyecto');
+    setSearchParams(next);
+  }
+
+  function exportTasks() {
+    downloadCsv(
+      'tareas.csv',
+      [
+        'Tarea',
+        'Proyecto',
+        'ID de Odoo',
+        'Enlace de Odoo',
+        'Estado',
+        'Archivada',
+        'Estimación (min)',
+        'Real (s)',
+        'Imputado (s)',
+      ],
+      listed.map((task) => [
+        task.titulo,
+        projectById.get(task.proyecto_id)?.nombre ?? '',
+        task.odoo_id,
+        task.odoo_url,
+        taskStatusLabels[task.estado],
+        task.archivado_en ? 'Sí' : 'No',
+        task.estimacion_minutos,
+        totals(task.id).real,
+        totals(task.id).logged,
+      ]),
+    );
+  }
 
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Operaciones / Proyectos / Tareas & entregables"
-        title={view === 'board' ? 'Tablero de tareas' : 'Tareas & Imputaciones por Jornada'}
-        description="Planifica tareas y consulta el tiempo real e imputado de sus sesiones de trabajo."
+        eyebrow="Trabajo / Tareas"
+        title="Tareas"
         actions={
           <>
-            <Button
-              icon="download"
-              disabled={!visible.length}
-              onClick={() =>
-                downloadCsv(
-                  'tareas.csv',
-                  [
-                    'Tarea',
-                    'Proyecto',
-                    'ID de Odoo',
-                    'Enlace de Odoo',
-                    'Estado',
-                    'Archivada',
-                    'Estimación (min)',
-                    'Real (s)',
-                    'Imputado (s)',
-                  ],
-                  visible.map((task) => [
-                    task.titulo,
-                    projectById.get(task.proyecto_id)?.nombre ?? '',
-                    task.odoo_id,
-                    task.odoo_url,
-                    taskStatusLabels[task.estado],
-                    task.archivado_en ? 'Sí' : 'No',
-                    task.estimacion_minutos,
-                    totals(task.id).real,
-                    totals(task.id).logged,
-                  ]),
-                )
-              }
-            >
+            <Button icon="download" disabled={!listed.length} onClick={exportTasks}>
               Exportar CSV
             </Button>
             <Button
@@ -117,182 +117,146 @@ export default function TasksPage({ defaultView = 'list' }: { defaultView?: 'lis
           <Button onClick={() => void reload()}>Reintentar</Button>
         </Notice>
       ) : null}
-      <div className="toolbar">
-        <SegmentedControl<'list' | 'board'>
-          label="Vista de tareas"
-          value={view}
-          onChange={(value) => {
-            const next = new URLSearchParams(searchParams);
-            next.set('vista', value === 'board' ? 'tablero' : 'lista');
-            setSearchParams(next);
-          }}
-          options={[
-            { value: 'list', label: 'Lista' },
-            { value: 'board', label: 'Tablero' },
-          ]}
-        />
-        <SegmentedControl<Filter>
-          label="Estado de tareas"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: 'all', label: 'Todas' },
-            { value: 'en_curso', label: 'En curso' },
-            { value: 'pendiente', label: 'Pendientes' },
-            { value: 'completada', label: 'Completadas' },
-          ]}
-        />
-        <SelectField
-          label="Proyecto"
-          value={projectId ?? ''}
-          onChange={(event) => {
-            const next = new URLSearchParams(searchParams);
-            if (event.target.value) next.set('proyecto', event.target.value);
-            else next.delete('proyecto');
-            setSearchParams(next);
-          }}
-        >
-          <option value="">Todos los proyectos</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.nombre}
-              {project.archivado_en ? ' (archivado)' : ''}
-            </option>
-          ))}
-        </SelectField>
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(event) => setIncludeArchived(event.target.checked)}
-          />{' '}
-          Incluir archivadas
-        </label>
-      </div>
-      {view === 'board' ? (
-        <InputField
-          label="Buscar tarea en el tablero"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Tarea, proyecto o ID de Odoo…"
-        />
-      ) : null}
       {isLoading && !data ? (
         <p role="status">Cargando tareas…</p>
-      ) : view === 'board' ? (
-        <TaskBoard
-          tasks={visible}
-          projects={projects}
-          entries={entries}
-          onCreate={() => setCreateOpen(true)}
-        />
       ) : (
         <div className="task-workspace">
-          {selected ? (
-            <TaskDetail
-              key={selected.id}
-              task={selected}
-              projects={projects}
-              entries={entries.filter((entry) => entry.tarea_id === selected.id)}
-            />
-          ) : (
-            <div className="empty-state">
-              <h2>{tasks.length ? 'No hay tareas con estos filtros' : 'Crea tu primera tarea'}</h2>
-              <p className="muted">
-                {canCreate
-                  ? 'Organiza el trabajo de un proyecto y empieza a registrar tus horas.'
-                  : 'Crea un proyecto activo para añadir tareas.'}
-              </p>
-              {canCreate ? (
-                <Button onClick={() => setCreateOpen(true)}>Nueva tarea</Button>
-              ) : (
-                <ButtonLink to="/proyectos">Ir a proyectos</ButtonLink>
-              )}
-              {tasks.length ? (
-                <Button
-                  onClick={() => {
-                    setQuery('');
-                    setFilter('all');
-                    setIncludeArchived(true);
-                    setSearchParams({});
+          <div className="task-main">
+            {/* Tabs (not a switch): they change which set of tasks is shown, with counts. */}
+            <div className="task-tabs" role="tablist" aria-label="Estado de las tareas">
+              {(
+                [
+                  [false, 'Activas', queue.active.length],
+                  [true, 'Finalizadas y archivadas', queue.hidden.length],
+                ] as const
+              ).map(([hiddenTab, label, count]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  id={`task-tab-${hiddenTab ? 'hidden' : 'active'}`}
+                  aria-selected={archiveMode === hiddenTab}
+                  aria-controls="task-tabpanel"
+                  tabIndex={archiveMode === hiddenTab ? 0 : -1}
+                  onClick={() => setArchiveMode(hiddenTab)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                      event.preventDefault();
+                      setArchiveMode(!hiddenTab);
+                      const other = document.getElementById(
+                        `task-tab-${hiddenTab ? 'active' : 'hidden'}`,
+                      );
+                      other?.focus();
+                    }
                   }}
                 >
-                  Limpiar filtros
-                </Button>
-              ) : null}
+                  {label} <span className="mono">{count}</span>
+                </button>
+              ))}
             </div>
-          )}
-          <aside className="task-aside">
-            <Panel title="Tareas del proyecto" icon="tasks">
-              <InputField
-                label="Buscar tarea"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar tarea, proyecto o ID de Odoo…"
-              />
-              <div className="backlog">
-                {pageTasks.map((task) => {
-                  const logged = totals(task.id).logged;
-                  return (
-                    <div
-                      key={task.id}
-                      className={`backlog__item ${selected?.id === task.id ? 'backlog__item--selected' : ''}`}
+            <div
+              id="task-tabpanel"
+              role="tabpanel"
+              aria-labelledby={`task-tab-${archiveMode ? 'hidden' : 'active'}`}
+            >
+              {archiveMode ? (
+                <section className="archived-view" aria-label="Finalizadas y archivadas">
+                  {queue.hidden.length ? (
+                    <>
+                      <ArchivedTaskCards
+                        tasks={archive.items}
+                        projects={projects}
+                        logged={(id) => totals(id).logged}
+                        onOpen={(task) => setPopupId(task.id)}
+                      />
+                      {archive.pages > 1 ? (
+                        <TaskPagination
+                          page={archive.page}
+                          pages={archive.pages}
+                          total={queue.hidden.length}
+                          pageSize={archivePageSize}
+                          onChange={(page) => setArchivePage({ key: filterKey, page })}
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="muted">Ninguna tarea finalizada o archivada coincide.</p>
+                  )}
+                </section>
+              ) : focus ? (
+                <>
+                  <TaskDetail
+                    key={focus.id}
+                    task={focus}
+                    projects={projects}
+                    entries={entries.filter((entry) => entry.tarea_id === focus.id)}
+                  />
+                  <TaskNotes taskId={focus.id} notes={data?.notes ?? []} />
+                </>
+              ) : (
+                <div className="empty-state">
+                  <h2>
+                    {tasks.length
+                      ? 'No hay tareas activas con estos filtros'
+                      : 'Crea tu primera tarea'}
+                  </h2>
+                  <p className="muted">
+                    {canCreate
+                      ? 'Organiza el trabajo de un proyecto y empieza a registrar tus horas.'
+                      : 'Crea un proyecto activo para añadir tareas.'}
+                  </p>
+                  {canCreate ? (
+                    <Button onClick={() => setCreateOpen(true)}>Nueva tarea</Button>
+                  ) : (
+                    <ButtonLink to="/proyectos">Ir a proyectos</ButtonLink>
+                  )}
+                  {query || projectId ? (
+                    <Button
+                      onClick={() => {
+                        setQuery('');
+                        setProject(null);
+                      }}
                     >
-                      <button
-                        type="button"
-                        className="backlog__select"
-                        aria-pressed={selected?.id === task.id}
-                        onClick={() => setSelectedId(task.id)}
-                      >
-                        <span className="eyebrow accent">
-                          {taskStatusLabels[task.estado]}
-                          {task.archivado_en ? ' · Archivada' : ''}
-                        </span>
-                        <strong>{task.titulo}</strong>
-                        <span className="muted">{projectById.get(task.proyecto_id)?.nombre}</span>
-                        <span className="mono dim">
-                          {formatDuration(logged)} /{' '}
-                          {task.estimacion_minutos !== null
-                            ? formatDuration(task.estimacion_minutos * 60)
-                            : 'Sin estimar'}
-                        </span>
-                        {task.estimacion_minutos && task.estimacion_minutos > 0 ? (
-                          <Progress
-                            value={(logged / (task.estimacion_minutos * 60)) * 100}
-                            label={`Estimación de ${task.titulo}`}
-                          />
-                        ) : null}
-                      </button>
-                      <OdooLink task={task} />
-                    </div>
-                  );
-                })}
-              </div>
-              {visible.length ? (
-                <TaskPagination
-                  page={page}
-                  pages={pages}
-                  total={visible.length}
-                  pageSize={pageSize}
-                  onChange={(next) => setPagination({ key: filterKey, page: next })}
-                />
-              ) : null}
-              {!visible.length ? <p className="muted">No hay tareas con estos filtros.</p> : null}
-              <Button
-                icon="plus"
-                className="full-width"
-                disabled={!canCreate}
-                onClick={() => setCreateOpen(true)}
-              >
-                Crear tarea
-              </Button>
-            </Panel>
-            <Notice title="Inicio y fin exactos" icon="settings">
-              El redondeo se aplica únicamente a la duración total de cada parte finalizado.
-            </Notice>
-          </aside>
+                      Limpiar filtros
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+          <TaskQueue
+            inProgress={others(queue.inProgress)}
+            pending={others(queue.pending)}
+            hidden={hiddenPreview}
+            projects={projects}
+            focusId={focus?.id}
+            activeTaskId={activeTaskId}
+            query={query}
+            projectId={projectId}
+            allMatches={[...queue.active, ...queue.hidden]}
+            totals={totals}
+            onQuery={setQuery}
+            onProject={setProject}
+            onShowHidden={() => setArchiveMode(true)}
+            onSelect={(task) => {
+              setSelectedId(task.id);
+              setArchiveMode(false);
+            }}
+            onOpen={(task) => setPopupId(task.id)}
+          />
         </div>
       )}
+      {popupTask ? (
+        <Modal open size="wide" title="Detalle de tarea" onClose={() => setPopupId(null)}>
+          <TaskDetail
+            key={popupTask.id}
+            task={popupTask}
+            projects={projects}
+            entries={entries.filter((entry) => entry.tarea_id === popupTask.id)}
+          />
+          <TaskNotes taskId={popupTask.id} notes={data?.notes ?? []} />
+        </Modal>
+      ) : null}
       {createOpen ? (
         <TaskForm projects={projects} projectId={projectId} onClose={() => setCreateOpen(false)} />
       ) : null}

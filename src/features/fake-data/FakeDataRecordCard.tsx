@@ -1,3 +1,4 @@
+import { copyOnClick } from './copyOnClick';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import type { IconName } from '../../shared/ui/Icon';
@@ -105,7 +106,12 @@ function RecordField({
     <div className={`fake-data-field ${wide ? 'fake-data-field--wide' : ''}`}>
       <dt>{field.label}</dt>
       <dd>
-        <span className={mono ? 'mono' : undefined}>{field.value}</span>
+        <span
+          {...copyOnClick(() => void onCopy(field.value, `${field.label}: copiado.`))}
+          className={`fake-copyable ${mono ? 'mono' : ''}`}
+        >
+          {field.value}
+        </span>
         <IconButton
           icon="copy"
           label={`Copiar ${field.label.toLowerCase()} de la ficha ${index + 1}`}

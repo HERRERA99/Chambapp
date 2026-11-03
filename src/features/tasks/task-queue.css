@@ -1,0 +1,235 @@
+/* Compact queue of the next tasks, next to the focused task. */
+.task-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.task-queue__filters {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+.task-queue__filters .toggle-row {
+  padding: 4px 0 0;
+  border: 0;
+}
+.task-queue__group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Rows never grow wider than the column: long titles truncate. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.task-queue__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.task-queue__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.task-queue__row:hover,
+.task-queue__row:focus-visible {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.task-queue__row[aria-current='true'] {
+  background: #ff2e5608;
+  border-color: #b3415b;
+}
+.task-queue__row--active {
+  border-color: var(--accent);
+}
+.task-queue__dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.task-queue__dot--en_curso {
+  background: var(--accent);
+}
+.task-queue__dot--pendiente {
+  background: var(--warning);
+}
+.task-queue__dot--completada {
+  background: var(--success);
+}
+.task-queue__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.task-queue__main strong {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-queue__main .dim {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-queue__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 0;
+  max-width: 45%;
+  font-size: 10px;
+}
+.task-queue__side > * {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.task-queue__odoo {
+  color: var(--accent-soft);
+  background: #ff2e5614;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.task-queue__note {
+  margin: 0;
+  font-size: 12px;
+}
+.task-queue__more {
+  margin-top: 6px;
+  width: 100%;
+}
+/* Tabs: active vs completed/archived tasks. */
+.task-tabs {
+  display: flex;
+  gap: 4px;
+  /* Fixed: the search column is offset by this height (see below). */
+  height: 42px;
+  border-bottom: 1px solid var(--border);
+}
+.task-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.task-tabs button:hover {
+  color: var(--text);
+}
+.task-tabs button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.task-tabs button:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+.task-tabs .mono {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+/* Notes linked to a task, inside the task popup. */
+.task-notes {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+.task-notes h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.task-notes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.task-notes__note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text);
+  text-decoration: none;
+}
+.task-notes__note:hover,
+.task-notes__note:focus-visible {
+  border-color: var(--border);
+}
+.task-notes__text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.task-notes__text strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.task-notes__text .dim {
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.task-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+/* Two columns: the search column starts level with the tab content, below the tabs
+   (tabs height + the 16px gap of .task-main). */
+@media (min-width: 1191px) {
+  .task-workspace > .task-queue {
+    margin-top: calc(42px + 16px);
+  }
+}
