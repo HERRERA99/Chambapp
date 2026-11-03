@@ -383,6 +383,10 @@
   border-radius: 8px;
   box-shadow: 0 30px 100px #0008;
 }
+.modal--wide {
+  width: min(1100px, calc(100% - 32px));
+  overflow-y: auto;
+}
 .modal::backdrop {
   background: #050507c9;
   backdrop-filter: blur(6px);
@@ -945,8 +949,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Header timer: two lines only, so the header height stays fixed. */
 .timer-display--compact .odoo-entry-status {
-  margin: 2px 0 0;
+  display: none;
 }
 .timer-display--compact .eyebrow {
   font-size: 7px;
@@ -1369,7 +1374,7 @@
   padding: 20px 0 0;
 }
 
-/* Task detail and backlog. */
+/* Task detail. */
 .task-workspace {
   display: grid;
   grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr);
@@ -1510,52 +1515,6 @@
   color: var(--accent-soft);
   font-size: 14px;
 }
-.task-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.backlog {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 18px 0;
-}
-.backlog__item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface-low);
-  padding: 16px;
-  color: var(--text);
-  text-align: left;
-}
-.backlog__item:hover {
-  border-color: #6c4b59;
-}
-.backlog__item strong {
-  font-size: 13px;
-  line-height: 1.5;
-}
-.backlog__item .muted,
-.backlog__item .mono {
-  font-size: 10px;
-}
-.backlog__item .eyebrow {
-  font-size: 8px;
-}
-.backlog__item .progress {
-  margin-top: 4px;
-  height: 3px;
-}
-.backlog__item--selected {
-  border-color: #b3415b;
-  background: #ff2e5608;
-}
-
 /* Planning and preferences. */
 .schedule-preview {
   margin-top: 20px;
@@ -1993,15 +1952,6 @@
   .task-workspace {
     grid-template-columns: 1fr;
   }
-  .task-aside {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    align-items: start;
-  }
-  .backlog {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .form-grid--three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2284,12 +2234,6 @@
   }
   .session-row > .icon-button {
     margin-left: auto;
-  }
-  .task-aside {
-    grid-template-columns: 1fr;
-  }
-  .backlog {
-    grid-template-columns: 1fr;
   }
   .schedule-days {
     grid-template-columns: repeat(2, minmax(0, 1fr));

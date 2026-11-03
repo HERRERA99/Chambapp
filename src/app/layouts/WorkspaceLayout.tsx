@@ -29,7 +29,7 @@ const sections: readonly NavSection[] = [
     items: [
       { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
       { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
-      { to: paths.board, label: 'Tablero de tareas', icon: 'kanban' },
+      { to: paths.timesheet, label: 'Parte semanal', icon: 'grid' },
       { to: paths.notes, label: 'Notas', icon: 'notebook' },
     ],
   },

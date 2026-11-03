@@ -161,6 +161,125 @@ export let data: WorkspaceData = {
   serverTime: now,
   receivedAt: Date.now(),
 };
+// Extra tasks and a full current week of entries for /tareas and /parte-semanal.
+const extraTasks: WorkspaceData['tasks'] = [
+  [
+    'ccccccc3',
+    'Migrar facturación al nuevo ERP y validar los asientos contables del cierre mensual',
+    'en_curso',
+    'T512004',
+    null,
+  ],
+  ['ccccccc4', 'Preparar demo del portal', 'pendiente', null, null],
+  ['ccccccc5', 'Corregir exportación CSV', 'completada', 'T498120', null],
+  ['ccccccc6', 'Prototipo descartado', 'pendiente', null, now],
+  // Enough completed tasks to paginate the archive view (15 per page).
+  ...Array.from({ length: 22 }, (_, index) => [
+    `cccccc${String(index + 10).padStart(2, '0')}`,
+    index === 0
+      ? 'Revisión completa de la integración contable con el ERP corporativo y conciliación de facturas de proveedores'
+      : `Tarea finalizada ${index + 1}`,
+    'completada',
+    index % 3 === 0 ? `T7${String(index).padStart(5, '0')}` : null,
+    null,
+  ]),
+].map(([suffix, titulo, estado, odoo_id, archivado_en]) => ({
+  ...owned,
+  id: `cccccccc-cccc-4ccc-cccc-${String(suffix).padStart(12, 'c')}`,
+  proyecto_id: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+  titulo: String(titulo),
+  descripcion: null,
+  estado: estado as 'pendiente' | 'en_curso' | 'completada',
+  estimacion_minutos: 240,
+  odoo_id: odoo_id as string | null,
+  odoo_url: null,
+  archivado_en: archivado_en as string | null,
+  eliminado_en: null,
+}));
+function weekEntries(): WorkspaceData['entries'] {
+  const today = new Date();
+  const monday = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+  );
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  const taskIds = [
+    'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+    'cccccccc-cccc-4ccc-cccc-ccccccccccc2',
+    'cccccccc-cccc-4ccc-cccc-ccccccccccc3',
+    'cccccccc-cccc-4ccc-cccc-ccccccccccc4',
+  ];
+  const entries: WorkspaceData['entries'] = [];
+  for (let day = 0; day < 5; day++) {
+    const date = new Date(monday);
+    date.setUTCDate(monday.getUTCDate() + day);
+    const fecha = date.toISOString().slice(0, 10);
+    const slots =
+      day === 2
+        ? [
+            [7, 9.5],
+            [10, 11],
+            [11.25, 13],
+            [14, 15.4],
+            [15.5, 17],
+          ]
+        : [
+            [7, 9.25],
+            [9.5, 12],
+            [13, 16.1],
+          ];
+    slots.forEach(([from, to], index) => {
+      const start = new Date(date.getTime() + from! * 3600_000).toISOString();
+      const end = new Date(date.getTime() + to! * 3600_000).toISOString();
+      const real = (to! - from!) * 3600;
+      const open = day === 4 && index === slots.length - 1;
+      entries.push({
+        ...owned,
+        id: `dddddddd-dddd-4ddd-dddd-${String(day * 10 + index).padStart(12, '0')}`,
+        tarea_id: taskIds[(day + index) % taskIds.length]!,
+        jornada_id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+        proyecto_id: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+        inicio_en: start,
+        fin_en: open ? null : end,
+        intervalo_redondeo_minutos: 15,
+        modo_redondeo: 'superior',
+        descripcion: null,
+        eliminado_en: null,
+        odoo_id: null,
+        odoo_url: null,
+        fecha,
+        zona_horaria: 'Europe/Madrid',
+        inicio_imputado_en: start,
+        fin_imputado_en: open ? null : end,
+        duracion_real_segundos: open ? null : real,
+        duracion_imputada_segundos: open ? null : Math.ceil(real / 900) * 900,
+        imputado_en_odoo: day < 2,
+      });
+    });
+  }
+  // Saturday overnight entry: shows the weekend column and a (+1) range.
+  const saturday = new Date(monday);
+  saturday.setUTCDate(monday.getUTCDate() + 5);
+  const satStart = new Date(saturday.getTime() + 20 * 3600_000).toISOString();
+  const satEnd = new Date(saturday.getTime() + 23.5 * 3600_000).toISOString();
+  entries.push({
+    ...entries[0]!,
+    id: 'dddddddd-dddd-4ddd-dddd-000000000099',
+    fecha: saturday.toISOString().slice(0, 10),
+    inicio_en: satStart,
+    fin_en: satEnd,
+    inicio_imputado_en: satStart,
+    fin_imputado_en: satEnd,
+    duracion_real_segundos: 3.5 * 3600,
+    duracion_imputada_segundos: 3.5 * 3600,
+    imputado_en_odoo: false,
+  });
+  return entries;
+}
+data = {
+  ...data,
+  tasks: [...data.tasks, ...extraTasks],
+  entries: [...data.entries, ...weekEntries()],
+};
 export const operations: { action: string; payload: Record<string, Json | undefined> }[] = [];
 export async function executeCommand(action: string, payload: Record<string, Json | undefined>) {
   operations.push({ action, payload });
@@ -223,6 +342,9 @@ export async function executeCommand(action: string, payload: Record<string, Jso
   const start = String(payload.inicio_en ?? base.inicio_en);
   const end = String(payload.fin_en ?? base.fin_en);
   const real = (Date.parse(end) - Date.parse(start)) / 1000;
+  const intervalChanged =
+    !previous || payload.inicio_en !== undefined || payload.fin_en !== undefined;
+  const roundTo = (base.intervalo_redondeo_minutos || 60) * 60;
   const entry = {
     ...base,
     ...payload,
@@ -236,8 +358,11 @@ export async function executeCommand(action: string, payload: Record<string, Jso
       typeof payload.imputado_en_odoo === 'boolean'
         ? payload.imputado_en_odoo
         : base.imputado_en_odoo,
-    duracion_real_segundos: real,
-    duracion_imputada_segundos: Math.ceil(real / 3600) * 3600,
+    // Status-only edits keep the stored durations, like the database view.
+    duracion_real_segundos: intervalChanged ? real : base.duracion_real_segundos,
+    duracion_imputada_segundos: intervalChanged
+      ? Math.ceil(real / roundTo) * roundTo
+      : base.duracion_imputada_segundos,
   } as typeof base;
   data = { ...data, entries: [...data.entries.filter((item) => item.id !== entry.id), entry] };
   window.dispatchEvent(new Event('chambapp-smoke-workspace'));

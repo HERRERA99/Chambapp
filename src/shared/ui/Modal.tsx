@@ -7,12 +7,14 @@ export function Modal({
   onClose,
   title,
   description,
+  size = 'default',
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   description?: string;
+  size?: 'default' | 'wide';
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -26,7 +28,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={`modal ${size === 'wide' ? 'modal--wide' : ''}`}
       aria-labelledby={id}
       aria-describedby={description ? `${id}-description` : undefined}
       onCancel={(event) => {

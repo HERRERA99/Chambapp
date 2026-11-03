@@ -4,6 +4,7 @@ import { formatClock, formatTime } from '../../domain/time';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useAttendance } from './useAttendance';
 import { ManualAttendanceButton } from './ManualAttendanceButton';
+import { QuickAttendanceButton } from './QuickAttendanceButton';
 import './attendance.css';
 
 export function AttendanceControls({ compact = false }: { compact?: boolean }) {
@@ -43,7 +44,10 @@ export function AttendanceControls({ compact = false }: { compact?: boolean }) {
         ) : null}
       </div>
       <div className="actions">
-        {attendance.pending ? (
+        {compact ? (
+          // Stays mounted while an operation is pending so its popup keeps its state.
+          <QuickAttendanceButton disabled={disabled} />
+        ) : attendance.pending ? (
           <Button
             variant="primary"
             disabled={attendance.busy}

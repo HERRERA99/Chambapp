@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { WorkspaceLayout } from './layouts/WorkspaceLayout';
 import { FeedbackProvider } from '../shared/feedback/FeedbackProvider';
 import { AuthProvider } from '../features/auth/AuthProvider';
@@ -17,6 +17,7 @@ const OnboardingPage = lazy(() => import('../features/onboarding/OnboardingPage'
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage'));
 const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
+const TimesheetPage = lazy(() => import('../features/timesheet/TimesheetPage'));
 const NotesPage = lazy(() => import('../features/notes/NotesPage'));
 const EntriesPage = lazy(() => import('../features/time-entries/EntriesPage'));
 const AttendancePage = lazy(() => import('../features/attendance/AttendancePage'));
@@ -39,7 +40,7 @@ const routeTitles: Record<string, string> = {
   '/resumen': 'Resumen',
   '/proyectos': 'Proyectos y clientes',
   '/tareas': 'Tareas',
-  '/tablero': 'Tablero de tareas',
+  '/parte-semanal': 'Parte semanal',
   '/notas': 'Notas Markdown',
   '/calendario': 'Festivos y vacaciones',
   '/partes-de-horas': 'Partes de horas',
@@ -92,7 +93,11 @@ export function App() {
                         <Route path={paths.dashboard} element={<DashboardPage />} />
                         <Route path={paths.projects} element={<ProjectsPage />} />
                         <Route path={paths.tasks} element={<TasksPage />} />
-                        <Route path={paths.board} element={<TasksPage defaultView="board" />} />
+                        <Route path={paths.timesheet} element={<TimesheetPage />} />
+                        <Route
+                          path={paths.board}
+                          element={<Navigate to={paths.timesheet} replace />}
+                        />
                         <Route path={paths.notes} element={<NotesPage />} />
                         <Route path={paths.calendar} element={<CalendarPage />} />
                         <Route path={paths.entries} element={<EntriesPage />} />

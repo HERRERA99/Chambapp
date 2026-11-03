@@ -1,0 +1,231 @@
+/* Weekly timesheet: fits the viewport; only an overfull day scrolls internally. */
+.timesheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Viewport minus workspace header, content padding and footer. */
+  height: calc(100dvh - var(--header-height) - 64px - 92px);
+  min-height: 360px;
+}
+.timesheet__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.timesheet__toolbar .eyebrow {
+  margin-bottom: 6px;
+}
+.timesheet__title {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.timesheet__total {
+  font-size: 13px;
+  color: var(--accent-soft);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.timesheet__nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.timesheet > .form-error {
+  margin: 0;
+}
+.timesheet__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--timesheet-days, 5), minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-low);
+  overflow: hidden;
+}
+.timesheet__day {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+.timesheet__day:first-child {
+  border-left: 0;
+}
+.timesheet__day--today {
+  background: radial-gradient(ellipse at top, #ff2e560a, transparent 70%);
+}
+.timesheet__day-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.timesheet__day-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+.timesheet__weekday {
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.timesheet__day--today .timesheet__day-header strong {
+  color: var(--accent);
+}
+.timesheet__day-header .mono {
+  font-size: 11px;
+}
+.timesheet__items {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+.timesheet__empty {
+  text-align: center;
+  padding: 12px 0;
+}
+.timesheet__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'head actions'
+    'meta actions';
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 7px 6px 7px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--warning);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.timesheet__item--imputed {
+  border-left-color: var(--success);
+}
+.timesheet__item--open {
+  border-left-color: var(--accent);
+}
+.timesheet__item-head {
+  grid-area: head;
+  display: flex;
+  align-items: flex-start;
+  /* The Odoo chip drops below the title when both do not fit. */
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.timesheet__item-title {
+  flex: 1 0 min(10em, 100%);
+  min-width: 0;
+  font-weight: 500;
+  /* Full title: wraps onto as many lines as needed and the card grows. */
+  overflow-wrap: anywhere;
+}
+.timesheet__odoo-id {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  color: var(--accent-soft);
+  background: #ff2e5614;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.timesheet__item-meta {
+  grid-area: meta;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.timesheet__item-actions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.timesheet__item-meta > * {
+  font-size: inherit;
+}
+.timesheet__logged {
+  font-weight: 500;
+}
+.timesheet__check {
+  display: inline-flex;
+  cursor: pointer;
+}
+.timesheet__check input {
+  margin: 0;
+  accent-color: var(--success);
+}
+.timesheet__check input:disabled {
+  cursor: not-allowed;
+}
+.timesheet__send.icon-button {
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  padding: 0;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* Narrow day columns (six or seven days): controls move below the times. */
+@container (max-width: 200px) {
+  .timesheet__item {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'meta'
+      'actions';
+  }
+  .timesheet__item-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  .timesheet__item-meta {
+    flex-wrap: wrap;
+    font-size: 10px;
+  }
+}
+@media (max-width: 1366px) {
+  .timesheet__item-meta {
+    font-size: 10px;
+    gap: 4px;
+  }
+  .timesheet__item {
+    padding-left: 6px;
+  }
+}
+@media (max-width: 900px) {
+  .timesheet {
+    height: auto;
+  }
+  .timesheet__grid {
+    grid-template-columns: 1fr;
+  }
+  .timesheet__day {
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+}

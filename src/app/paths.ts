@@ -8,6 +8,8 @@ export const paths = {
   dashboard: '/resumen',
   projects: '/proyectos',
   tasks: '/tareas',
+  timesheet: '/parte-semanal',
+  /** Legacy task board; redirects to the weekly timesheet. */
   board: '/tablero',
   notes: '/notas',
   calendar: '/calendario',
