@@ -2,6 +2,10 @@ import { OdooSettings } from './components/OdooSettings';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { formatDuration } from '../../domain/time';
+import { Icon } from '../../shared/ui/Icon';
+import type { IconName } from '../../shared/ui/Icon';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button } from '../../shared/ui/Button';
 import { Panel, Notice } from '../../shared/ui/Panel';
@@ -13,6 +17,16 @@ import { RegionalSettings } from './components/RegionalSettings';
 import { SecuritySettings } from './components/SecuritySettings';
 import { initialSchedule, minimumScheduleMonday, profileDraft } from './settingsDraft';
 import type { Profile, WorkspaceData } from '../../domain/models';
+
+type SectionId = 'perfil' | 'jornada' | 'redondeo' | 'odoo' | 'seguridad';
+const SECTION_IDS: readonly SectionId[] = ['perfil', 'jornada', 'redondeo', 'odoo', 'seguridad'];
+
+/** `#regional` (old link) is an alias of Perfil; unknown or empty hashes open Perfil. */
+function sectionFromHash(hash: string): SectionId {
+  const id = hash.replace(/^#/, '');
+  if (id === 'regional') return 'perfil';
+  return (SECTION_IDS as readonly string[]).includes(id) ? (id as SectionId) : 'perfil';
+}
 
 function SettingsEditor({ data }: { data: WorkspaceData }) {
   const { run } = useCommand();
@@ -28,6 +42,57 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
   const dirty = profileDirty || scheduleDirty;
   const changedElsewhere = data.profile.version !== version;
   const minimumDate = minimumScheduleMonday(data);
+  const { hash } = useLocation();
+  const navigate = useNavigate();
+  const active = sectionFromHash(hash);
+  const roundingDirty = profile.intervaloRedondeo !== baseline.intervaloRedondeo;
+  const profileFieldsDirty =
+    profile.nombre !== baseline.nombre ||
+    profile.workspace !== baseline.workspace ||
+    profile.especialidad !== baseline.especialidad ||
+    profile.zonaHoraria !== baseline.zonaHoraria;
+  const weeklyMinutesDraft = schedule.minutes.reduce((sum, value) => sum + value, 0);
+  const sections: {
+    id: SectionId;
+    label: string;
+    icon: IconName;
+    summary: string;
+    dirty: boolean;
+  }[] = [
+    {
+      id: 'perfil',
+      label: 'Perfil y zona horaria',
+      icon: 'user',
+      summary: `${profile.nombre.trim() || 'Sin nombre'} · ${profile.zonaHoraria.replaceAll('_', ' ')}`,
+      dirty: profileFieldsDirty,
+    },
+    {
+      id: 'jornada',
+      label: 'Jornada semanal',
+      icon: 'calendar',
+      summary: `${formatDuration(weeklyMinutesDraft * 60)} por semana`,
+      dirty: scheduleDirty,
+    },
+    {
+      id: 'redondeo',
+      label: 'Redondeo',
+      icon: 'timer',
+      summary:
+        profile.intervaloRedondeo === 0
+          ? 'Tiempo exacto'
+          : `Bloques de ${profile.intervaloRedondeo} min`,
+      dirty: roundingDirty,
+    },
+    { id: 'odoo', label: 'Odoo', icon: 'globe', summary: 'Integración y API key', dirty: false },
+    {
+      id: 'seguridad',
+      label: 'Seguridad',
+      icon: 'lock',
+      summary: 'Contraseña y sesión',
+      dirty: false,
+    },
+  ];
+  const dirtyLabels = sections.filter((section) => section.dirty).map((section) => section.label);
 
   function reset() {
     const current = profileDraft(data);
@@ -150,89 +215,134 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
   }
 
   return (
-    <form className="page-stack" onSubmit={submit} aria-busy={saving}>
+    <form
+      className="page-stack settings-page"
+      // Hidden sections stay mounted: submit() validates every field and shows the error.
+      noValidate
+      onSubmit={submit}
+      aria-busy={saving}
+    >
       <PageHeader
-        eyebrow="Operaciones / Sistema & Cuenta / Preferencias globales"
-        title="Ajustes y Preferencias"
-        description="Tu perfil, jornada laboral, redondeo y zona horaria."
-        actions={
-          <>
-            <Button icon="left" disabled={saving || (!dirty && !changedElsewhere)} onClick={reset}>
-              {changedElsewhere ? 'Cargar valores actuales' : 'Descartar cambios'}
-            </Button>
-            <Button type="submit" variant="primary" icon="check" disabled={saving || !dirty}>
-              {saving ? 'Guardando…' : 'Guardar cambios'}
-            </Button>
-          </>
-        }
+        eyebrow="Sistema & cuenta"
+        title="Ajustes"
+        description="Elige una sección para ver y cambiar sus preferencias."
       />
-      <nav className="section-nav" aria-label="Secciones de ajustes">
-        {[
-          { id: 'jornada', label: 'Jornada semanal' },
-          { id: 'redondeo', label: 'Redondeo de duración' },
-          { id: 'regional', label: 'Perfil y zona horaria' },
-          { id: 'odoo', label: 'Odoo' },
-          { id: 'seguridad', label: 'Seguridad' },
-        ].map((section) => (
-          <a key={section.id} href={`#${section.id}`}>
-            {section.label}
-          </a>
-        ))}
-      </nav>
-      {changedElsewhere ? (
-        <Notice title="El perfil ha cambiado en otra sesión">
-          Carga los valores actuales antes de guardar para revisar esos cambios.
-        </Notice>
-      ) : null}
-      {error ? (
-        <div role="alert">
-          <Notice title="No se han guardado todos los cambios">{error}</Notice>
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Secciones de ajustes">
+          {sections.map((section) => (
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              className="settings-nav__item"
+              aria-current={active === section.id ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                navigate({ hash: section.id }, { replace: true });
+              }}
+            >
+              <Icon name={section.icon} size={18} />
+              <span className="settings-nav__text">
+                <strong>
+                  {section.label}
+                  {section.dirty ? (
+                    <span className="settings-nav__dot" title="Cambios sin guardar">
+                      <span className="sr-only"> (cambios sin guardar)</span>
+                    </span>
+                  ) : null}
+                </strong>
+                <span className="dim">{section.summary}</span>
+              </span>
+            </a>
+          ))}
+        </nav>
+        <div className="settings-content">
+          {changedElsewhere ? (
+            <Notice title="El perfil ha cambiado en otra sesión">
+              Carga los valores actuales antes de guardar para revisar esos cambios.
+            </Notice>
+          ) : null}
+          {error ? (
+            <div role="alert">
+              <Notice title="No se han guardado todos los cambios">{error}</Notice>
+            </div>
+          ) : null}
+          {message ? (
+            <div role="status">
+              <Notice title="Configuración" icon="check">
+                {message}
+              </Notice>
+            </div>
+          ) : null}
+          {/* Every section stays mounted (drafts and pending requests survive);
+              only the chosen one is visible. */}
+          <div hidden={active !== 'jornada'}>
+            <WorkdaySettings
+              value={schedule}
+              onChange={(next) => {
+                setSchedule(next);
+                setScheduleDirty(true);
+                setMessage(null);
+              }}
+              minimumDate={minimumDate}
+              dirty={scheduleDirty}
+              disabled={saving}
+              data={data}
+            />
+          </div>
+          <div hidden={active !== 'redondeo'}>
+            <RoundingSettings
+              interval={profile.intervaloRedondeo}
+              onChange={(intervaloRedondeo) => {
+                setProfile((current) => ({ ...current, intervaloRedondeo }));
+                setMessage(null);
+              }}
+              disabled={saving}
+            />
+          </div>
+          <div hidden={active !== 'perfil'}>
+            <RegionalSettings
+              value={profile}
+              onChange={(next) => {
+                setProfile(next);
+                setMessage(null);
+              }}
+              disabled={saving}
+            />
+          </div>
+          <div hidden={active !== 'odoo'}>
+            <OdooSettings disabled={saving} />
+          </div>
+          <div hidden={active !== 'seguridad'}>
+            <SecuritySettings disabled={saving} />
+          </div>
+          {dirty || changedElsewhere ? (
+            <div className="settings-savebar" role="region" aria-label="Guardar cambios">
+              <span>
+                {dirty ? (
+                  <>
+                    <strong>Cambios sin guardar</strong>
+                    <span className="dim"> en {dirtyLabels.join(', ')}</span>
+                  </>
+                ) : (
+                  <strong>Hay una versión más reciente de tu perfil</strong>
+                )}
+              </span>
+              <div className="actions">
+                <Button
+                  icon="left"
+                  variant="ghost"
+                  disabled={saving || (!dirty && !changedElsewhere)}
+                  onClick={reset}
+                >
+                  {changedElsewhere ? 'Cargar valores actuales' : 'Descartar'}
+                </Button>
+                <Button type="submit" variant="primary" icon="check" disabled={saving || !dirty}>
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      {message ? (
-        <div role="status">
-          <Notice title="Configuración" icon="check">
-            {message}
-          </Notice>
-        </div>
-      ) : null}
-      <WorkdaySettings
-        value={schedule}
-        onChange={(next) => {
-          setSchedule(next);
-          setScheduleDirty(true);
-          setMessage(null);
-        }}
-        minimumDate={minimumDate}
-        dirty={scheduleDirty}
-        disabled={saving}
-        data={data}
-      />
-      <RoundingSettings
-        interval={profile.intervaloRedondeo}
-        onChange={(intervaloRedondeo) => {
-          setProfile((current) => ({ ...current, intervaloRedondeo }));
-          setMessage(null);
-        }}
-        disabled={saving}
-      />
-      <RegionalSettings
-        value={profile}
-        onChange={(next) => {
-          setProfile(next);
-          setMessage(null);
-        }}
-        disabled={saving}
-      />
-      <OdooSettings disabled={saving} />
-      <SecuritySettings disabled={saving} />
-      <div className="settings-footer">
-        <Notice title="El histórico se conserva" icon="shield">
-          Las nuevas preferencias afectan a los registros y jornadas que se creen a partir de ahora.
-        </Notice>
-        <Button type="submit" variant="primary" icon="check" disabled={saving || !dirty}>
-          {saving ? 'Guardando…' : 'Aplicar cambios'}
-        </Button>
       </div>
     </form>
   );

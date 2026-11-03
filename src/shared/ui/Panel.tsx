@@ -10,6 +10,7 @@ export function Panel({
   children,
   className = '',
   id,
+  hidden,
 }: {
   title?: string;
   eyebrow?: string;
@@ -18,9 +19,10 @@ export function Panel({
   children: ReactNode;
   className?: string;
   id?: string;
+  hidden?: boolean;
 }) {
   return (
-    <section id={id} className={`panel ${className}`}>
+    <section id={id} className={`panel ${className}`} hidden={hidden}>
       {title ? (
         <div className="panel__header">
           <div>

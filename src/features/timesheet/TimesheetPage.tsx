@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { DateTime } from 'luxon';
-import type { TimeEntry } from '../../domain/models';
+import type { TimeEntry, WorkspaceData } from '../../domain/models';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../auth/useAuth';
 import { formatDuration, mondayForDate, todayInZone } from '../../domain/time';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
@@ -10,6 +12,7 @@ import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
+import { OdooSendButton } from '../time-entries/components/OdooSendButton';
 import { buildTimesheetWeek } from './timesheet.model';
 import type { TimesheetItem } from './timesheet.model';
 import './timesheet.css';
@@ -25,13 +28,10 @@ export default function TimesheetPage() {
   const { run, pending } = useCommand();
   const tracker = useTracker();
   const notify = useFeedback();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
-  // Saved marks (entry id -> saved version) stay locked while the cached data is older
-  // than the save, e.g. if the follow-up reload fails. Newer data is authoritative.
-  const [confirmed, setConfirmed] = useState<ReadonlyMap<string, number>>(new Map());
-  const isImputed = (entry: TimeEntry) =>
-    entry.imputado_en_odoo || (confirmed.get(entry.id) ?? -1) > entry.version;
   const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
   const today = todayInZone(zone);
   const currentMonday = mondayForDate(today);
@@ -48,19 +48,36 @@ export default function TimesheetPage() {
     setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
   }
 
-  async function markImputed(entry: TimeEntry) {
-    // This view only ever marks entries; it never sends `false`.
-    if (busy || isImputed(entry) || !entry.fin_en) return;
+  async function setImputed(entry: TimeEntry, imputed: boolean) {
+    // The mark can be set and cleared until automatic Odoo logging exists.
+    if (busy || !entry.fin_en || entry.imputado_en_odoo === imputed) return;
     setActionError('');
     try {
-      const saved = await run<{ version?: number }>('editar_parte', {
+      const saved = await run<{ version?: number; imputado_en_odoo?: boolean }>('editar_parte', {
         id: entry.id,
         version: entry.version,
-        imputado_en_odoo: true,
+        imputado_en_odoo: imputed,
       });
-      const version = typeof saved?.version === 'number' ? saved.version : entry.version + 1;
-      setConfirmed((current) => new Map(current).set(entry.id, version));
-      notify('Parte marcado como imputado en Odoo.');
+      // If the follow-up refresh failed, the cache is older than the save: apply the
+      // saved flag and version so the checkbox stays correct and stays reversible.
+      if (user && typeof saved?.version === 'number') {
+        const version = saved.version;
+        queryClient.setQueryData<WorkspaceData>(['workspace', user.id], (current) =>
+          current
+            ? {
+                ...current,
+                entries: current.entries.map((item) =>
+                  item.id === entry.id && item.version < version
+                    ? { ...item, imputado_en_odoo: saved.imputado_en_odoo ?? imputed, version }
+                    : item,
+                ),
+              }
+            : current,
+        );
+      }
+      notify(
+        imputed ? 'Parte marcado como imputado en Odoo.' : 'Parte marcado como pendiente en Odoo.',
+      );
     } catch (cause) {
       setActionError(
         cause instanceof Error ? cause.message : 'No se pudo guardar la marca de Odoo.',
@@ -135,8 +152,7 @@ export default function TimesheetPage() {
                         key={item.entry.id}
                         item={item}
                         busy={busy}
-                        imputed={isImputed(item.entry)}
-                        onMark={() => void markImputed(item.entry)}
+                        onToggle={(imputed) => void setImputed(item.entry, imputed)}
                       />
                     ))
                   ) : (
@@ -155,15 +171,14 @@ export default function TimesheetPage() {
 function TimesheetRow({
   item,
   busy,
-  imputed,
-  onMark,
+  onToggle,
 }: {
   item: TimesheetItem;
   busy: boolean;
-  imputed: boolean;
-  onMark: () => void;
+  onToggle: (imputed: boolean) => void;
 }) {
   const { entry } = item;
+  const imputed = entry.imputado_en_odoo;
   const open = !entry.fin_en;
   return (
     <li
@@ -200,33 +215,22 @@ function TimesheetRow({
         <label
           className="timesheet__check"
           title={
-            imputed
-              ? 'Imputado en Odoo. No se puede desmarcar desde esta vista.'
-              : open
-                ? 'Finaliza el parte para marcarlo como imputado.'
-                : 'Marcar como imputado en Odoo (no se podrá desmarcar aquí).'
+            open
+              ? 'Finaliza el parte para marcarlo como imputado.'
+              : imputed
+                ? 'Imputado en Odoo (desmarca para dejarlo pendiente).'
+                : 'Marcar como imputado en Odoo.'
           }
         >
           <input
             type="checkbox"
             checked={imputed}
-            disabled={imputed || open || busy}
+            disabled={open || busy}
             aria-label={`Imputado en Odoo: ${item.title}, ${item.range}`}
-            onChange={(event) => {
-              if (event.target.checked) onMark();
-            }}
+            onChange={(event) => onToggle(event.target.checked)}
           />
         </label>
-        {/* Placeholder: automatic Odoo logging is not implemented yet. */}
-        <button
-          type="button"
-          className="icon-button timesheet__send"
-          aria-disabled="true"
-          aria-label={`Imputar automáticamente en Odoo (próximamente): ${item.title}`}
-          title="Imputar automáticamente en Odoo (próximamente)"
-        >
-          <Icon name="send" size={14} />
-        </button>
+        <OdooSendButton label={item.title} />
       </div>
     </li>
   );

@@ -81,3 +81,43 @@ Resultado: scratchpad/p3i2/claudex-8i30p792/result.json. Presupuesto de inspecci
 - P3-R2-001 (medium) pantalla completa con biblioteca minimizada dejaba el editor en 44px → clase de colapso solo fuera de pantalla completa. SIN inspección independiente.
 - P3-R2-002 (low) la lista de sugerencias no volvía arriba al reescribir → scroll a 0 al cambiar el texto. SIN inspección independiente.
 Pruebas tras los arreglos: typecheck, lint, 133 tests, build, prettier OK; ambos casos verificados en navegador.
+
+# Ronda de cambios 4 (PLAN-4.md)
+- Base 497bfa7. Petición: notas en tareas activas, filtros ocultables y paginación de 5 en partes, varias restas en calculadora, rediseño de datos ficticios (submenú plegable, cantidad secundaria), rediseño de ajustes. Implementación autorizada. Sin commit.
+
+## Plan 4 ronda 1 — Codex — REVISE
+- P4-001 conflicto externo sin barra. ACEPTADO.
+- P4-002 Inmuebles con lotes propios. ACEPTADO (excepción D3b).
+- P4-003 arnés no soporta guardar ajustes/hash. ACEPTADO.
+- Ronda 2 intento 1: fallo operativo de Codex ("Selected model is at capacity"); no cuenta como veredicto. Reintento.
+- Ronda 2 intento 2: mismo fallo de capacidad. DECISIÓN DEL USUARIO: construir con el plan revisado SIN reaprobación del plan (no consta como APPROVED) e inspeccionar el código con Codex al final.
+
+## Plan 4 — build (Claude)
+Base 497bfa7. Plan no reaprobado (fallo de capacidad de Codex; decisión del usuario). Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador de A–E.
+
+## Plan 4 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p4i1/claudex-2wgkzjib/result.json. Todos ACEPTADOS y corregidos:
+- P4-IR-001 Odoo/Seguridad se desmontaban al cambiar de sección → todas las secciones montadas y ocultas (+ noValidate: submit() valida y muestra el error).
+- P4-IR-002 días demasiado estrechos con el menú → container query (4 / 2 columnas).
+- P4-IR-003 búsqueda solo con espacios no contaba como filtro → cuenta cualquier texto.
+- P4-IR-004 bump del arnés antes de cargar Ajustes → espera al editor.
+Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador.
+
+## Plan 4 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p4i2/claudex-3_o96m4s/result.json. Presupuesto de inspección agotado (2/2).
+- P4-R2-001 (medium) tarjetas de redondeo apretadas en pantallas estrechas → container queries (6/3/2/1 columnas). SIN inspección independiente. Verificado en navegador a 1280, 1000 y 360 px sin solapamientos.
+Pruebas tras el arreglo: typecheck, lint, 135 tests, build, prettier OK.
+
+# Ronda 5 (PLAN-5.md) — cambios menores pedidos directamente
+- Plan escrito a partir de la petición (sin revisión previa de Codex por ser cambios pequeños y explícitos). Sustituye Plan 1 B3/B6 (check no desmarcable).
+- Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador.
+
+## Plan 5 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p5i1/claudex-ax8hbmoj/result.json. Ambos ACEPTADOS y corregidos:
+- P5-001 con clic real `user-select: all` selecciona el valor y la guarda anulaba la copia → solo se cancela ante una selección parcial manual. Verificado con clics reales de Playwright (perfil, fecha, UUID).
+- P5-002 si fallaba la recarga tras guardar, el check volvía al valor viejo → se aplica a la caché el valor y la versión devueltos (solo si la caché es más antigua).
+
+## Plan 5 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p5i2/claudex-8ry_v178/result.json. Presupuesto de inspección agotado (2/2).
+- P5-R2-001 (medium) arrastrar para seleccionar el valor completo también copiaba → se distingue el gesto: si el puntero se mueve > 4 px entre pulsar y soltar no se copia. SIN inspección independiente. Verificado con ratón real: clic copia, arrastre no copia.
+Pruebas: typecheck, lint, 135 tests, build, prettier OK.

@@ -10,7 +10,7 @@ import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
 import DashboardPage from '../../src/features/dashboard/DashboardPage';
-import { data as current, operations, uid, now } from './repository';
+import { data as current, operations, uid, now, bumpProfileElsewhere } from './repository';
 import '@fontsource/geist/latin-400.css';
 import '@fontsource/geist/latin-500.css';
 import '@fontsource/geist/latin-600.css';
@@ -28,6 +28,7 @@ const DeveloperPage = lazy(() => import('../../src/features/developer/DeveloperP
 const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
 const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
 const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
+const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
 const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const noop = async () => {};
 const client = new QueryClient();
@@ -90,6 +91,14 @@ function Smoke() {
   useEffect(() => {
     const refresh = () => setData(current);
     window.addEventListener('chambapp-smoke-workspace', refresh);
+    // `?bump=perfil`: another session changes the profile shortly after loading.
+    if (new URLSearchParams(window.location.search).get('bump') === 'perfil') {
+      const waitForEditor = setInterval(() => {
+        if (!document.querySelector('.settings-nav')) return;
+        clearInterval(waitForEditor);
+        setTimeout(bumpProfileElsewhere, 300);
+      }, 100);
+    }
     return () => window.removeEventListener('chambapp-smoke-workspace', refresh);
   }, []);
   return (
@@ -140,7 +149,7 @@ function Smoke() {
                   initialEntries={[
                     window.location.pathname === '/'
                       ? '/partes-de-horas'
-                      : `${window.location.pathname}${window.location.search}`,
+                      : `${window.location.pathname}${window.location.search}${window.location.hash}`,
                   ]}
                 >
                   <Suspense fallback={<p>Cargando vista de prueba…</p>}>
@@ -154,6 +163,7 @@ function Smoke() {
                         <Route path="/utilidades-desarrollo" element={<DeveloperPage />} />
                         <Route path="/notas" element={<NotesPage />} />
                         <Route path="/proyectos" element={<ProjectsPage />} />
+                        <Route path="/ajustes" element={<SettingsPage />} />
                         <Route path="/tareas" element={<TasksPage />} />
                         <Route path="/parte-semanal" element={<TimesheetPage />} />
                       </Route>

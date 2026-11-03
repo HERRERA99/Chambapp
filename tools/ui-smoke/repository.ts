@@ -302,6 +302,11 @@ data = {
   entries: [...data.entries, ...weekEntries()],
   notes: [...data.notes, ...extraNotes],
 };
+/** Simulates a profile change made in another session (bumps its version). */
+export function bumpProfileElsewhere() {
+  data = { ...data, profile: { ...data.profile, version: data.profile.version + 1 } };
+  window.dispatchEvent(new Event('chambapp-smoke-workspace'));
+}
 export const operations: { action: string; payload: Record<string, Json | undefined> }[] = [];
 export async function executeCommand(action: string, payload: Record<string, Json | undefined>) {
   operations.push({ action, payload });
@@ -354,6 +359,53 @@ export async function executeCommand(action: string, payload: Record<string, Jso
     data = { ...data, notes: [note, ...data.notes.filter((item) => item.id !== note.id)] };
     window.dispatchEvent(new Event('chambapp-smoke-workspace'));
     return note;
+  }
+  if (action === 'editar_perfil') {
+    if (payload.version !== data.profile.version)
+      throw new Error('El perfil ha cambiado. Recarga los datos antes de guardar.');
+    const profile = {
+      ...data.profile,
+      ...(payload.nombre !== undefined ? { nombre: String(payload.nombre) } : {}),
+      ...(payload.zona_horaria !== undefined ? { zona_horaria: String(payload.zona_horaria) } : {}),
+      ...(payload.intervalo_redondeo_minutos !== undefined
+        ? { intervalo_redondeo_minutos: Number(payload.intervalo_redondeo_minutos) }
+        : {}),
+      ...(payload.preferencias !== undefined
+        ? { preferencias: payload.preferencias as typeof data.profile.preferencias }
+        : {}),
+      version: data.profile.version + 1,
+      actualizado_en: new Date().toISOString(),
+    };
+    data = { ...data, profile };
+    window.dispatchEvent(new Event('chambapp-smoke-workspace'));
+    return profile;
+  }
+  if (action === 'crear_configuracion_semanal') {
+    const id = crypto.randomUUID();
+    const reparto = (payload.reparto ?? {}) as Record<string, number>;
+    data = {
+      ...data,
+      configurations: [
+        ...data.configurations,
+        {
+          id,
+          usuario_id: uid,
+          minutos_semanales: Number(payload.minutos_semanales),
+          vigente_desde: String(payload.vigente_desde),
+          creado_en: new Date().toISOString(),
+        },
+      ],
+      days: [
+        ...data.days,
+        ...Object.entries(reparto).map(([day, minutes]) => ({
+          configuracion_id: id,
+          dia_semana: Number(day),
+          minutos_objetivo: Number(minutes),
+        })),
+      ],
+    };
+    window.dispatchEvent(new Event('chambapp-smoke-workspace'));
+    return { id };
   }
   if (action !== 'editar_parte' && action !== 'crear_parte')
     throw new Error('Operación fuera de esta prueba.');

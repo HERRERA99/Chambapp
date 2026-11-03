@@ -1,13 +1,13 @@
-import { Panel, Badge, Notice } from '../../../shared/ui/Panel';
+import { Panel, Badge } from '../../../shared/ui/Panel';
 import { RoundingPreview } from '../../time-entries/components/RoundingPreview';
 
 const choices = [
-  { value: 0, title: 'Tiempo exacto', detail: 'Sin redondeo' },
-  { value: 5, title: '5 minutos (R05)', detail: 'Granularidad fina' },
-  { value: 10, title: '10 minutos (R10)', detail: 'Balance intermedio' },
-  { value: 15, title: '15 minutos (R15)', detail: 'Cuartos de hora' },
-  { value: 30, title: '30 minutos (R30)', detail: 'Medias horas' },
-  { value: 60, title: '60 minutos (R60)', detail: 'Horas completas' },
+  { value: 0, title: 'Exacto', detail: 'Sin redondeo' },
+  { value: 5, title: '5 min', detail: 'R05 · Fino' },
+  { value: 10, title: '10 min', detail: 'R10 · Intermedio' },
+  { value: 15, title: '15 min', detail: 'R15 · Cuartos de hora' },
+  { value: 30, title: '30 min', detail: 'R30 · Medias horas' },
+  { value: 60, title: '60 min', detail: 'R60 · Horas completas' },
 ] as const;
 
 export function RoundingSettings({
@@ -31,12 +31,11 @@ export function RoundingSettings({
       }
     >
       <p className="muted section-intro">
-        Inicio y fin se registran con su hora exacta. Solo la duración total se redondea hacia
-        arriba al siguiente bloque.
+        Solo se redondea hacia arriba la duración total de cada parte; inicio y fin son exactos.
       </p>
       <fieldset className="choice-fieldset" disabled={disabled}>
         <legend>Intervalo de imputación</legend>
-        <div className="choice-grid choice-grid--three">
+        <div className="choice-grid choice-grid--six">
           {choices.map((option) => (
             <label
               className={`choice-card ${interval === option.value ? 'choice-card--selected' : ''}`}
@@ -55,11 +54,14 @@ export function RoundingSettings({
           ))}
         </div>
       </fieldset>
-      <RoundingPreview interval={String(interval)} />
-      <Notice title="El histórico conserva su regla" icon="shield">
-        El intervalo se guarda en cada parte al crearlo. Cambiar la preferencia afecta a los nuevos
-        registros y conserva las duraciones históricas.
-      </Notice>
+      <details className="settings-help">
+        <summary>Ver un ejemplo y cómo afecta a los partes</summary>
+        <RoundingPreview interval={String(interval)} />
+        <p className="field__hint">
+          El intervalo se guarda en cada parte al crearlo: cambiarlo solo afecta a los nuevos
+          registros.
+        </p>
+      </details>
     </Panel>
   );
 }

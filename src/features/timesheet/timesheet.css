@@ -182,13 +182,9 @@
 .timesheet__check input:disabled {
   cursor: not-allowed;
 }
-.timesheet__send.icon-button {
+.timesheet__item-actions .odoo-send-button {
   width: 22px;
   height: 22px;
-  min-width: 0;
-  padding: 0;
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 /* Narrow day columns (six or seven days): controls move below the times. */
 @container (max-width: 200px) {

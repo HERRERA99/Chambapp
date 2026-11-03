@@ -2513,3 +2513,183 @@
   background: none;
   border: 0;
 }
+
+/* Show/hide filters bar (time entries). */
+.filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -8px;
+}
+.filters-bar__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent-deep);
+  color: #fff;
+  font-size: 10px;
+}
+.panel[hidden] {
+  display: none;
+}
+
+/* Settings: a section menu and one section at a time. */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.settings-nav {
+  position: sticky;
+  top: calc(var(--header-height) + 16px);
+  display: grid;
+  gap: 4px;
+}
+.settings-nav__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-decoration: none;
+}
+.settings-nav__item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-nav__item[aria-current='page'] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.settings-nav__item[aria-current='page'] > .icon {
+  color: var(--accent-soft);
+}
+.settings-nav__item:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+.settings-nav__text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.settings-nav__text strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.settings-nav__text .dim {
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.settings-nav__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.settings-content {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+.settings-content > [hidden] {
+  display: none;
+}
+.settings-savebar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px 10px 16px;
+  background: #1b1b1ef2;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px #0008;
+  font-size: 13px;
+}
+/* Week schedule: seven compact day fields in one row. */
+.settings-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+.choice-grid--six {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.choice-grid--six .choice-card {
+  padding: 12px;
+}
+.settings-help {
+  margin-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px;
+}
+.settings-help > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.settings-help[open] > summary {
+  margin-bottom: 12px;
+}
+/* Rounding options follow the width of the settings content, not the viewport. */
+@container (max-width: 900px) {
+  .choice-grid--six {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (max-width: 480px) {
+  .choice-grid--six {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 300px) {
+  .choice-grid--six {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container (max-width: 720px) {
+  .settings-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@container (max-width: 420px) {
+  .settings-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+  }
+  .settings-nav__item {
+    flex-shrink: 0;
+  }
+  .settings-nav__text .dim {
+    display: none;
+  }
+}

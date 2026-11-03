@@ -184,12 +184,15 @@ export default function TasksPage() {
                   )}
                 </section>
               ) : focus ? (
-                <TaskDetail
-                  key={focus.id}
-                  task={focus}
-                  projects={projects}
-                  entries={entries.filter((entry) => entry.tarea_id === focus.id)}
-                />
+                <>
+                  <TaskDetail
+                    key={focus.id}
+                    task={focus}
+                    projects={projects}
+                    entries={entries.filter((entry) => entry.tarea_id === focus.id)}
+                  />
+                  <TaskNotes taskId={focus.id} notes={data?.notes ?? []} />
+                </>
               ) : (
                 <div className="empty-state">
                   <h2>

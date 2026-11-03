@@ -136,6 +136,8 @@
 .task-tabs {
   display: flex;
   gap: 4px;
+  /* Fixed: the search column is offset by this height (see below). */
+  height: 42px;
   border-bottom: 1px solid var(--border);
 }
 .task-tabs button {
@@ -223,4 +225,11 @@
   gap: 16px;
   align-content: start;
   min-width: 0;
+}
+/* Two columns: the search column starts level with the tab content, below the tabs
+   (tabs height + the 16px gap of .task-main). */
+@media (min-width: 1191px) {
+  .task-workspace > .task-queue {
+    margin-top: calc(42px + 16px);
+  }
 }

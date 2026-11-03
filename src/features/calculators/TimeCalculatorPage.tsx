@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { paths } from '../../app/paths';
-import { ButtonLink } from '../../shared/ui/Button';
+import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { InputField } from '../../shared/ui/FormField';
 import { Icon } from '../../shared/ui/Icon';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Badge } from '../../shared/ui/Panel';
 import { CopyResult, DurationFields, DurationValue } from './CalculatorControls';
 import {
+  MAX_SUBTRACTIONS,
   elapsedMinutes,
   formatMinutes,
   parseDurationMinutes,
   subtractTime,
+  sumDurations,
 } from './calculators.model';
 import './calculators.css';
 
@@ -25,11 +27,15 @@ export default function TimeCalculatorPage() {
   const [end, setEnd] = useState('17:30');
   const [nextDay, setNextDay] = useState(false);
   const [baseTime, setBaseTime] = useState('17:30');
-  const [hours, setHours] = useState('1');
-  const [minutes, setMinutes] = useState('45');
+  // Several durations can be subtracted; each row has a stable id for React keys.
+  const [rows, setRows] = useState([{ id: 1, hours: '1', minutes: '45' }]);
+  const [nextId, setNextId] = useState(2);
   const automaticNextDay = !!start && !!end && end < start;
   const elapsed = elapsedMinutes(start, end, nextDay);
-  const duration = parseDurationMinutes(hours, minutes);
+  const duration = sumDurations(rows);
+  function updateRow(id: number, change: Partial<{ hours: string; minutes: string }>) {
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...change } : row)));
+  }
   const subtraction = duration === null ? null : subtractTime(baseTime, duration);
 
   return (
@@ -153,19 +159,45 @@ export default function TimeCalculatorPage() {
             aria-invalid={!baseTime}
             onChange={(event) => setBaseTime(event.target.value)}
           />
-          <div className="time-calculator__subtract-duration">
-            <span className="time-calculator__operator" aria-hidden="true">
-              <Icon name="minus" />
-            </span>
-            <DurationFields
-              legend="Duración que quieres restar"
-              hours={hours}
-              minutes={minutes}
-              onHoursChange={setHours}
-              onMinutesChange={setMinutes}
-              invalid={duration === null}
-            />
-          </div>
+          <ol className="time-calculator__subtractions" aria-label="Duraciones que quieres restar">
+            {rows.map((row, index) => (
+              <li key={row.id} className="time-calculator__subtract-duration">
+                <span className="time-calculator__operator" aria-hidden="true">
+                  <Icon name="minus" />
+                </span>
+                <DurationFields
+                  legend={`Duración ${index + 1} que quieres restar`}
+                  hours={row.hours}
+                  minutes={row.minutes}
+                  onHoursChange={(value) => updateRow(row.id, { hours: value })}
+                  onMinutesChange={(value) => updateRow(row.id, { minutes: value })}
+                  invalid={parseDurationMinutes(row.hours, row.minutes) === null}
+                />
+                {rows.length > 1 ? (
+                  <IconButton
+                    icon="close"
+                    className="time-calculator__remove"
+                    label={`Quitar la resta ${index + 1}`}
+                    onClick={() =>
+                      setRows((current) => current.filter((item) => item.id !== row.id))
+                    }
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <Button
+            icon="plus"
+            variant="ghost"
+            className="time-calculator__add"
+            disabled={rows.length >= MAX_SUBTRACTIONS}
+            onClick={() => {
+              setRows((current) => [...current, { id: nextId, hours: '0', minutes: '0' }]);
+              setNextId((value) => value + 1);
+            }}
+          >
+            Añadir otra resta
+          </Button>
           {duration === null || !baseTime ? (
             <p className="calculator-error" role="status">
               Completa la hora, las horas enteras (0–9999) y los minutos (0–59).
@@ -186,10 +218,20 @@ export default function TimeCalculatorPage() {
               </span>
             </div>
             <p className="calculator-equation mono">
-              {baseTime || '--:--'} <span>−</span>{' '}
-              {duration === null ? '—' : formatMinutes(duration)} <span>=</span>{' '}
-              {subtraction?.time ?? '—'}
+              {baseTime || '--:--'}{' '}
+              {rows.map((row) => {
+                const minutes = parseDurationMinutes(row.hours, row.minutes);
+                return (
+                  <span key={row.id} className="calculator-equation__term">
+                    <span>−</span> {minutes === null ? '—' : formatMinutes(minutes)}{' '}
+                  </span>
+                );
+              })}
+              <span>=</span> {subtraction?.time ?? '—'}
             </p>
+            {rows.length > 1 && duration !== null ? (
+              <p className="calculator-description">Total restado: {formatMinutes(duration)}</p>
+            ) : null}
             <CopyResult
               value={
                 subtraction

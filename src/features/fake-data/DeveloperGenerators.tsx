@@ -1,3 +1,4 @@
+import { copyOnClick } from './copyOnClick';
 import { useState } from 'react';
 import { Button } from '../../shared/ui/Button';
 import { InputField } from '../../shared/ui/FormField';
@@ -50,7 +51,7 @@ export function DeveloperGenerators() {
   return (
     <div className="fake-generator-stack">
       <div
-        className="fake-data-categories fake-data-categories--two"
+        className="fake-data-categories fake-data-categories--compact"
         role="group"
         aria-label="Generadores de desarrollo"
       >
@@ -60,18 +61,13 @@ export function DeveloperGenerators() {
             type="button"
             className="fake-data-category"
             aria-pressed={tool === item.id}
+            title={item.description}
             onClick={() => setTool(item.id)}
           >
-            <span className="fake-data-category__top">
-              <span className="fake-data-category__icon">
-                <Icon name={item.icon} size={22} />
-              </span>
-              <span className="fake-data-category__selected" aria-hidden="true">
-                <Icon name="check" size={13} />
-              </span>
+            <span className="fake-data-category__icon">
+              <Icon name={item.icon} size={18} />
             </span>
             <strong>{item.title}</strong>
-            <span>{item.description}</span>
           </button>
         ))}
       </div>
@@ -136,7 +132,7 @@ export function DeveloperGenerators() {
                 {uuids.map((uuid, index) => (
                   <li key={uuid}>
                     <span className="eyebrow">{String(index + 1).padStart(2, '0')}</span>
-                    <code>{uuid}</code>
+                    <code {...copyOnClick(() => void copy(uuid))}>{uuid}</code>
                     <Button
                       icon="copy"
                       aria-label={`Copiar UUID ${index + 1}`}
@@ -150,7 +146,12 @@ export function DeveloperGenerators() {
             ) : (
               <>
                 <Badge>{text.length.toLocaleString('es-ES')} caracteres</Badge>
-                <pre className="fake-generator-text">{text}</pre>
+                <pre
+                  {...copyOnClick(() => void copy(text))}
+                  className="fake-generator-text fake-copyable"
+                >
+                  {text}
+                </pre>
               </>
             )
           ) : (

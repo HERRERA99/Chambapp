@@ -1,3 +1,4 @@
+import { copyOnClick } from './copyOnClick';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Badge } from '../../shared/ui/Panel';
 import { fakeDataToText } from './fakeData.model';
@@ -76,7 +77,10 @@ function ProfileField({
           onClick={() => void onCopy(field.value, `${field.label}: copiado.`)}
         />
       </dt>
-      <dd className={textFields.has(field.key) ? undefined : 'mono'}>
+      <dd
+        {...copyOnClick(() => void onCopy(field.value, `${field.label}: copiado.`))}
+        className={`fake-copyable ${textFields.has(field.key) ? '' : 'mono'}`}
+      >
         {emailAt > 0 ? (
           <>
             {field.value.slice(0, emailAt)}
