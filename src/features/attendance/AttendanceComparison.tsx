@@ -79,20 +79,7 @@ export function AttendanceComparison({
           },
         ]}
       />
-      <div className="attendance-chart-legend" aria-hidden="true">
-        <span>
-          <i className="attendance-chart-legend__worked" /> Fichado
-        </span>
-        <span>
-          <i className="attendance-chart-legend__imputed" /> Imputado
-        </span>
-        {total.provisionalSeconds > 0 ? (
-          <span>
-            <i className="attendance-chart-legend__provisional" /> Fichaje en curso
-          </span>
-        ) : null}
-      </div>
-      <AttendanceChart days={days} />
+      <AttendanceChart days={days} today={today} />
       {!compact ? (
         <DataTable
           caption="Detalle diario de fichajes y porcentaje imputado"

@@ -254,19 +254,7 @@ export default function WeekPage() {
           ))}
         </div>
       </Panel>
-      <Panel
-        title="Horas fichadas frente al objetivo"
-        action={
-          <div className="chart-legend">
-            <span>
-              <i /> Fichado
-            </span>
-            <span>
-              <i className="chart-legend__target" /> Objetivo
-            </span>
-          </div>
-        }
-      >
+      <Panel title="Horas fichadas frente al objetivo">
         <WeekChart
           hoursLabel="fichadas"
           days={week.days.map((day) => ({ ...day, loggedSeconds: day.workedSeconds }))}

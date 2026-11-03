@@ -1,0 +1,190 @@
+/* Shared bar chart: same look as the landing page weekly balance. */
+.bar-chart {
+  min-width: 0;
+}
+.bar-chart__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 10px;
+  color: #9d8fa5;
+}
+.bar-chart__legend > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.bar-chart__legend > small {
+  margin-left: auto;
+  color: #8a7b8f;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.bar-chart__swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.bar-chart__swatch--neutral {
+  background: #8c7890;
+}
+.bar-chart__swatch--accent {
+  background: #ff497e;
+}
+.bar-chart__swatch--provisional {
+  background: repeating-linear-gradient(45deg, #9d88a2 0 2px, transparent 2px 4px);
+  outline: 1px solid #9d88a2;
+  outline-offset: -1px;
+}
+.bar-chart__plot {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(var(--bar-chart-min, 0px), 1fr);
+  gap: 13px;
+  margin-top: 14px;
+  padding-top: 17px;
+  overflow-x: auto;
+  outline: none;
+  border-radius: 7px;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 54px,
+    rgb(255 255 255 / 3%) 54px,
+    rgb(255 255 255 / 3%) 55px
+  );
+}
+.bar-chart__plot:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.bar-chart__day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 15px 6px 8px;
+  color: #96839e;
+  font-size: 10px;
+  text-align: center;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.bar-chart__day:hover {
+  background: rgb(255 46 86 / 3%);
+}
+.bar-chart__day--active {
+  background: rgb(255 46 86 / 5%);
+  border-color: rgb(255 123 165 / 13%);
+  color: #e7b2ca;
+}
+.bar-chart__badge {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #a3173f, #ff477a);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.bar-chart__header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.bar-chart__columns {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  height: var(--bar-chart-height, 200px);
+}
+.bar-chart__bar {
+  position: relative;
+  display: block;
+  width: 20px;
+  max-width: 35%;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+  transform-origin: bottom;
+  transition: height 0.45s ease;
+}
+.bar-chart__bar--neutral {
+  background: linear-gradient(0deg, #514255, #9d88a2);
+}
+.bar-chart__bar--accent {
+  background: linear-gradient(0deg, #81203d, #ff477a);
+  box-shadow: 0 0 18px rgb(255 46 86 / 8%);
+}
+.bar-chart__provisional {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgb(255 255 255 / 28%) 0 3px,
+    rgb(14 14 17 / 55%) 3px 6px
+  );
+}
+.bar-chart__label {
+  font-size: 10px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.bar-chart__day--active .bar-chart__label {
+  color: #f3d3e2;
+}
+.bar-chart__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: -4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .bar-chart__plot {
+    gap: 4px;
+  }
+  .bar-chart__day {
+    padding: 12px 2px 6px;
+  }
+  .bar-chart__columns {
+    gap: 4px;
+    height: min(var(--bar-chart-height, 200px), 150px);
+  }
+  .bar-chart__bar {
+    width: 13px;
+  }
+  .bar-chart__label,
+  .bar-chart__footer {
+    font-size: 8px;
+  }
+  .bar-chart__header {
+    font-size: 8px;
+  }
+}
+@media print {
+  .bar-chart__bar,
+  .bar-chart__swatch {
+    print-color-adjust: exact;
+  }
+}

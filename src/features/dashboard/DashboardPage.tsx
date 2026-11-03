@@ -159,25 +159,14 @@ export default function DashboardPage() {
         <TimerDisplay />
       </section>
       <AttendanceComparison monday={mondayForDate(today)} today={today} compact />
-      <Panel
-        eyebrow="Comparativa semanal"
-        title="Horas fichadas y objetivo"
-        action={
-          <div className="chart-legend">
-            <span>
-              <i /> Fichado
-            </span>
-            <span>
-              <i className="chart-legend__target" /> Objetivo
-            </span>
-            <strong className="mono">
-              {formatDuration(workedTotal.workedSeconds)} / {formatDuration(total.target)}
-            </strong>
-          </div>
-        }
-      >
+      <Panel eyebrow="Comparativa semanal" title="Horas fichadas y objetivo">
         <WeekChart
           hoursLabel="fichadas"
+          legendAside={
+            <>
+              {formatDuration(workedTotal.workedSeconds)} / {formatDuration(total.target)}
+            </>
+          }
           days={week.map((item) => ({
             date: item.date,
             label: DateTime.fromISO(item.date).setLocale('es').toFormat('ccc dd'),
