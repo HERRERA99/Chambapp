@@ -18,6 +18,7 @@ export function StartTimerButton({
   label = 'Iniciar a otra hora',
   defaultWhen = 'other',
   variant = 'secondary',
+  className,
 }: {
   taskId?: string;
   disabled?: boolean;
@@ -25,6 +26,7 @@ export function StartTimerButton({
   /** Option preselected in the popup: start right now or at another time. */
   defaultWhen?: When;
   variant?: 'primary' | 'secondary';
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const tracker = useTracker();
@@ -33,6 +35,7 @@ export function StartTimerButton({
       <Button
         icon={defaultWhen === 'now' ? 'play' : 'clock'}
         variant={variant}
+        className={className}
         disabled={disabled || tracker.busy || tracker.pending || !!tracker.active}
         onClick={() => setOpen(true)}
       >

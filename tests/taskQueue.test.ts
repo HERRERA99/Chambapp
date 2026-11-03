@@ -47,7 +47,8 @@ test('splits active in-progress and pending tasks from hidden ones, newest first
 });
 
 test('search finds hidden tasks too (title, Odoo ID, project) and respects the project', () => {
-  const byTitle = taskQueue({ ...base, query: 'exportación' });
+  // Accent- and case-insensitive.
+  const byTitle = taskQueue({ ...base, query: 'EXPORTACION' });
   assert.deepEqual(byTitle.active, []);
   assert.deepEqual(ids(byTitle.hidden), ['done']);
   assert.deepEqual(ids(taskQueue({ ...base, query: 't42' }).pending), ['p2']);

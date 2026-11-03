@@ -2367,3 +2367,149 @@
 .week-chart__logged-total {
   color: var(--dim);
 }
+
+/* Search field with live suggestions (combobox). */
+.search-suggest {
+  position: relative;
+}
+.search-suggest__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 40px #0009;
+}
+.search-suggest__list[hidden] {
+  display: none;
+}
+.search-suggest__group {
+  display: block;
+  padding: 8px 8px 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.search-suggest__option {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.search-suggest__option strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.search-suggest__option .dim {
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.search-suggest__option[aria-selected='true'] {
+  background: #ff2e5614;
+  outline: 1px solid #b3415b;
+}
+.search-suggest__option[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.search-suggest__empty {
+  padding: 8px;
+  font-size: 12px;
+}
+
+/* Top bar chips: clock-in/out (with live status) and start timer, same height. */
+.header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.header-chip:hover:not(:disabled) {
+  background: var(--surface-raised);
+  border-color: #6c4b59;
+}
+.header-chip:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+.header-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.header-chip__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.header-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.header-chip--in .header-chip__status {
+  color: var(--success);
+}
+.header-chip--in .header-chip__dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px #88cbb222;
+}
+.header-chip__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.header-chip--warning {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.button.header-chip--timer {
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: #fff;
+}
+.button.header-chip--timer:hover:not(:disabled) {
+  background: #e6124c;
+  border-color: #e6124c;
+}
+/* The tracker box only frames a running/paused timer, not the start chip. */
+.header-tracker:has(.header-chip) {
+  padding: 0;
+  background: none;
+  border: 0;
+}

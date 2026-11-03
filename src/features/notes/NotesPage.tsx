@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Note } from '../../domain/models';
-import { Button } from '../../shared/ui/Button';
+import { Button, IconButton } from '../../shared/ui/Button';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Notice, Badge } from '../../shared/ui/Panel';
-import { InputField, SelectField } from '../../shared/ui/FormField';
+import { SelectField } from '../../shared/ui/FormField';
+import { SearchSuggest } from '../../shared/ui/SearchSuggest';
+import { paginate } from '../../lib/paginate';
+import { TaskPagination } from '../tasks/components/TaskPagination';
 import { Icon } from '../../shared/ui/Icon';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useWorkspace } from '../workspace/useWorkspace';
@@ -16,6 +19,17 @@ import type { NoteSession } from './notesDraft';
 import { noteMatchesSearch, readMarkdownFile } from './notes.model';
 import './notes.css';
 
+const NOTES_PAGE_SIZE = 8;
+const COLLAPSED_KEY = 'chambapp:notes-library-collapsed';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function NotesPage() {
   const { user } = useAuth();
   return <NotesWorkspace key={user?.id} />;
@@ -25,7 +39,13 @@ function NotesWorkspace() {
   const { data, isLoading, error, reload } = useWorkspace();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [libraryPage, setLibraryPage] = useState({ key: '', page: 1 });
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [handledRequest, setHandledRequest] = useState<string | null>(null);
   const draftKey = `chambapp:notes-draft:${user?.id}`;
+  const [restoredDraft] = useState(() => !!readNoteSession(draftKey));
   const [selection, setSelection] = useState<NoteSession | null>(() => {
     const saved = readNoteSession(draftKey);
     return saved?.draft.usuario_id === user?.id ? saved : null;
@@ -38,7 +58,11 @@ function NotesWorkspace() {
   const [importError, setImportError] = useState('');
   const [discardAction, setDiscardAction] = useState<(() => void) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Id of the note shown in the editor, read by late save/delete callbacks.
+  const currentNoteId = useRef<string | undefined>(undefined);
   const handleDirty = useCallback((value: boolean, session?: NoteSession) => {
+    // The mounted editor reports its note on mount and on every change.
+    if (session) currentNoteId.current = session.baseline.id;
     setDirty(value);
     if (value && session) setSelection((previous) => previous ?? session);
   }, []);
@@ -110,6 +134,33 @@ function NotesWorkspace() {
     }
   }
 
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0');
+    } catch {
+      /* The preference just is not remembered. */
+    }
+  }
+  function openNote(note: Note) {
+    leaveDraft(() => setSelection({ baseline: note, draft: note }));
+  }
+
+  // `?nota=<id>` (e.g. from a task popup) opens that note once. A restored or
+  // unsaved draft of another note goes through the discard confirmation.
+  const requestedId = searchParams.get('nota');
+  // Wait while a save or import is running; the request is handled afterwards.
+  if (requestedId && data && !busy && !importing && handledRequest !== requestedId) {
+    setHandledRequest(requestedId);
+    const note = data.notes.find((item) => item.id === requestedId);
+    if (note && selection?.baseline.id !== note.id) {
+      const open = () => setSelection({ baseline: note, draft: note });
+      if (dirty || restoredDraft) setDiscardAction(() => open);
+      else open();
+    }
+  }
+
   if (!data)
     return (
       <Notice title={isLoading ? 'Cargando notas…' : 'No se pudieron cargar las notas'}>
@@ -140,33 +191,49 @@ function NotesWorkspace() {
   const first = visible[0];
   const active = selection ?? (first ? { baseline: first, draft: first } : null);
   const latest = notes.find((note) => note.id === active?.baseline.id);
+  const editorNoteId = active?.baseline.id;
+  const filterKey = JSON.stringify([query, projectId]);
+  // Any change of search or project returns the library to its first page.
+  if (libraryPage.key !== filterKey) setLibraryPage({ key: filterKey, page: 1 });
+  const library = paginate(
+    visible,
+    libraryPage.key === filterKey ? libraryPage.page : 1,
+    NOTES_PAGE_SIZE,
+  );
+  const suggestions = visible.map((note) => ({
+    id: note.id,
+    title: note.titulo || 'Sin título',
+    detail: note.contenido_md.trim().slice(0, 90) || 'Sin contenido todavía',
+  }));
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        eyebrow="Mi espacio / Documentación"
-        title="Notas"
-        description="Ideas, decisiones y documentación en Markdown, conectadas con tu trabajo."
-        actions={
-          <>
-            <Button
-              icon="file"
-              disabled={importing || busy}
-              onClick={() => fileInput.current?.click()}
-            >
-              {importing ? 'Importando…' : 'Importar .md'}
-            </Button>
-            <Button
-              variant="primary"
-              icon="plus"
-              disabled={importing || busy}
-              onClick={() => leaveDraft(() => openNew())}
-            >
-              Nueva nota
-            </Button>
-          </>
-        }
-      />
+    <div className={`page-stack ${fullscreen ? 'notes-page--fullscreen' : ''}`}>
+      {fullscreen ? null : (
+        <PageHeader
+          eyebrow="Mi espacio / Documentación"
+          title="Notas"
+          description="Ideas, decisiones y documentación en Markdown, conectadas con tu trabajo."
+          actions={
+            <>
+              <Button
+                icon="file"
+                disabled={importing || busy}
+                onClick={() => fileInput.current?.click()}
+              >
+                {importing ? 'Importando…' : 'Importar .md'}
+              </Button>
+              <Button
+                variant="primary"
+                icon="plus"
+                disabled={importing || busy}
+                onClick={() => leaveDraft(() => openNew())}
+              >
+                Nueva nota
+              </Button>
+            </>
+          }
+        />
+      )}
       <input
         ref={fileInput}
         type="file"
@@ -185,77 +252,110 @@ function NotesWorkspace() {
           {importError}
         </p>
       ) : null}
-      <div className="notes-workspace">
-        <aside className="notes-library" aria-label="Biblioteca de notas">
-          <div className="notes-library__heading">
-            <h2>Tu biblioteca</h2>
-            <Badge>{notes.length}</Badge>
-          </div>
-          <InputField
-            label="Buscar notas"
-            type="search"
-            value={query}
-            placeholder="Título o contenido…"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <SelectField
-            label="Filtrar por proyecto"
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
+      <div
+        className={`notes-workspace ${collapsed && !fullscreen ? 'notes-workspace--collapsed' : ''}`}
+      >
+        {fullscreen ? null : collapsed ? (
+          <aside
+            className="notes-library notes-library--collapsed"
+            aria-label="Biblioteca de notas"
           >
-            <option value="">Todos los proyectos</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.nombre}
-                {project.archivado_en ? ' (archivado)' : ''}
-              </option>
-            ))}
-          </SelectField>
-          <div className="notes-library__list">
-            {visible.map((note) => (
-              <button
-                type="button"
-                disabled={busy || importing}
-                key={note.id}
-                className={`notes-library__note ${active?.baseline.id === note.id ? 'notes-library__note--active' : ''}`}
-                aria-pressed={active?.baseline.id === note.id}
-                onClick={() => {
-                  if (note.id !== active?.baseline.id)
-                    leaveDraft(() => setSelection({ baseline: note, draft: note }));
-                }}
-              >
-                <span className="notes-library__note-title">
-                  <Icon name="file" size={16} />
-                  <strong>{note.titulo}</strong>
-                  <span className="mono dim">.md</span>
-                </span>
-                <span className="notes-library__excerpt">
-                  {note.contenido_md.trim().slice(0, 100) || 'Sin contenido todavía'}
-                </span>
-                <span className="notes-library__metadata">
-                  <time dateTime={note.actualizado_en}>
-                    {new Date(note.actualizado_en).toLocaleDateString('es', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </time>
-                  <span>
-                    {note.proyecto_ids.length}{' '}
-                    {note.proyecto_ids.length === 1 ? 'proyecto' : 'proyectos'} ·{' '}
-                    {note.tarea_ids.length} {note.tarea_ids.length === 1 ? 'tarea' : 'tareas'}
+            <IconButton icon="sidebarOpen" label="Mostrar biblioteca" onClick={toggleCollapsed} />
+            <Badge>{notes.length}</Badge>
+          </aside>
+        ) : (
+          <aside className="notes-library" aria-label="Biblioteca de notas">
+            <div className="notes-library__heading">
+              <h2>Tu biblioteca</h2>
+              <div className="actions">
+                <Badge>{notes.length}</Badge>
+                <IconButton
+                  icon="sidebarClose"
+                  label="Minimizar biblioteca"
+                  onClick={toggleCollapsed}
+                />
+              </div>
+            </div>
+            <SearchSuggest
+              label="Buscar notas"
+              value={query}
+              placeholder="Título o contenido…"
+              onChange={setQuery}
+              suggestions={suggestions}
+              emptyText="Ninguna nota coincide."
+              onPick={(suggestion) => {
+                const note = notes.find((item) => item.id === suggestion.id);
+                if (note && note.id !== active?.baseline.id) openNote(note);
+              }}
+            />
+            <SelectField
+              label="Filtrar por proyecto"
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+            >
+              <option value="">Todos los proyectos</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.nombre}
+                  {project.archivado_en ? ' (archivado)' : ''}
+                </option>
+              ))}
+            </SelectField>
+            <div className="notes-library__list">
+              {library.items.map((note) => (
+                <button
+                  type="button"
+                  disabled={busy || importing}
+                  key={note.id}
+                  className={`notes-library__note ${active?.baseline.id === note.id ? 'notes-library__note--active' : ''}`}
+                  aria-pressed={active?.baseline.id === note.id}
+                  onClick={() => {
+                    if (note.id !== active?.baseline.id) openNote(note);
+                  }}
+                >
+                  <span className="notes-library__note-title">
+                    <Icon name="file" size={16} />
+                    <strong>{note.titulo}</strong>
+                    <span className="mono dim">.md</span>
                   </span>
-                </span>
-              </button>
-            ))}
-            {!visible.length ? (
-              <p className="notes-library__empty muted">
-                {notes.length
-                  ? 'No hay notas con estos filtros.'
-                  : 'Tu primera idea empieza aquí. Crea una nota o importa un archivo .md.'}
-              </p>
+                  <span className="notes-library__excerpt">
+                    {note.contenido_md.trim().slice(0, 100) || 'Sin contenido todavía'}
+                  </span>
+                  <span className="notes-library__metadata">
+                    <time dateTime={note.actualizado_en}>
+                      {new Date(note.actualizado_en).toLocaleDateString('es', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                    </time>
+                    <span>
+                      {note.proyecto_ids.length}{' '}
+                      {note.proyecto_ids.length === 1 ? 'proyecto' : 'proyectos'} ·{' '}
+                      {note.tarea_ids.length} {note.tarea_ids.length === 1 ? 'tarea' : 'tareas'}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {!visible.length ? (
+                <p className="notes-library__empty muted">
+                  {notes.length
+                    ? 'No hay notas con estos filtros.'
+                    : 'Tu primera idea empieza aquí. Crea una nota o importa un archivo .md.'}
+                </p>
+              ) : null}
+            </div>
+            {library.pages > 1 ? (
+              <TaskPagination
+                page={library.page}
+                pages={library.pages}
+                total={visible.length}
+                pageSize={NOTES_PAGE_SIZE}
+                noun="notas"
+                onChange={(page) => setLibraryPage({ key: filterKey, page })}
+              />
             ) : null}
-          </div>
-        </aside>
+          </aside>
+        )}
         {active ? (
           <NoteEditor
             key={active.baseline.id}
@@ -267,11 +367,18 @@ function NotesWorkspace() {
             onDirty={handleDirty}
             onBusy={setBusy}
             locked={importing}
-            onSaved={(note) => setSelection({ baseline: note, draft: note })}
+            onSaved={(note) => {
+              // A late save from an editor that is no longer shown must not reselect it.
+              if (currentNoteId.current === note.id) setSelection({ baseline: note, draft: note });
+            }}
+            fullscreen={fullscreen}
+            onFullscreen={setFullscreen}
             onDeleted={() => {
+              if (currentNoteId.current !== editorNoteId) return;
               setDirty(false);
               setBusy(false);
               setSelection(null);
+              setFullscreen(false);
             }}
           />
         ) : (
@@ -291,6 +398,7 @@ function NotesWorkspace() {
       </div>
       <ConfirmDialog
         open={!!discardAction}
+        busy={busy || importing}
         title="Tienes cambios sin guardar"
         description="Puedes cancelar para guardar tu nota antes de continuar. Si continúas, se descartará este borrador."
         confirmLabel="Descartar y continuar"

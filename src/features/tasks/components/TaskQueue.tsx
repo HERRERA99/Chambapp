@@ -1,7 +1,8 @@
 import type { Project, Task } from '../../../domain/models';
 import { formatDuration } from '../../../domain/time';
 import { Button } from '../../../shared/ui/Button';
-import { InputField, SelectField, Toggle } from '../../../shared/ui/FormField';
+import { SelectField } from '../../../shared/ui/FormField';
+import { SearchSuggest } from '../../../shared/ui/SearchSuggest';
 import { taskStatusLabels } from '../taskLabels';
 import { isArchivedTask } from '../taskQueue';
 import '../task-queue.css';
@@ -20,11 +21,11 @@ export function TaskQueue({
   activeTaskId,
   query,
   projectId,
-  archiveMode,
+  allMatches,
   totals,
   onQuery,
   onProject,
-  onArchiveMode,
+  onShowHidden,
   onSelect,
   onOpen,
 }: {
@@ -37,11 +38,13 @@ export function TaskQueue({
   activeTaskId: string | null;
   query: string;
   projectId: string | null;
-  archiveMode: boolean;
+  /** Every task matching the search (active and hidden), for the suggestions. */
+  allMatches: Task[];
   totals: Totals;
   onQuery: (value: string) => void;
   onProject: (value: string | null) => void;
-  onArchiveMode: (value: boolean) => void;
+  /** Switches to the «Finalizadas y archivadas» tab. */
+  onShowHidden: () => void;
   /** Active task: becomes the focused task. */
   onSelect: (task: Task) => void;
   /** Hidden task: opens the task popup. */
@@ -59,6 +62,17 @@ export function TaskQueue({
     },
   ];
   const shown = inProgress.length + pending.length + hidden.length;
+  const suggestions = allMatches.map((task) => ({
+    id: task.id,
+    title: task.titulo,
+    detail: [
+      projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto',
+      isArchivedTask(task, projects) ? 'Archivada' : taskStatusLabels[task.estado],
+      task.odoo_id,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  }));
 
   function row(task: Task, isHidden: boolean) {
     const logged = totals(task.id).logged;
@@ -100,13 +114,18 @@ export function TaskQueue({
   return (
     <aside className="task-queue" aria-label="Siguientes tareas">
       <div className="task-queue__filters">
-        <InputField
+        <SearchSuggest
           label="Buscar tarea"
-          type="search"
           value={query}
-          onChange={(event) => onQuery(event.target.value)}
+          onChange={onQuery}
           placeholder="Título, proyecto o ID de Odoo…"
-          hint="También encuentra tareas finalizadas y archivadas."
+          hint="Incluye tareas finalizadas y archivadas."
+          suggestions={suggestions}
+          emptyText="Ninguna tarea coincide."
+          onPick={(suggestion) => {
+            const task = allMatches.find((item) => item.id === suggestion.id);
+            if (task) onOpen(task);
+          }}
         />
         <SelectField
           label="Proyecto"
@@ -121,7 +140,6 @@ export function TaskQueue({
             </option>
           ))}
         </SelectField>
-        <Toggle label="Finalizadas y archivadas" checked={archiveMode} onChange={onArchiveMode} />
       </div>
       {groups.map((group) =>
         group.tasks.length ? (
@@ -135,11 +153,7 @@ export function TaskQueue({
             </h2>
             <ul>{group.tasks.map((task) => row(task, group.id === 'hidden'))}</ul>
             {group.id === 'hidden' && group.total > group.tasks.length ? (
-              <Button
-                variant="ghost"
-                className="task-queue__more"
-                onClick={() => onArchiveMode(true)}
-              >
+              <Button variant="ghost" className="task-queue__more" onClick={onShowHidden}>
                 Ver las {group.total}
               </Button>
             ) : null}

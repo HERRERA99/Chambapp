@@ -275,10 +275,32 @@ function weekEntries(): WorkspaceData['entries'] {
   });
   return entries;
 }
+// More notes so the library paginates (8 per page); some linked to the ERP task.
+const extraNotes: WorkspaceData['notes'] = Array.from({ length: 12 }, (_, index) => ({
+  ...owned,
+  id: `99999999-9999-4999-8999-9999999999${String(index + 10).padStart(2, '0')}`,
+  titulo: index === 0 ? 'Acta de cierre contable' : `Nota de seguimiento ${index + 1}`,
+  contenido_md: Array.from(
+    { length: 60 },
+    (_, line) =>
+      `${line % 10 === 0 ? `## Sección ${line / 10 + 1}\n\n` : ''}Línea ${line + 1} de la nota ${index + 1}.`,
+  ).join('\n\n'),
+  proyecto_ids: [],
+  tarea_ids: index < 2 ? ['cccccccc-cccc-4ccc-cccc-ccccccccccc3'] : [],
+  actualizado_en: new Date(Date.parse(now) - index * 3600_000).toISOString(),
+}));
 data = {
   ...data,
-  tasks: [...data.tasks, ...extraTasks],
+  tasks: [
+    ...data.tasks,
+    ...extraTasks.map((task) =>
+      task.odoo_id === 'T512004'
+        ? { ...task, odoo_url: 'https://odoo.example.com/odoo/tasks/512004' }
+        : task,
+    ),
+  ],
   entries: [...data.entries, ...weekEntries()],
+  notes: [...data.notes, ...extraNotes],
 };
 export const operations: { action: string; payload: Record<string, Json | undefined> }[] = [];
 export async function executeCommand(action: string, payload: Record<string, Json | undefined>) {

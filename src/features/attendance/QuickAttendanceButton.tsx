@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Attendance } from '../../domain/models';
 import { DateTime } from 'luxon';
 import { Button } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
+import { formatClock } from '../../domain/time';
 import { Modal } from '../../shared/ui/Modal';
 import { readableError } from '../../lib/supabase/errors';
 import { useWorkspace } from '../workspace/useWorkspace';
@@ -38,25 +40,35 @@ export function QuickAttendanceButton({ disabled }: { disabled: boolean }) {
   return (
     <>
       {attendance.pending && step === 'closed' ? (
-        <Button
-          variant="primary"
+        <button
+          type="button"
+          className="header-chip header-chip--warning"
           disabled={attendance.busy}
           onClick={() => void attendance.retry().catch(() => undefined)}
         >
+          <Icon name="refresh" size={15} />
           {attendance.busy ? 'Confirmando…' : 'Reintentar fichaje'}
-        </Button>
+        </button>
       ) : (
-        <Button
-          variant={exit ? 'secondary' : 'primary'}
-          icon={exit ? 'logout' : 'play'}
+        <button
+          type="button"
+          className={`header-chip header-chip--attendance ${exit ? 'header-chip--in' : ''}`}
           disabled={disabled || step !== 'closed'}
+          aria-label={`${verb}${exit ? ` (dentro desde hace ${formatClock(attendance.elapsedSeconds)})` : ''}`}
           onClick={() => {
             setError('');
             setStep('choose');
           }}
         >
-          {attendance.busy ? 'Guardando…' : verb}
-        </Button>
+          <span className="header-chip__status" aria-hidden="true">
+            <span className="header-chip__dot" />
+            {exit ? formatClock(attendance.elapsedSeconds) : 'Fuera'}
+          </span>
+          <span className="header-chip__action" aria-hidden="true">
+            <Icon name={exit ? 'logout' : 'play'} size={15} />
+            {attendance.busy ? 'Guardando…' : verb}
+          </span>
+        </button>
       )}
       {step === 'choose' ? (
         <Modal

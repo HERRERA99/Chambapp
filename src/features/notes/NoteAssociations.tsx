@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import type { Project, Task } from '../../domain/models';
-import { InputField } from '../../shared/ui/FormField';
+import { SearchSuggest } from '../../shared/ui/SearchSuggest';
+import type { Suggestion } from '../../shared/ui/SearchSuggest';
 import { normalizeNoteSearch } from './notes.model';
 
+const LIMIT = 100;
+
+/** Linked projects and tasks as removable chips, plus one search field to add more. */
 export function NoteAssociations({
   projects,
   tasks,
@@ -21,117 +25,172 @@ export function NoteAssociations({
   const [search, setSearch] = useState('');
   const query = normalizeNoteSearch(search);
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  const visibleProjects = projects.filter((project) =>
-    normalizeNoteSearch(project.nombre).includes(query),
-  );
-  const visibleTasks = tasks.filter((task) =>
-    normalizeNoteSearch(
-      `${task.titulo} ${task.odoo_id ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`,
-    ).includes(query),
-  );
-  function toggle(ids: string[], id: string) {
-    return ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id];
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const projectsFull = projectIds.length >= LIMIT;
+  const tasksFull = taskIds.length >= LIMIT;
+  const suggestions: Suggestion[] = [
+    ...projects
+      .filter(
+        (project) =>
+          !projectIds.includes(project.id) &&
+          normalizeNoteSearch(`${project.nombre} ${project.cliente ?? ''}`).includes(query),
+      )
+      .map((project) => ({
+        id: `project:${project.id}`,
+        group: 'Proyectos',
+        title: project.nombre,
+        detail: projectsFull
+          ? `Límite de ${LIMIT} proyectos alcanzado`
+          : [project.cliente, project.archivado_en ? 'Archivado' : null]
+              .filter(Boolean)
+              .join(' · ') || undefined,
+        disabled: projectsFull,
+      })),
+    ...tasks
+      .filter(
+        (task) =>
+          !taskIds.includes(task.id) &&
+          normalizeNoteSearch(
+            `${task.titulo} ${task.odoo_id ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`,
+          ).includes(query),
+      )
+      .map((task) => ({
+        id: `task:${task.id}`,
+        group: 'Tareas',
+        title: task.titulo,
+        detail: tasksFull
+          ? `Límite de ${LIMIT} tareas alcanzado`
+          : [
+              projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible',
+              task.odoo_id,
+              task.archivado_en ? 'Archivada' : null,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+        disabled: tasksFull,
+      })),
+  ];
+
+  function add(suggestion: Suggestion) {
+    const [kind, id] = suggestion.id.split(':') as ['project' | 'task', string];
+    if (kind === 'project') onChange([...projectIds, id], taskIds);
+    else onChange(projectIds, [...taskIds, id]);
   }
+
   return (
-    <details
-      className="note-associations"
-      open={projectIds.length + taskIds.length > 0 || undefined}
-    >
-      <summary>
-        Proyectos y tareas asociados{' '}
-        <span className="dim">({projectIds.length + taskIds.length})</span>
-      </summary>
-      <p className="field__hint">
-        Relaciona esta nota con varios proyectos y tareas. Puedes asociar tareas de cualquier
-        proyecto.
-      </p>
-      <InputField
-        label="Buscar proyectos o tareas"
-        type="search"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-      <div className="note-associations__columns">
-        <fieldset disabled={disabled}>
-          <legend>Proyectos · {projectIds.length}/100</legend>
-          <div className="note-associations__options">
-            {projectIds
-              .filter((id) => !projectById.has(id))
-              .map((id) => (
-                <label className="note-associations__option" key={id}>
-                  <input
-                    type="checkbox"
-                    checked
-                    onChange={() => onChange(toggle(projectIds, id), taskIds)}
-                  />
-                  <span>
-                    Proyecto no disponible<small>Desmarca para quitar esta asociación.</small>
-                  </span>
-                </label>
-              ))}
-            {visibleProjects.map((project) => (
-              <label className="note-associations__option" key={project.id}>
-                <input
-                  type="checkbox"
-                  checked={projectIds.includes(project.id)}
-                  disabled={!projectIds.includes(project.id) && projectIds.length >= 100}
-                  onChange={() => onChange(toggle(projectIds, project.id), taskIds)}
-                />
-                <span>
-                  {project.nombre}
-                  {project.archivado_en ? <small>Archivado</small> : null}
-                </span>
-              </label>
-            ))}
-            {!visibleProjects.length ? (
-              <p className="muted">
-                {projects.length ? 'Sin coincidencias.' : 'Todavía no hay proyectos.'}
-              </p>
-            ) : null}
-          </div>
-        </fieldset>
-        <fieldset disabled={disabled}>
-          <legend>Tareas · {taskIds.length}/100</legend>
-          <div className="note-associations__options">
-            {taskIds
-              .filter((id) => !tasks.some((task) => task.id === id))
-              .map((id) => (
-                <label className="note-associations__option" key={id}>
-                  <input
-                    type="checkbox"
-                    checked
-                    onChange={() => onChange(projectIds, toggle(taskIds, id))}
-                  />
-                  <span>
-                    Tarea no disponible<small>Desmarca para quitar esta asociación.</small>
-                  </span>
-                </label>
-              ))}
-            {visibleTasks.map((task) => (
-              <label className="note-associations__option" key={task.id}>
-                <input
-                  type="checkbox"
-                  checked={taskIds.includes(task.id)}
-                  disabled={!taskIds.includes(task.id) && taskIds.length >= 100}
-                  onChange={() => onChange(projectIds, toggle(taskIds, task.id))}
-                />
-                <span>
-                  {task.titulo}
-                  <small>
-                    {projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible'}
-                    {task.archivado_en ? ' · Archivada' : ''}
-                  </small>
-                </span>
-              </label>
-            ))}
-            {!visibleTasks.length ? (
-              <p className="muted">
-                {tasks.length ? 'Sin coincidencias.' : 'Todavía no hay tareas.'}
-              </p>
-            ) : null}
-          </div>
-        </fieldset>
+    <section className="note-associations" aria-labelledby="note-associations-title">
+      <div className="note-associations__header">
+        <h3 id="note-associations-title">Proyectos y tareas asociados</h3>
+        <span className="mono dim">{projectIds.length + taskIds.length}</span>
       </div>
-    </details>
+      <div className="note-associations__groups">
+        <ChipGroup
+          label="Proyectos"
+          count={projectIds.length}
+          empty="Sin proyectos asociados."
+          disabled={disabled}
+          chips={projectIds.map((id) => {
+            const project = projectById.get(id);
+            return {
+              id,
+              title: project?.nombre ?? 'Proyecto no disponible',
+              detail: project ? (project.archivado_en ? 'Archivado' : undefined) : 'Quítalo',
+              missing: !project,
+            };
+          })}
+          onRemove={(id) =>
+            onChange(
+              projectIds.filter((value) => value !== id),
+              taskIds,
+            )
+          }
+        />
+        <ChipGroup
+          label="Tareas"
+          count={taskIds.length}
+          empty="Sin tareas asociadas."
+          disabled={disabled}
+          chips={taskIds.map((id) => {
+            const task = taskById.get(id);
+            return {
+              id,
+              title: task?.titulo ?? 'Tarea no disponible',
+              detail: task
+                ? (projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible')
+                : 'Quítala',
+              missing: !task,
+            };
+          })}
+          onRemove={(id) =>
+            onChange(
+              projectIds,
+              taskIds.filter((value) => value !== id),
+            )
+          }
+        />
+      </div>
+      <SearchSuggest
+        label="Añadir proyecto o tarea"
+        value={search}
+        onChange={setSearch}
+        placeholder="Escribe para buscar proyectos o tareas…"
+        suggestions={suggestions}
+        emptyText="Nada más que asociar con ese texto."
+        clearOnPick
+        disabled={disabled}
+        onPick={add}
+      />
+    </section>
+  );
+}
+
+function ChipGroup({
+  label,
+  count,
+  empty,
+  chips,
+  disabled,
+  onRemove,
+}: {
+  label: string;
+  count: number;
+  empty: string;
+  chips: { id: string; title: string; detail?: string; missing: boolean }[];
+  disabled: boolean;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="note-associations__group">
+      <span className="note-associations__label">
+        {label} · {count}/{LIMIT}
+      </span>
+      {chips.length ? (
+        <ul className="note-chips">
+          {chips.map((chip) => (
+            <li
+              key={chip.id}
+              className={`note-chip ${chip.missing ? 'note-chip--missing' : ''}`}
+              title={chip.title}
+            >
+              <span className="note-chip__text">
+                <strong>{chip.title}</strong>
+                {chip.detail ? <small>{chip.detail}</small> : null}
+              </span>
+              <button
+                type="button"
+                className="note-chip__remove"
+                aria-label={`Quitar ${chip.title}`}
+                disabled={disabled}
+                onClick={() => onRemove(chip.id)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="dim note-associations__empty">{empty}</p>
+      )}
+    </div>
   );
 }

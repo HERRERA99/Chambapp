@@ -132,3 +132,95 @@
   margin-top: 6px;
   width: 100%;
 }
+/* Tabs: active vs completed/archived tasks. */
+.task-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.task-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.task-tabs button:hover {
+  color: var(--text);
+}
+.task-tabs button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.task-tabs button:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+.task-tabs .mono {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+/* Notes linked to a task, inside the task popup. */
+.task-notes {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+.task-notes h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.task-notes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.task-notes__note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text);
+  text-decoration: none;
+}
+.task-notes__note:hover,
+.task-notes__note:focus-visible {
+  border-color: var(--border);
+}
+.task-notes__text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.task-notes__text strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.task-notes__text .dim {
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.task-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}

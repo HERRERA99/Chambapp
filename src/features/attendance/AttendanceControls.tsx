@@ -13,6 +13,13 @@ export function AttendanceControls({ compact = false }: { compact?: boolean }) {
   if (!data) return null;
   const zone = data.profile.zona_horaria;
   const disabled = attendance.busy || attendance.pending || !!error;
+  // Top bar: one chip that shows the status and opens the clock-in/out popup.
+  if (compact)
+    return (
+      <div className="attendance-controls attendance-controls--compact">
+        <QuickAttendanceButton disabled={disabled} />
+      </div>
+    );
   return (
     <div className={`attendance-controls ${compact ? 'attendance-controls--compact' : ''}`}>
       <div className="attendance-controls__status">
@@ -44,10 +51,7 @@ export function AttendanceControls({ compact = false }: { compact?: boolean }) {
         ) : null}
       </div>
       <div className="actions">
-        {compact ? (
-          // Stays mounted while an operation is pending so its popup keeps its state.
-          <QuickAttendanceButton disabled={disabled} />
-        ) : attendance.pending ? (
+        {attendance.pending ? (
           <Button
             variant="primary"
             disabled={attendance.busy}

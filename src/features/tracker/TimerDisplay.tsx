@@ -26,7 +26,12 @@ function LiveTimer({ compact }: { compact: boolean }) {
   if (!tracker.active && !tracker.pausedTaskId && !tracker.pending)
     return (
       <div className="actions">
-        <StartTimerButton label="Iniciar cronómetro" defaultWhen="now" variant="primary" />
+        <StartTimerButton
+          label="Iniciar cronómetro"
+          defaultWhen="now"
+          variant="primary"
+          className={compact ? 'header-chip header-chip--timer' : undefined}
+        />
       </div>
     );
   const disabled = tracker.busy || tracker.pending;

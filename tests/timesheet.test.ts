@@ -80,7 +80,10 @@ test('builds Monday–Friday plus weekend days only when they have entries', () 
 test('lists one item per entry, sorted, excluding deleted entries and other weeks', () => {
   const week = buildTimesheetWeek({
     monday,
-    tasks: [task('a', { odoo_id: 'T1' }), task('b', { eliminado_en: '2026-10-01T00:00:00Z' })],
+    tasks: [
+      task('a', { odoo_id: 'T1', odoo_url: 'https://odoo.example/tasks/1' }),
+      task('b', { eliminado_en: '2026-10-01T00:00:00Z' }),
+    ],
     entries: [
       entry('late', {
         inicio_en: `${monday}T12:00:00Z`,
@@ -94,7 +97,12 @@ test('lists one item per entry, sorted, excluding deleted entries and other week
         duracion_imputada_segundos: null,
       }),
       entry('gone', { eliminado_en: '2026-10-19T10:00:00Z' }),
-      entry('orphan', { tarea_id: 'b', inicio_en: `${monday}T13:00:00Z`, odoo_id: 'T9' }),
+      entry('orphan', {
+        tarea_id: 'b',
+        inicio_en: `${monday}T13:00:00Z`,
+        odoo_id: 'T9',
+        odoo_url: 'javascript:alert(1)',
+      }),
       entry('nextweek', { fecha: '2026-10-26' }),
       entry('prevsunday', { fecha: '2026-10-18' }),
     ],
@@ -106,6 +114,10 @@ test('lists one item per entry, sorted, excluding deleted entries and other week
   );
   assert.equal(first.items[0]!.title, 'Tarea a');
   assert.equal(first.items[0]!.odooId, 'T1');
+  assert.equal(first.items[0]!.odooUrl, 'https://odoo.example/tasks/1');
+  // Unsafe links are never exposed.
+  assert.equal(first.items[2]!.odooUrl, null);
+  assert.equal(first.items[1]!.odooUrl, 'https://odoo.example/tasks/1');
   assert.equal(first.items[2]!.title, 'Tarea no disponible');
   assert.equal(first.items[2]!.odooId, 'T9');
   assert.equal(first.items[3]!.loggedSeconds, null);

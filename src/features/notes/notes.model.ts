@@ -60,3 +60,14 @@ export function noteMatchesSearch(
   const query = normalizeNoteSearch(search);
   return !query || normalizeNoteSearch(`${note.titulo}\n${note.contenido_md}`).includes(query);
 }
+
+type Scrollable = { scrollTop: number; scrollHeight: number; clientHeight: number };
+
+/** Scroll position for `target` matching the proportional position of `source`. */
+export function syncScrollTarget(source: Scrollable, target: Scrollable): number {
+  const sourceRange = source.scrollHeight - source.clientHeight;
+  const targetRange = target.scrollHeight - target.clientHeight;
+  if (sourceRange <= 0 || targetRange <= 0) return 0;
+  const ratio = Math.min(1, Math.max(0, source.scrollTop / sourceRange));
+  return Math.round(ratio * targetRange);
+}

@@ -1,11 +1,14 @@
 import { DateTime } from 'luxon';
 import type { Task, TimeEntry } from '../../domain/models';
 import { weekDates } from '../../domain/time.ts';
+import { isOdooUrl } from '../../domain/odoo.ts';
 
 export type TimesheetItem = {
   entry: TimeEntry;
   title: string;
   odooId: string | null;
+  /** Safe Odoo link of the task, if any. */
+  odooUrl: string | null;
   range: string;
   /** Rounded duration to log in Odoo; null while the entry is still running. */
   loggedSeconds: number | null;
@@ -51,6 +54,7 @@ export function buildTimesheetWeek({
           entry,
           title: task && !task.eliminado_en ? task.titulo : 'Tarea no disponible',
           odooId: entry.odoo_id ?? task?.odoo_id ?? null,
+          odooUrl: [task?.odoo_url, entry.odoo_url].find(isOdooUrl) ?? null,
           range: formatRange(entry),
           loggedSeconds: entry.fin_en ? (entry.duracion_imputada_segundos ?? 0) : null,
         };

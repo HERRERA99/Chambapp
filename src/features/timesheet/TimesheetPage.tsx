@@ -170,7 +170,20 @@ function TimesheetRow({
       className={`timesheet__item ${imputed ? 'timesheet__item--imputed' : ''} ${open ? 'timesheet__item--open' : ''}`}
     >
       <div className="timesheet__item-head">
-        <strong className="timesheet__item-title">{item.title}</strong>
+        {item.odooUrl ? (
+          <a
+            className="timesheet__item-title timesheet__item-title--link"
+            href={item.odooUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir en Odoo"
+          >
+            {item.title}
+            <Icon name="external" size={11} />
+          </a>
+        ) : (
+          <strong className="timesheet__item-title">{item.title}</strong>
+        )}
         {item.odooId ? (
           <span className="timesheet__odoo-id mono" title={item.odooId}>
             {item.odooId}

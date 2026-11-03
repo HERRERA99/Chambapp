@@ -27,6 +27,7 @@ const FakeDataPage = lazy(() => import('../../src/features/fake-data/FakeDataPag
 const DeveloperPage = lazy(() => import('../../src/features/developer/DeveloperPage'));
 const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
 const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
+const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
 const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const noop = async () => {};
 const client = new QueryClient();
@@ -152,6 +153,7 @@ function Smoke() {
                         <Route path="/datos-ficticios" element={<FakeDataPage />} />
                         <Route path="/utilidades-desarrollo" element={<DeveloperPage />} />
                         <Route path="/notas" element={<NotesPage />} />
+                        <Route path="/proyectos" element={<ProjectsPage />} />
                         <Route path="/tareas" element={<TasksPage />} />
                         <Route path="/parte-semanal" element={<TimesheetPage />} />
                       </Route>

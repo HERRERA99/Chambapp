@@ -6,20 +6,23 @@ export function TaskPagination({
   pages,
   total,
   pageSize,
+  noun = 'tareas',
   onChange,
 }: {
   page: number;
   pages: number;
   total: number;
   pageSize: number;
+  /** Plural noun for the counter and labels, e.g. «notas». */
+  noun?: string;
   onChange: (page: number) => void;
 }) {
   return (
-    <nav className="task-pagination" aria-label="Paginación de tareas">
+    <nav className="task-pagination" aria-label={`Paginación de ${noun}`}>
       <div className="task-pagination__controls">
         <IconButton
           icon="left"
-          label="Página anterior de tareas"
+          label={`Página anterior de ${noun}`}
           disabled={page === 1}
           onClick={() => onChange(page - 1)}
         />
@@ -28,13 +31,13 @@ export function TaskPagination({
         </span>
         <IconButton
           icon="right"
-          label="Página siguiente de tareas"
+          label={`Página siguiente de ${noun}`}
           disabled={page === pages}
           onClick={() => onChange(page + 1)}
         />
       </div>
       <p className="task-pagination__count">
-        {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total} tareas
+        {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total} {noun}
       </p>
     </nav>
   );

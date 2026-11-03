@@ -5,16 +5,6 @@
   gap: 14px;
   min-width: 0;
 }
-.archived-view__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.archived-view__header h2 {
-  margin: 0;
-  font-size: 16px;
-}
 .archived-cards {
   list-style: none;
   margin: 0;

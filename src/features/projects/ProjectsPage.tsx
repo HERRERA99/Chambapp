@@ -8,7 +8,8 @@ import { StatGrid } from '../../shared/ui/StatGrid';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Badge, Notice } from '../../shared/ui/Panel';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
-import { InputField } from '../../shared/ui/FormField';
+import { SearchSuggest } from '../../shared/ui/SearchSuggest';
+import { normalizeNoteSearch } from '../notes/notes.model';
 import { DataTable } from '../../shared/ui/DataTable';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
@@ -38,9 +39,9 @@ export default function ProjectsPage() {
   const visible = projects.filter(
     (project) =>
       (status === 'all' || (status === 'archived') === !!project.archivado_en) &&
-      `${project.nombre} ${project.cliente ?? ''}`
-        .toLocaleLowerCase('es')
-        .includes(query.toLocaleLowerCase('es')),
+      normalizeNoteSearch(`${project.nombre} ${project.cliente ?? ''}`).includes(
+        normalizeNoteSearch(query),
+      ),
   );
   const totals = entryTotals(entries);
   const projectTotals = entryTotalsBy(entries, 'proyecto_id');
@@ -149,13 +150,31 @@ export default function ProjectsPage() {
         ]}
       />
       <div className="toolbar">
-        <InputField
-          label="Buscar proyectos"
-          className="search-field"
-          placeholder="Buscar por proyecto o cliente…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        <div className="search-field">
+          <SearchSuggest
+            label="Buscar proyectos"
+            placeholder="Buscar por proyecto o cliente…"
+            value={query}
+            onChange={setQuery}
+            emptyText="Ningún proyecto coincide."
+            suggestions={projects
+              .filter((project) =>
+                normalizeNoteSearch(`${project.nombre} ${project.cliente ?? ''}`).includes(
+                  normalizeNoteSearch(query),
+                ),
+              )
+              .map((project) => ({
+                id: project.id,
+                title: project.nombre,
+                detail: [project.cliente, project.archivado_en ? 'Archivado' : 'Activo']
+                  .filter(Boolean)
+                  .join(' · '),
+              }))}
+            onPick={(suggestion) =>
+              setSelected(projects.find((project) => project.id === suggestion.id) ?? null)
+            }
+          />
+        </div>
         <SegmentedControl<StatusFilter>
           label="Estado de proyectos"
           value={status}

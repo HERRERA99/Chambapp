@@ -57,3 +57,27 @@ Resultado: scratchpad/p2i2/claudex-7_58r9um/result.json. Presupuesto de inspecci
 - REVIEW-001 (medium) el editor manual usaba el fichaje vivo (versión nueva) → ACEPTADO y corregido: snapshot al abrir. SIN inspección independiente.
 - REVIEW-002 (low) fidelidad del arnés (cronómetro inicial y tiempo transcurrido). NO corregido: solo afecta a la herramienta de pruebas, no a la app.
 Pruebas tras el arreglo: typecheck, lint, 130 tests, build, prettier OK; editor de salida verificado en navegador.
+
+# Ronda de cambios 3 (PLAN-3.md)
+- Petición: estilo de botones de barra superior, biblioteca paginada y minimizable, dividida sincronizada, pantalla completa de sección, asociaciones de notas, buscadores con sugerencias (cada uno lo suyo; proyecto abre detalle), notas en popup de tarea, sustituir interruptor (investigado: pestañas con contador), enlace Odoo en parte semanal. Implementación autorizada. Sin commit.
+
+## Plan 3 ronda 1 — Codex — APPROVED
+Resultado: scratchpad/p3r1/claudex-57nl3516/result.json.
+
+## Plan 3 — build (Claude)
+Base de inspección: 941e430 (commit del usuario con Planes 1–2). Pruebas: typecheck, lint, 133 tests, build, prettier OK; verificación en navegador de todos los criterios.
+
+## Plan 3 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p3i1/claudex-_v0jsx2d/result.json. Todos ACEPTADOS y corregidos:
+- P3-001 (high) guardado tardío de otra nota podía reseleccionarla y perder cambios → ?nota espera a que no haya guardado/importación; diálogo de descarte bloqueado si busy; callbacks de guardar/eliminar ignorados si el editor ya no es el actual.
+- P3-002 búsqueda de tareas/proyectos sensible a acentos → normalizeNoteSearch en taskQueue y lista de proyectos (+ test).
+- P3-003 opción activa fuera de vista con teclado → scroll interno de la lista.
+- P3-004 lista de notas desbordaba en móvil → overflow-y:auto.
+- P3-005 raíl minimizado sobrescrito por media queries → mayor especificidad.
+Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador (1440, 1000, 560 px).
+
+## Plan 3 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p3i2/claudex-8i30p792/result.json. Presupuesto de inspección agotado (2/2).
+- P3-R2-001 (medium) pantalla completa con biblioteca minimizada dejaba el editor en 44px → clase de colapso solo fuera de pantalla completa. SIN inspección independiente.
+- P3-R2-002 (low) la lista de sugerencias no volvía arriba al reescribir → scroll a 0 al cambiar el texto. SIN inspección independiente.
+Pruebas tras los arreglos: typecheck, lint, 133 tests, build, prettier OK; ambos casos verificados en navegador.

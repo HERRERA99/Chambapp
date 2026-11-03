@@ -1,5 +1,9 @@
 import type { Project, Task } from '../../domain/models';
 
+import { normalizeNoteSearch } from '../notes/notes.model.ts';
+
+export { paginate } from '../../lib/paginate.ts';
+
 export const archivePageSize = 15;
 
 type QueueInput = {
@@ -24,15 +28,16 @@ export function isArchivedTask(task: Task, projects: readonly Project[]) {
  */
 export function taskQueue({ tasks, projects, query, projectId }: QueueInput) {
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  const needle = query.trim().toLocaleLowerCase('es');
+  // Accent- and case-insensitive, like every search with suggestions.
+  const needle = normalizeNoteSearch(query);
   const matches = tasks
     .filter(
       (task) =>
         !task.eliminado_en &&
         (!projectId || task.proyecto_id === projectId) &&
-        `${task.titulo} ${task.odoo_id ?? ''} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`
-          .toLocaleLowerCase('es')
-          .includes(needle),
+        normalizeNoteSearch(
+          `${task.titulo} ${task.odoo_id ?? ''} ${task.descripcion ?? ''} ${projectById.get(task.proyecto_id)?.nombre ?? ''}`,
+        ).includes(needle),
     )
     .sort(newestFirst);
   const hidden = matches.filter(
@@ -50,12 +55,6 @@ export function taskQueue({ tasks, projects, query, projectId }: QueueInput) {
     /** Default focus candidate. */
     fallback: inProgress[0] ?? pending[0],
   };
-}
-
-export function paginate<T>(list: readonly T[], page: number, size: number) {
-  const pages = Math.max(1, Math.ceil(list.length / size));
-  const current = Math.min(Math.max(1, page), pages);
-  return { items: list.slice((current - 1) * size, current * size), page: current, pages };
 }
 
 /**
