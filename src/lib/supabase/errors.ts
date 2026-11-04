@@ -18,6 +18,14 @@ const messages: Record<string, string> = {
   NOTA_DEMASIADO_GRANDE: 'La nota supera el límite de 1 MB de texto Markdown.',
   NOTA_DEMASIADOS_VINCULOS: 'Puedes asociar hasta 100 proyectos y 100 tareas a cada nota.',
   IMPUTACION_ODOO_INVALIDA: 'Indica si este parte está imputado en Odoo con una marca válida.',
+  IMPUTACION_DATOS_INVALIDOS: 'Selecciona entre 1 y 1000 partes distintos para imputarlos juntos.',
+  IMPUTACION_NO_DISPONIBLE: 'Esta imputación ya no existe. Actualiza los datos.',
+  PARTE_YA_IMPUTADO:
+    'Alguno de los partes ya está imputado. Actualiza los datos y vuelve a seleccionar.',
+  PARTE_EN_CURSO: 'Detén el parte en curso antes de imputarlo.',
+  PARTES_DE_DISTINTO_GRUPO:
+    'Solo se pueden imputar juntos partes de la misma tarea y el mismo día.',
+  PARTE_NO_DISPONIBLE: 'El parte ya no está disponible. Actualiza los datos.',
   SESION_REQUERIDA: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
   CONFLICTO_VERSION:
     'Los datos han cambiado en otra sesión. Cierra el formulario y vuelve a abrirlo para revisar los valores actualizados.',

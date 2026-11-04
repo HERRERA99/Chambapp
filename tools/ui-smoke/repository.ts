@@ -118,6 +118,7 @@ export let data: WorkspaceData = {
       duracion_real_segundos: 3661.25,
       duracion_imputada_segundos: 7200,
       imputado_en_odoo: false,
+      imputacion_odoo_id: null,
     },
   ],
   configurations: [],
@@ -235,7 +236,8 @@ function weekEntries(): WorkspaceData['entries'] {
       entries.push({
         ...owned,
         id: `dddddddd-dddd-4ddd-dddd-${String(day * 10 + index).padStart(12, '0')}`,
-        tarea_id: taskIds[(day + index) % taskIds.length]!,
+        // Thursday: three entries of the same task, to group and split them.
+        tarea_id: taskIds[(day + (day === 3 ? 0 : index)) % taskIds.length]!,
         jornada_id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
         proyecto_id: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
         inicio_en: start,
@@ -253,6 +255,9 @@ function weekEntries(): WorkspaceData['entries'] {
         duracion_real_segundos: open ? null : real,
         duracion_imputada_segundos: open ? null : Math.ceil(real / 900) * 900,
         imputado_en_odoo: day < 2,
+        // One imputation per marked entry, like the migrated data.
+        imputacion_odoo_id:
+          day < 2 ? `abababab-abab-4bab-8bab-${String(day * 10 + index).padStart(12, '0')}` : null,
       });
     });
   }
@@ -272,6 +277,7 @@ function weekEntries(): WorkspaceData['entries'] {
     duracion_real_segundos: 3.5 * 3600,
     duracion_imputada_segundos: 3.5 * 3600,
     imputado_en_odoo: false,
+    imputacion_odoo_id: null,
   });
   return entries;
 }
@@ -407,6 +413,64 @@ export async function executeCommand(action: string, payload: Record<string, Jso
     window.dispatchEvent(new Event('chambapp-smoke-workspace'));
     return { id };
   }
+  if (action === 'imputar_partes' || action === 'deshacer_imputacion') {
+    const touched = new Map<string, (typeof data.entries)[number]>();
+    let result: Record<string, Json>;
+    if (action === 'imputar_partes') {
+      const refs = (Array.isArray(payload.partes) ? payload.partes : []) as {
+        id: string;
+        version: number;
+      }[];
+      const selected = refs.map((ref) => data.entries.find((entry) => entry.id === ref.id));
+      if (!refs.length || selected.some((entry) => !entry || entry.eliminado_en))
+        throw new Error('El parte ya no está disponible. Actualiza los datos.');
+      if (selected.some((entry, index) => entry!.version !== refs[index]!.version))
+        throw new Error('Conflicto de versión de prueba.');
+      if (selected.some((entry) => !entry!.fin_en))
+        throw new Error('Detén el parte en curso antes de imputarlo.');
+      if (selected.some((entry) => entry!.imputacion_odoo_id))
+        throw new Error('Alguno de los partes ya está imputado.');
+      if (new Set(selected.map((entry) => `${entry!.tarea_id}:${entry!.fecha}`)).size !== 1)
+        throw new Error('Solo se pueden imputar juntos partes de la misma tarea y el mismo día.');
+      const id = crypto.randomUUID();
+      for (const entry of selected)
+        touched.set(entry!.id, {
+          ...entry!,
+          version: entry!.version + 1,
+          imputacion_odoo_id: id,
+          imputado_en_odoo: true,
+        });
+      result = {
+        id,
+        tarea_id: selected[0]!.tarea_id,
+        jornada_id: selected[0]!.jornada_id,
+        estado: 'manual',
+        partes: [],
+      };
+    } else {
+      const members = data.entries.filter(
+        (entry) => entry.imputacion_odoo_id === payload.id && !entry.eliminado_en,
+      );
+      if (!members.length) throw new Error('Esta imputación ya no existe. Actualiza los datos.');
+      for (const entry of members)
+        touched.set(entry.id, {
+          ...entry,
+          version: entry.version + 1,
+          imputacion_odoo_id: null,
+          imputado_en_odoo: false,
+        });
+      result = { id: String(payload.id), partes: [] };
+    }
+    data = { ...data, entries: data.entries.map((entry) => touched.get(entry.id) ?? entry) };
+    result.partes = [...touched.values()].map((entry) => ({
+      id: entry.id,
+      version: entry.version,
+      imputacion_odoo_id: entry.imputacion_odoo_id,
+      imputado_en_odoo: entry.imputado_en_odoo,
+    }));
+    window.dispatchEvent(new Event('chambapp-smoke-workspace'));
+    return result;
+  }
   if (action !== 'editar_parte' && action !== 'crear_parte')
     throw new Error('Operación fuera de esta prueba.');
   const previous = data.entries.find((entry) => entry.id === payload.id);
@@ -432,6 +496,14 @@ export async function executeCommand(action: string, payload: Record<string, Jso
       typeof payload.imputado_en_odoo === 'boolean'
         ? payload.imputado_en_odoo
         : base.imputado_en_odoo,
+    // Same rule as the database trigger: a legacy mark is a single-entry imputation.
+    imputacion_odoo_id:
+      typeof payload.imputado_en_odoo === 'boolean' &&
+      payload.imputado_en_odoo !== base.imputado_en_odoo
+        ? payload.imputado_en_odoo
+          ? crypto.randomUUID()
+          : null
+        : base.imputacion_odoo_id,
     // Status-only edits keep the stored durations, like the database view.
     duracion_real_segundos: intervalChanged ? real : base.duracion_real_segundos,
     duracion_imputada_segundos: intervalChanged

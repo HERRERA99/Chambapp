@@ -166,3 +166,62 @@ Pruebas: typecheck, lint, 151 tests, build, prettier, db:test 45 grupos OK. Nave
 
 ## Plan 6 — Corrección tras uso real (Claude, sin inspección independiente)
 - Con la migración sin aplicar en el Supabase remoto, `notas_detalle` no devuelve `cifrado`/`boveda_generacion` y `assertNote` rechazaba la nota, bloqueando todo el espacio («La nota contiene datos incompletos o no válidos»). `withNoteDefaults` trata las columnas ausentes como nota en claro; test añadido. VaultGate indica que falta la migración (PGRST205). Pruebas: typecheck, lint, 152 tests, build OK.
+
+# Ronda de cambios 7 (PLAN-7.md)
+- Fecha: 2026-11-04. Host/planificador: Claude Code (Opus 5.5). Revisor del plan: Codex (modelo por defecto de su CLI, sin override). Builder: Claude. Inspector final: Codex (sesión nueva).
+- Petición: partes agrupados por tarea y día en Parte semanal; imputar todos o seleccionados juntos (redondeo sobre la suma); botones de envío a Odoo sin funcionalidad todavía; quitar el envío por parte individual. Implementación autorizada. Sin commit ni push.
+- Base: 348ab57. Rondas máx.: 5. Fix rounds máx.: 2. Inspección: on.
+
+## Plan 7 ronda 1 — Codex — REVISE
+Resultado: scratchpad/p7r1/claudex-k7h3v_7m/result.json. Modelo efectivo: gpt-6.1-sol (ultra), sandbox read-only. Plan sha256 eeed9abf…3a25.
+- P7-001 (high) el relleno con validar_fila desactivado deja eventos diferidos de validar_arbol → falla el enable. ACEPTADO → desactivar ambos + set constraints immediate; upgrade sembrado con marcados y lápidas.
+- P7-002 (medium) quitar setImputed pierde la recuperación de caché. ACEPTADO → applyImputationResult.
+- P7-003 (medium) odoo-status.mjs no puede pasar sin cambios. ACEPTADO → stripStatus excluye imputacion_odoo_id + aserciones nuevas.
+- P7-004 (medium) límite 100 vs «Marcar todos». ACEPTADO PARCIAL → límite 1000, llamada siempre atómica, UI bloquea por encima; sin límite rechazado.
+- P7-005 (low) arnés visual sin acciones nuevas. ACEPTADO.
+
+## Plan 7 ronda 2 — Codex — REVISE
+Resultado: scratchpad/p7r2/claudex-9iwa85ro/result.json. Plan sha256 4e46ccd3…8a0f. Los 5 hallazgos previos dados por resueltos; límite 1000 aceptado.
+- P7-006 (medium) la limpieza del upgrade en verify.mjs borraría jornadas con imputaciones vivas → FK. ACEPTADO → teardown borra imputaciones; trigger de limpieza también en DELETE.
+
+## Plan 7 ronda 3 — Codex — APPROVED
+Resultado: scratchpad/p7r3/claudex-1qn_eb3l/result.json. Plan sha256 b27e9d05…a5e4. Sin hallazgos. Pre-build: 348ab57 (árbol limpio salvo PLAN-7.md y este log).
+
+## Plan 7 — Build (Claude)
+Base: 348ab57. Desviación registrada en el plan: la timeline muestra duración real por parte. Nuevo sha256 af0f3b83e33a9a3133d0bead7b60b7c02fc4b169c62e6d5322712c4444ac7bb2.
+Pruebas: typecheck, lint, 157 tests, build, prettier (eol auto) OK; db:test 51 grupos OK (incluye upgrade sembrado con marcados y lápidas, suite odoo-imputations). Verificación visual en arnés ui-smoke a 1280x720 y 760x900: desplegar, seleccionar 2 de 3 (05h 36m → 05h 45m), marcar, parcial, marcar todos, deshacer, botones de envío deshabilitados, timeline sin casilla ni botón.
+
+## Plan 7 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p7i1/claudex-vui87ksg/result.json. Ambos ACEPTADOS y corregidos:
+- P7-IR-001 (medium) suma en coma flotante de segundos fraccionarios superaba un límite exacto (900 → 1800). → groupRounding suma en microsegundos enteros y redondea con enteros; tests de límite exacto y +1 µs.
+- P7-IR-002 (low) la selección conservaba ids que dejaron de estar pendientes y reaparecían tras deshacer. → reconcileSelection al cambiar los pendientes (permanente); test de imputar fuera + deshacer.
+Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
+
+## Plan 7 — Inspección 2 — Codex (sesión nueva) — APPROVED
+Resultado: scratchpad/p7i2/claudex-rxojjzrh/result.json. Sin hallazgos. Cubre el estado final (25 archivos). Sin commit ni push.
+
+# Ronda de cambios 8 (PLAN-8.md)
+- Fecha: 2026-11-04. Host/planificador y builder: Claude Code (Opus 5.5). Revisor del plan e inspector: Codex (modelo por defecto de su CLI).
+- Petición: la timeline obliga a hacer scroll; la tabla por tarea debe ser en columnas por día como la timeline, con tarjetas espaciadas igual que se despliegan al hacer clic. Buenas prácticas de UI. Implementación autorizada (continuación del Plan 7). Sin commit ni push.
+- Base: 348ab57 + cambios sin commitear del Plan 7. Rondas máx.: 5. Inspección: on.
+
+## Plan 8 ronda 1 — Codex — REVISE
+Resultado: scratchpad/p8r1/claudex-u4cgw9b4/result.json.
+- P8-001 (medium) «Todo imputado» con partes en curso. ACEPTADO → estados separados (pendientes / en curso / todo imputado / semana vacía).
+
+## Plan 8 ronda 2 — Codex — APPROVED
+Resultado: scratchpad/p8r2/claudex-ylsfg9dw/result.json. Sin hallazgos.
+
+## Plan 8 — Build (Claude)
+Base: 348ab57 + Plan 7 sin commitear (ya inspeccionado). Nuevo componente TimesheetDayHeader compartido; TimesheetGroups en columnas por día con tarjetas desplegables; timeline en su sección con total real por día; CSS sin alturas fijas ni scroll interno.
+Pruebas: typecheck, lint, 159 tests, build, prettier OK. Verificación visual en ui-smoke a 1280x720, 1440x900 y 760x900: columnas alineadas, sin scroll interno, desplegar/seleccionar 2 de 3 (05h 36m → 05h 45m)/marcar/parcial/deshacer sin re-selección; botones 2 por fila en columna ancha. Ajustes durante la verificación: chevron junto al icono de estado, duración de los partes desplegados baja de línea en columnas estrechas, chip Odoo a ancho completo.
+
+## Plan 8 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p8i1/claudex-065nh733/result.json.
+- P8-IR-001 (medium) en columnas estrechas (≈1000 px con barra lateral, 6 días) la pareja de duraciones no cabe y se recorta. ACEPTADO → recuento y duraciones en áreas de grid separadas; «→ imputable» unido y salta de línea alineado a la derecha; en contenedores ≤ 200 px el título ocupa todo el ancho y estado/chevron pasan junto al recuento; los títulos solo parten palabras que no caben. Verificado a 1000x800 (barra abierta, 6 días), 1280x720.
+Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
+
+## Plan 8 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p8i2/claudex-m7117p45/result.json. Presupuesto de inspección agotado (2/2).
+- P8-IR2-001 (medium) rangos nocturnos («22:00–01:30 (+1)») desbordan columnas de ~105 px al desplegar. ACEPTADO y corregido: el rango puede partir línea (tras el guion, antes de «(+1)»). Verificado a 1000x800 con la tarjeta del sábado (21:00–00:30 (+1)) desplegada. SIN inspección independiente.
+Pruebas tras el arreglo: typecheck, lint, 159 tests, build, prettier OK. Sin commit ni push.

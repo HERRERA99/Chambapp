@@ -298,6 +298,19 @@ export type Database = {
           },
         ];
       };
+      imputaciones_odoo: {
+        Row: {
+          creado_en: string;
+          estado: string;
+          id: string;
+          jornada_id: string;
+          tarea_id: string;
+          usuario_id: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       partes_horas: {
         Row: {
           actualizado_en: string;
@@ -306,6 +319,7 @@ export type Database = {
           eliminado_en: string | null;
           fin_en: string | null;
           id: string;
+          imputacion_odoo_id: string | null;
           imputado_en_odoo: boolean;
           inicio_en: string;
           intervalo_redondeo_minutos: number;
@@ -322,6 +336,7 @@ export type Database = {
           eliminado_en?: string | null;
           fin_en?: string | null;
           id?: string;
+          imputacion_odoo_id?: string | null;
           imputado_en_odoo?: boolean;
           inicio_en: string;
           intervalo_redondeo_minutos: number;
@@ -338,6 +353,7 @@ export type Database = {
           eliminado_en?: string | null;
           fin_en?: string | null;
           id?: string;
+          imputacion_odoo_id?: string | null;
           imputado_en_odoo?: boolean;
           inicio_en?: string;
           intervalo_redondeo_minutos?: number;
@@ -629,6 +645,7 @@ export type Database = {
           fin_en: string | null;
           fin_imputado_en: string | null;
           id: string | null;
+          imputacion_odoo_id: string | null;
           imputado_en_odoo: boolean | null;
           inicio_en: string | null;
           inicio_imputado_en: string | null;
@@ -777,6 +794,7 @@ export type Database = {
       chambapp_boveda: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_credenciales: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_calendario: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
+      chambapp_imputaciones: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_configurar_odoo: {
         Args: { p_api_key?: string; p_guardar?: boolean };
         Returns: boolean;

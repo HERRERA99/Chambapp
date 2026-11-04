@@ -5,7 +5,6 @@ import { Button, IconButton } from '../../../shared/ui/Button';
 import { DataTable } from '../../../shared/ui/DataTable';
 import { Badge } from '../../../shared/ui/Panel';
 import { OdooLink } from '../../tasks/components/OdooLink';
-import { OdooSendButton } from './OdooSendButton';
 
 export function EntriesTable({
   entries,
@@ -106,9 +105,6 @@ export function EntriesTable({
           <td>
             {entry.fin_en ? (
               <div className="actions">
-                <OdooSendButton
-                  label={`parte del ${entry.fecha} a las ${formatTime(entry.inicio_en, entry.zona_horaria)}`}
-                />
                 <IconButton
                   icon="edit"
                   label={`Editar parte del ${entry.fecha} a las ${formatTime(entry.inicio_en, entry.zona_horaria)}`}

@@ -150,3 +150,73 @@ test('selected timer start is only confirmed when the returned instant matches t
     false,
   );
 });
+
+test('grouped imputation replies must confirm exactly the requested entries', () => {
+  const imputationId = '44444444-4444-4444-8444-444444444444';
+  const otherPart = '55555555-5555-4555-8555-555555555555';
+  const dayId = '66666666-6666-4666-8666-666666666666';
+  const payload = {
+    partes: [
+      { id: partId, version: 1 },
+      { id: otherPart, version: 3 },
+    ],
+  };
+  const marked = (id: string, version: number) => ({
+    id,
+    version,
+    imputacion_odoo_id: imputationId,
+    imputado_en_odoo: true,
+  });
+  const reply = {
+    id: imputationId,
+    tarea_id: taskId,
+    jornada_id: dayId,
+    estado: 'manual',
+    partes: [marked(partId, 2), marked(otherPart, 4)],
+  };
+  assert.equal(isValidCommandResponse('imputar_partes', payload, reply), true);
+  assert.equal(
+    isValidCommandResponse('imputar_partes', payload, { ...reply, partes: [marked(partId, 2)] }),
+    false,
+  );
+  assert.equal(
+    isValidCommandResponse('imputar_partes', payload, {
+      ...reply,
+      partes: [marked(partId, 2), marked(partId, 2)],
+    }),
+    false,
+  );
+  assert.equal(
+    isValidCommandResponse('imputar_partes', payload, {
+      ...reply,
+      partes: [marked(partId, 2), { ...marked(otherPart, 4), imputado_en_odoo: false }],
+    }),
+    false,
+  );
+  assert.equal(
+    isValidCommandResponse('imputar_partes', payload, {
+      ...reply,
+      partes: [marked(partId, 2), { ...marked(otherPart, 4), imputacion_odoo_id: dayId }],
+    }),
+    false,
+  );
+  assert.equal(isValidCommandResponse('imputar_partes', payload, { ...reply, estado: 'x' }), false);
+  assert.equal(isValidCommandResponse('imputar_partes', payload, { ...reply, id: 'x' }), false);
+
+  const freed = { id: partId, version: 3, imputacion_odoo_id: null, imputado_en_odoo: false };
+  const undo = { id: imputationId, partes: [freed] };
+  assert.equal(isValidCommandResponse('deshacer_imputacion', { id: imputationId }, undo), true);
+  assert.equal(
+    isValidCommandResponse('deshacer_imputacion', { id: imputationId }, { ...undo, partes: [] }),
+    true,
+  );
+  assert.equal(isValidCommandResponse('deshacer_imputacion', { id: dayId }, undo), false);
+  assert.equal(
+    isValidCommandResponse(
+      'deshacer_imputacion',
+      { id: imputationId },
+      { ...undo, partes: [{ ...freed, imputado_en_odoo: true }] },
+    ),
+    false,
+  );
+});

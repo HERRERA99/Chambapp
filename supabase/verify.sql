@@ -63,6 +63,18 @@ begin
     not exists(select 1 from information_schema.columns where table_schema='public'
     and table_name='partes_detalle' and column_name='imputado_en_odoo' and data_type='boolean') then
     raise exception 'Falta la marca manual de imputación de Odoo'; end if;
+  if not exists(select 1 from pg_catalog.pg_class c where c.oid = 'public.imputaciones_odoo'::regclass
+       and c.relrowsecurity) or
+     pg_catalog.has_table_privilege('authenticated','public.imputaciones_odoo','INSERT') or
+     pg_catalog.has_table_privilege('authenticated','public.imputaciones_odoo','UPDATE') or
+     pg_catalog.has_table_privilege('authenticated','public.imputaciones_odoo','DELETE') or
+     pg_catalog.has_table_privilege('anon','public.imputaciones_odoo','SELECT') or
+     pg_catalog.has_function_privilege('anon','public.chambapp_imputaciones(text,jsonb)','EXECUTE') or
+     not pg_catalog.has_function_privilege('authenticated','public.chambapp_imputaciones(text,jsonb)','EXECUTE') or
+     not exists(select 1 from information_schema.columns where table_schema='public'
+       and table_name='partes_detalle' and column_name='imputacion_odoo_id') or
+     not exists(select 1 from pg_catalog.pg_constraint where conname = 'partes_horas_imputado_coherente') then
+    raise exception 'Imputaciones de Odoo incorrectas'; end if;
 end $$;
 
 select s.nspname as esquema, c.relname as tabla, c.relrowsecurity as rls
