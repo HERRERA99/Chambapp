@@ -7,6 +7,7 @@ const protectedPaths: readonly string[] = [
   paths.timesheet,
   paths.board,
   paths.notes,
+  paths.passwords,
   paths.calendar,
   paths.entries,
   paths.attendance,

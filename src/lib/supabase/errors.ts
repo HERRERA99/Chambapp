@@ -1,5 +1,17 @@
 const messages: Record<string, string> = {
   NOTA_DATOS_INVALIDOS: 'Revisa el título, el contenido y los vínculos de la nota.',
+  NOTA_DEBE_CIFRARSE:
+    'Tus notas están cifradas: desbloquea la bóveda con tu clave maestra para guardar.',
+  BOVEDA_CAMBIADA:
+    'La clave maestra se ha restablecido o cambiado en otra sesión. Vuelve a desbloquear para continuar.',
+  BOVEDA_EXISTENTE: 'Ya tienes una clave maestra. Desbloquea la bóveda con ella.',
+  BOVEDA_DATOS_INVALIDOS: 'No se ha podido preparar la clave maestra. Vuelve a intentarlo.',
+  CONFIRMACION_REQUERIDA: 'Escribe BORRAR para confirmar el restablecimiento.',
+  CREDENCIAL_DATOS_INVALIDOS: 'Revisa los datos de la entrada.',
+  CREDENCIAL_NO_DISPONIBLE: 'La entrada ya no está disponible. Actualiza los datos.',
+  CREDENCIAL_ID_REUTILIZADO:
+    'Esta entrada ya se ha guardado con otros datos. Actualiza la página para revisarla.',
+  CREDENCIAL_DEMASIADO_GRANDE: 'La entrada es demasiado grande. Reduce el texto de sus campos.',
   NOTA_NO_DISPONIBLE: 'La nota ya no está disponible. Actualiza los datos.',
   NOTA_ID_REUTILIZADO:
     'Esta nota ya se ha guardado con otros datos. Actualiza la página para revisarla.',

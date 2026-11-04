@@ -17,6 +17,8 @@ export type Database = {
           creado_en: string;
           actualizado_en: string;
           version: number;
+          cifrado: string | null;
+          boveda_generacion: string | null;
         };
         Insert: {
           id?: string;
@@ -26,6 +28,8 @@ export type Database = {
           creado_en?: string;
           actualizado_en?: string;
           version?: number;
+          cifrado?: string | null;
+          boveda_generacion?: string | null;
         };
         Update: {
           id?: string;
@@ -35,7 +39,39 @@ export type Database = {
           creado_en?: string;
           actualizado_en?: string;
           version?: number;
+          cifrado?: string | null;
+          boveda_generacion?: string | null;
         };
+        Relationships: [];
+      };
+      bovedas: {
+        Row: {
+          usuario_id: string;
+          generacion: string;
+          sal: string;
+          iteraciones: number;
+          clave_envuelta: string;
+          creado_en: string;
+          actualizado_en: string;
+          version: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      credenciales: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          proyecto_id: string;
+          boveda_generacion: string;
+          cifrado: string;
+          creado_en: string;
+          actualizado_en: string;
+          version: number;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       nota_proyectos: {
@@ -522,8 +558,23 @@ export type Database = {
           creado_en: string | null;
           actualizado_en: string | null;
           version: number | null;
+          cifrado: string | null;
+          boveda_generacion: string | null;
           proyecto_ids: string[] | null;
           tarea_ids: string[] | null;
+        };
+        Relationships: [];
+      };
+      credenciales_detalle: {
+        Row: {
+          id: string | null;
+          usuario_id: string | null;
+          proyecto_id: string | null;
+          boveda_generacion: string | null;
+          cifrado: string | null;
+          creado_en: string | null;
+          actualizado_en: string | null;
+          version: number | null;
         };
         Relationships: [];
       };
@@ -723,6 +774,8 @@ export type Database = {
     };
     Functions: {
       chambapp_notas: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
+      chambapp_boveda: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
+      chambapp_credenciales: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_calendario: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_configurar_odoo: {
         Args: { p_api_key?: string; p_guardar?: boolean };

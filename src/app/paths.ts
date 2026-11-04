@@ -12,6 +12,7 @@ export const paths = {
   /** Legacy task board; redirects to the weekly timesheet. */
   board: '/tablero',
   notes: '/notas',
+  passwords: '/contrasenas',
   calendar: '/calendario',
   entries: '/partes-de-horas',
   attendance: '/fichajes',

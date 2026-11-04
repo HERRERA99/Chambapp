@@ -1,8 +1,10 @@
 import type {
   Attendance,
   CalendarAbsence,
-  Note,
+  CredentialRow,
+  NoteRow as NoteRowModel,
   Profile,
+  VaultRow,
   Task,
   TimeEntry,
 } from '../../domain/models';
@@ -15,19 +17,41 @@ type EntryRow = Database['public']['Views']['partes_detalle']['Row'];
 type AttendanceRow = Database['public']['Views']['fichajes_detalle']['Row'];
 
 type NoteRow = Database['public']['Views']['notas_detalle']['Row'];
+type CredentialViewRow = Database['public']['Views']['credenciales_detalle']['Row'];
 const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
-export function assertNote(row: NoteRow): asserts row is Note {
+/**
+ * Before the encryption migration is applied, `notas_detalle` has no `cifrado` or
+ * `boveda_generacion` columns: such rows are plaintext notes.
+ */
+export function withNoteDefaults(row: NoteRow): NoteRow {
+  return {
+    ...row,
+    cifrado: 'cifrado' in row ? row.cifrado : null,
+    boveda_generacion: 'boveda_generacion' in row ? row.boveda_generacion : null,
+  };
+}
+
+export function assertNote(row: NoteRow): asserts row is NoteRowModel {
   if (
     typeof row.id !== 'string' ||
     !uuid.test(row.id) ||
     typeof row.usuario_id !== 'string' ||
     !uuid.test(row.usuario_id) ||
     typeof row.titulo !== 'string' ||
-    !row.titulo.trim() ||
-    [...row.titulo].length > 200 ||
     typeof row.contenido_md !== 'string' ||
-    new TextEncoder().encode(row.contenido_md).length > 1_000_000 ||
+    // Encrypted rows keep the text inside the envelope; it is checked per note when
+    // decrypting, so one damaged envelope cannot block the whole workspace.
+    (row.cifrado === null
+      ? row.boveda_generacion !== null ||
+        !row.titulo.trim() ||
+        [...row.titulo].length > 200 ||
+        new TextEncoder().encode(row.contenido_md).length > 1_000_000
+      : typeof row.cifrado !== 'string' ||
+        typeof row.boveda_generacion !== 'string' ||
+        !uuid.test(row.boveda_generacion) ||
+        row.titulo !== '' ||
+        row.contenido_md !== '') ||
     typeof row.creado_en !== 'string' ||
     !Number.isFinite(Date.parse(row.creado_en)) ||
     typeof row.actualizado_en !== 'string' ||
@@ -149,4 +173,46 @@ export function assertEntry(row: EntryRow): asserts row is TimeEntry {
   ) {
     throw new Error('El parte contiene datos incompletos.');
   }
+}
+
+const envelope = /^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22,}$/;
+const instant = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value));
+
+export function assertVault(row: unknown): asserts row is VaultRow {
+  const value = row as Partial<VaultRow> | null;
+  if (
+    !value ||
+    typeof value.usuario_id !== 'string' ||
+    !uuid.test(value.usuario_id) ||
+    typeof value.generacion !== 'string' ||
+    !uuid.test(value.generacion) ||
+    typeof value.sal !== 'string' ||
+    !/^[A-Za-z0-9_-]{22}$/.test(value.sal) ||
+    !Number.isSafeInteger(value.iteraciones) ||
+    (value.iteraciones as number) < 100_000 ||
+    typeof value.clave_envuelta !== 'string' ||
+    !envelope.test(value.clave_envuelta) ||
+    !instant(value.creado_en) ||
+    !instant(value.actualizado_en) ||
+    !Number.isSafeInteger(value.version) ||
+    (value.version as number) < 1
+  )
+    throw new Error('La bóveda contiene datos incompletos o no válidos.');
+}
+
+export function assertCredential(row: CredentialViewRow | unknown): asserts row is CredentialRow {
+  const value = row as Partial<CredentialRow> | null;
+  if (
+    !value ||
+    [value.id, value.usuario_id, value.proyecto_id, value.boveda_generacion].some(
+      (id) => typeof id !== 'string' || !uuid.test(id),
+    ) ||
+    typeof value.cifrado !== 'string' ||
+    !envelope.test(value.cifrado) ||
+    !instant(value.creado_en) ||
+    !instant(value.actualizado_en) ||
+    !Number.isSafeInteger(value.version) ||
+    (value.version as number) < 1
+  )
+    throw new Error('La entrada contiene datos incompletos o no válidos.');
 }

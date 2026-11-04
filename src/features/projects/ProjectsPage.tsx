@@ -284,8 +284,8 @@ export default function ProjectsPage() {
         </div>
       )}
       <Notice title="Archivo e historial">
-        Archivar conserva tareas y horas. Eliminar un proyecto también elimina sus tareas y sus
-        partes de los informes.
+        Archivar conserva tareas y horas. Eliminar un proyecto también elimina sus tareas, sus
+        partes de los informes y las contraseñas guardadas en él.
       </Notice>
       {form ? (
         <ProjectForm
@@ -333,7 +333,7 @@ export default function ProjectsPage() {
         }
         description={
           action?.kind === 'delete'
-            ? `Se eliminarán «${action.project.nombre}», sus ${tasks.filter((task) => task.proyecto_id === action.project.id).length} tareas y sus ${entries.filter((entry) => entry.proyecto_id === action.project.id).length} partes de todos los informes.`
+            ? `Se eliminarán «${action.project.nombre}», sus ${tasks.filter((task) => task.proyecto_id === action.project.id).length} tareas y sus ${entries.filter((entry) => entry.proyecto_id === action.project.id).length} partes de todos los informes. También se borrarán para siempre las contraseñas guardadas en este proyecto.`
             : 'El historial de horas se conserva. Podrás desarchivar el proyecto más adelante.'
         }
         confirmLabel={

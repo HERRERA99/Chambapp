@@ -120,3 +120,89 @@ test('draft recovery reads only the requested account key', () => {
   );
   assert.deepEqual(requested, [key]);
 });
+
+import {
+  encryptNoteSession,
+  reconcilePending,
+  restoreNoteSession,
+} from '../src/features/notes/notesDraft.ts';
+import { createVault } from '../src/lib/crypto/vault.ts';
+
+const envelope = `v1.${'A'.repeat(16)}.${'B'.repeat(22)}`;
+const generation = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+test('encrypted drafts round-trip with their pending request and are bound to the account', async () => {
+  const { key } = await createVault('clave de prueba 123', userId, 1000);
+  const value: NoteSession = {
+    ...session(0),
+    pendiente: {
+      id: noteId,
+      cifrado: envelope,
+      boveda_generacion: generation,
+      proyecto_ids: [projectId],
+      tarea_ids: [],
+    },
+  };
+  const stored = await encryptNoteSession(key, userId, value);
+  assert.doesNotMatch(stored, /Pendiente de guardar|Plan/);
+  assert.deepEqual(await restoreNoteSession('k', key, userId, { getItem: () => stored }), {
+    kind: 'restored',
+    session: value,
+    legacy: false,
+  });
+  // Another account or key cannot open it, and it is reported instead of dropped.
+  assert.deepEqual(await restoreNoteSession('k', key, taskId, { getItem: () => stored }), {
+    kind: 'unreadable',
+  });
+  const other = await createVault('otra clave distinta', userId, 1000);
+  assert.deepEqual(await restoreNoteSession('k', other.key, userId, { getItem: () => stored }), {
+    kind: 'unreadable',
+  });
+  assert.deepEqual(await restoreNoteSession('k', key, userId, { getItem: () => null }), {
+    kind: 'none',
+  });
+  assert.deepEqual(await restoreNoteSession('k', key, userId, { getItem: () => '{broken' }), {
+    kind: 'unreadable',
+  });
+});
+
+test('plaintext drafts from earlier versions are restored for re-encryption', async () => {
+  const { key } = await createVault('clave de prueba 123', userId, 1000);
+  const value = session();
+  assert.deepEqual(await restoreNoteSession('k', key, userId, storage(value)), {
+    kind: 'restored',
+    session: value,
+    legacy: true,
+  });
+});
+
+test('pending saves are confirmed, resent with the same bytes or reported as conflicts', () => {
+  const create = { cifrado: envelope };
+  const update = { cifrado: envelope, version: 3 };
+  assert.equal(reconcilePending(create, null), 'resend');
+  assert.equal(reconcilePending(create, { version: 1, cifrado: envelope }), 'confirmed');
+  assert.equal(reconcilePending(create, { version: 1, cifrado: 'other' }), 'conflict');
+  assert.equal(reconcilePending(update, { version: 3, cifrado: 'previous' }), 'resend');
+  assert.equal(reconcilePending(update, { version: 4, cifrado: envelope }), 'confirmed');
+  assert.equal(reconcilePending(update, { version: 4, cifrado: 'someone else' }), 'conflict');
+  assert.equal(reconcilePending(update, null), 'conflict');
+});
+
+import {
+  clearNoteDraft,
+  draftWriteMark,
+  nextDraftWrite,
+} from '../src/features/notes/notesDraft.ts';
+
+test('an explicit discard invalidates draft writes that are still in flight', () => {
+  const key = 'chambapp:notes-draft:test-discard';
+  const removed: string[] = [];
+  const scheduled = draftWriteMark(key);
+  const write = nextDraftWrite(key);
+  assert.equal(draftWriteMark(key), write);
+  clearNoteDraft(key, { removeItem: (item) => removed.push(item) });
+  assert.deepEqual(removed, [key]);
+  // Both the late write and the unmount flush scheduled before the discard are stale.
+  assert.notEqual(draftWriteMark(key), write);
+  assert.notEqual(draftWriteMark(key), scheduled);
+});

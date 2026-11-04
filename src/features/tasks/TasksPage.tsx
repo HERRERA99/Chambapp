@@ -191,7 +191,7 @@ export default function TasksPage() {
                     projects={projects}
                     entries={entries.filter((entry) => entry.tarea_id === focus.id)}
                   />
-                  <TaskNotes taskId={focus.id} notes={data?.notes ?? []} />
+                  <TaskNotes taskId={focus.id} />
                 </>
               ) : (
                 <div className="empty-state">
@@ -254,7 +254,7 @@ export default function TasksPage() {
             projects={projects}
             entries={entries.filter((entry) => entry.tarea_id === popupTask.id)}
           />
-          <TaskNotes taskId={popupTask.id} notes={data?.notes ?? []} />
+          <TaskNotes taskId={popupTask.id} />
         </Modal>
       ) : null}
       {createOpen ? (

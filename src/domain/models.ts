@@ -42,11 +42,38 @@ export type Task = OwnedRecord & {
   eliminado_en: string | null;
 };
 
+/** Note as shown and edited in the app (decrypted). */
 export type Note = OwnedRecord & {
   titulo: string;
   contenido_md: string;
   proyecto_ids: string[];
   tarea_ids: string[];
+};
+
+/**
+ * Note row as stored: legacy plaintext (`cifrado` null) or an encrypted
+ * envelope with empty `titulo`/`contenido_md`.
+ */
+export type NoteRow = Note & {
+  cifrado: string | null;
+  boveda_generacion: string | null;
+};
+
+export type VaultRow = {
+  usuario_id: string;
+  generacion: string;
+  sal: string;
+  iteraciones: number;
+  clave_envuelta: string;
+  creado_en: string;
+  actualizado_en: string;
+  version: number;
+};
+
+export type CredentialRow = OwnedRecord & {
+  proyecto_id: string;
+  boveda_generacion: string;
+  cifrado: string;
 };
 
 export type TimeRecord = OwnedRecord & {
@@ -109,7 +136,7 @@ export type WorkspaceData = {
   profile: Profile;
   projects: Project[];
   tasks: Task[];
-  notes: Note[];
+  notes: NoteRow[];
   entries: TimeEntry[];
   configurations: WeeklyConfiguration[];
   days: ScheduleDay[];
@@ -132,6 +159,11 @@ export type CalendarAbsence = OwnedRecord & {
 export type CommandAction =
   | 'guardar_nota'
   | 'eliminar_nota'
+  | 'crear_boveda'
+  | 'cambiar_clave'
+  | 'restablecer_boveda'
+  | 'guardar_credencial'
+  | 'eliminar_credencial'
   | 'guardar_ausencia'
   | 'eliminar_ausencia'
   | 'sincronizar_festivos'

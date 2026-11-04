@@ -16,6 +16,7 @@ import { useAuth } from '../../features/auth/useAuth';
 import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
+import { VaultProvider } from '../../features/vault/VaultProvider';
 
 type NavItem = { to: string; label: string; icon: IconName };
 type NavSection = { id: string; label: string; items: readonly NavItem[] };
@@ -31,6 +32,7 @@ const sections: readonly NavSection[] = [
       { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
       { to: paths.timesheet, label: 'Parte semanal', icon: 'grid' },
       { to: paths.notes, label: 'Notas', icon: 'notebook' },
+      { to: paths.passwords, label: 'Contraseñas', icon: 'key' },
     ],
   },
   {
@@ -307,7 +309,10 @@ export function WorkspaceLayout() {
               intento original.
             </Notice>
           ) : null}
-          <Outlet />
+          {/* Keyed by account: switching users drops any key held in memory. */}
+          <VaultProvider key={user?.id}>
+            <Outlet />
+          </VaultProvider>
         </main>
         <footer className="workspace-footer">
           <span>Chambapp</span>

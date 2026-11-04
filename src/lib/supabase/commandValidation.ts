@@ -33,9 +33,13 @@ export function isValidCommandResponse(
       !Number.isSafeInteger(data.version) ||
       data.version < 1 ||
       typeof data.titulo !== 'string' ||
-      !data.titulo.trim() ||
-      [...data.titulo].length > 200 ||
       typeof data.contenido_md !== 'string' ||
+      (data.cifrado == null
+        ? !data.titulo.trim() || [...data.titulo].length > 200
+        : typeof data.cifrado !== 'string' ||
+          !identifier(data.boveda_generacion) ||
+          data.titulo !== '' ||
+          data.contenido_md !== '') ||
       [data.proyecto_ids, data.tarea_ids].some(
         (ids) =>
           !Array.isArray(ids) ||
@@ -52,14 +56,42 @@ export function isValidCommandResponse(
       actual.length === new Set(expected).size &&
       expected.every((id) => actual.includes(id));
     return (
-      typeof payload.titulo === 'string' &&
-      data.titulo === payload.titulo.trim() &&
-      data.contenido_md === payload.contenido_md &&
+      (typeof payload.cifrado === 'string'
+        ? data.cifrado === payload.cifrado && data.boveda_generacion === payload.boveda_generacion
+        : typeof payload.titulo === 'string' &&
+          data.cifrado == null &&
+          data.titulo === payload.titulo.trim() &&
+          data.contenido_md === payload.contenido_md) &&
       sameIds(data.proyecto_ids, payload.proyecto_ids) &&
       sameIds(data.tarea_ids, payload.tarea_ids) &&
       (payload.version === undefined || data.version === Number(payload.version) + 1)
     );
   }
+  if (action === 'crear_boveda' || action === 'cambiar_clave')
+    return (
+      identifier(data.usuario_id) &&
+      data.generacion === payload.generacion &&
+      data.sal === payload.sal &&
+      data.iteraciones === payload.iteraciones &&
+      data.clave_envuelta === payload.clave_envuelta &&
+      typeof data.version === 'number' &&
+      (action === 'crear_boveda' || data.version === Number(payload.version) + 1)
+    );
+  if (action === 'restablecer_boveda')
+    return data.restablecida === true && data.generacion === payload.generacion;
+  if (action === 'guardar_credencial' || action === 'eliminar_credencial')
+    return (
+      identifier(data.id) &&
+      data.id === payload.id &&
+      typeof data.version === 'number' &&
+      Number.isSafeInteger(data.version) &&
+      (action === 'eliminar_credencial'
+        ? data.version === payload.version
+        : data.cifrado === payload.cifrado &&
+          data.proyecto_id === payload.proyecto_id &&
+          data.boveda_generacion === payload.boveda_generacion &&
+          (payload.version === undefined || data.version === Number(payload.version) + 1))
+    );
   if (action === 'sincronizar_festivos')
     return (
       typeof data.sincronizados === 'number' &&

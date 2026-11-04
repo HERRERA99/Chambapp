@@ -71,3 +71,55 @@ export function syncScrollTarget(source: Scrollable, target: Scrollable): number
   const ratio = Math.min(1, Math.max(0, source.scrollTop / sourceRange));
   return Math.round(ratio * targetRange);
 }
+
+export type ExcerptPart = { text: string; match: boolean };
+
+/**
+ * Short excerpt of the note body for the library and search suggestions.
+ * With a search that matches the body, the excerpt is centred on the first match
+ * and the matched text is marked; otherwise it is the start of the body.
+ */
+export function noteSearchExcerpt(content: string, search: string, length = 100): ExcerptPart[] {
+  const text = content.replace(/\s+/g, ' ').trim();
+  const query = normalizeNoteSearch(search);
+  const found = query ? findNormalized(text, query) : null;
+  if (!found)
+    return text ? [{ text: Array.from(text).slice(0, length).join(''), match: false }] : [];
+  const [start, end] = found;
+  const room = Math.max(0, length - (end - start));
+  let from = Math.max(0, start - Math.floor(room / 3));
+  let to = Math.min(text.length, end + room - (start - from));
+  // Do not cut a surrogate pair in half.
+  if (from > 0 && /[\uDC00-\uDFFF]/.test(text[from] ?? '')) from -= 1;
+  if (to < text.length && /[\uDC00-\uDFFF]/.test(text[to] ?? '')) to += 1;
+  const parts: ExcerptPart[] = [];
+  const before = text.slice(from, start);
+  if (from > 0 || before) parts.push({ text: `${from > 0 ? '…' : ''}${before}`, match: false });
+  parts.push({ text: text.slice(start, end), match: true });
+  const after = text.slice(end, to);
+  if (after || to < text.length)
+    parts.push({ text: `${after}${to < text.length ? '…' : ''}`, match: false });
+  return parts.filter((part) => part.text);
+}
+
+/** Range in the original text whose normalized form starts with `query`. */
+function findNormalized(text: string, query: string): [number, number] | null {
+  // Map each normalized character back to its original UTF-16 index.
+  let normalized = '';
+  const origin: number[] = [];
+  let index = 0;
+  for (const char of text) {
+    const folded = normalizeNoteSearch(char) || (char.trim() ? '' : ' ');
+    for (const unit of folded) {
+      normalized += unit;
+      for (let i = 0; i < unit.length; i += 1) origin.push(index);
+    }
+    index += char.length;
+  }
+  const at = normalized.indexOf(query);
+  if (at < 0) return null;
+  const last = at + query.length - 1;
+  const lastOrigin = origin[last] ?? 0;
+  const lastChar = String.fromCodePoint(text.codePointAt(lastOrigin) ?? 0);
+  return [origin[at] ?? 0, lastOrigin + lastChar.length];
+}

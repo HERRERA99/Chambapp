@@ -1,18 +1,42 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Note } from '../../../domain/models';
 import { Icon } from '../../../shared/ui/Icon';
+import { Button } from '../../../shared/ui/Button';
+import { useWorkspace } from '../../workspace/useWorkspace';
+import { useNotes } from '../../notes/useNotes';
+import { useVault } from '../../vault/useVault';
+import { VaultUnlockCard } from '../../vault/VaultGate';
 
 /** Notes linked to a task; each opens in Notes (`/notas?nota=<id>`). */
-export function TaskNotes({ taskId, notes }: { taskId: string; notes: readonly Note[] }) {
-  const linked = notes
+export function TaskNotes({ taskId }: { taskId: string }) {
+  const { data } = useWorkspace();
+  const vault = useVault();
+  const decrypted = useNotes();
+  const [unlocking, setUnlocking] = useState(false);
+  // Links are not encrypted, so the count is known while the vault is locked.
+  const count = (data?.notes ?? []).filter((note) => note.tarea_ids.includes(taskId)).length;
+  const linked = decrypted.notes
     .filter((note) => note.tarea_ids.includes(taskId))
     .sort((a, b) => b.actualizado_en.localeCompare(a.actualizado_en));
+  const locked = vault.status !== 'unlocked';
   return (
     <section className="task-notes" aria-labelledby={`task-notes-${taskId}`}>
       <h3 id={`task-notes-${taskId}`}>
-        Notas asociadas <span className="dim">· {linked.length}</span>
+        Notas asociadas <span className="dim">· {count}</span>
       </h3>
-      {linked.length ? (
+      {locked && count ? (
+        unlocking && (vault.status === 'locked' || vault.status === 'missing') ? (
+          <VaultUnlockCard purpose="Tus notas" compact />
+        ) : (
+          <p className="dim task-notes__locked">
+            <Icon name="lock" size={15} />
+            {count === 1 ? 'Una nota cifrada.' : `${count} notas cifradas.`}
+            <Button variant="ghost" icon="unlock" onClick={() => setUnlocking(true)}>
+              Desbloquear
+            </Button>
+          </p>
+        )
+      ) : linked.length ? (
         <ul>
           {linked.map((note) => (
             <li key={note.id}>
@@ -34,6 +58,8 @@ export function TaskNotes({ taskId, notes }: { taskId: string; notes: readonly N
             </li>
           ))}
         </ul>
+      ) : count && !locked ? (
+        <p className="dim">Descifrando notas…</p>
       ) : (
         <p className="dim">Esta tarea no tiene notas asociadas.</p>
       )}
