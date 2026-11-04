@@ -33,10 +33,26 @@ export async function verifyOdooStatus({ ca, cb, client, rpc, expectError, ok })
   assert.equal(changed.inicio_en, first.inicio_en);
   assert.equal(changed.fin_en, first.fin_en);
   assert.equal(changed.jornada_id, first.jornada_id);
-  const stripStatus = ({ imputado_en_odoo, version, actualizado_en, ...rest }) => rest;
+  const stripStatus = ({
+    imputado_en_odoo,
+    imputacion_odoo_id,
+    version,
+    actualizado_en,
+    ...rest
+  }) => rest;
   const marked = await read(first.id);
   assert.equal(marked.imputado_en_odoo, true);
   assert.deepEqual(stripStatus(marked), stripStatus(original));
+  assert.equal(original.imputacion_odoo_id, null);
+  // The legacy mark becomes a single-entry imputation of the entry's own task and day.
+  const legacyImputation = (
+    await ca.query('select * from public.imputaciones_odoo where id=$1', [
+      marked.imputacion_odoo_id,
+    ])
+  ).rows[0];
+  assert.equal(legacyImputation.tarea_id, first.tarea_id);
+  assert.equal(legacyImputation.jornada_id, first.jornada_id);
+  assert.equal(legacyImputation.estado, 'manual');
   assert.equal(Number(marked.duracion_real_segundos), 0.000001);
   changed = await rpc(ca, 'editar_parte', {
     id: changed.id,
@@ -50,6 +66,15 @@ export async function verifyOdooStatus({ ca, cb, client, rpc, expectError, ok })
     imputado_en_odoo: false,
   });
   assert.equal(cleared.imputado_en_odoo, false);
+  assert.equal(cleared.imputacion_odoo_id, null);
+  assert.equal(
+    (
+      await ca.query('select count(*)::int n from public.imputaciones_odoo where id=$1', [
+        marked.imputacion_odoo_id,
+      ])
+    ).rows[0].n,
+    0,
+  );
   assert.equal(cleared.inicio_en, first.inicio_en);
   assert.equal(cleared.fin_en, first.fin_en);
   ok(

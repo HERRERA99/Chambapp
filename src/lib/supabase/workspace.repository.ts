@@ -52,7 +52,9 @@ export async function executeCommand<T = unknown>(
             ? 'chambapp_credenciales'
             : ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
               ? 'chambapp_calendario'
-              : 'chambapp_operar',
+              : ['imputar_partes', 'deshacer_imputacion'].includes(action)
+                ? 'chambapp_imputaciones'
+                : 'chambapp_operar',
       { p_accion: action, p_datos: payload },
     )
     .abortSignal(signal);

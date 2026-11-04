@@ -21,6 +21,7 @@ const entry: Database['public']['Views']['partes_detalle']['Row'] = {
   modo_redondeo: 'superior',
   descripcion: null,
   imputado_en_odoo: false,
+  imputacion_odoo_id: null,
   eliminado_en: null,
   version: 1,
   duracion_real_segundos: 0.000001,
@@ -49,7 +50,17 @@ test('cannot display finalized totals from incomplete or invalid view data', () 
   assert.throws(() => assertEntry({ ...entry, intervalo_redondeo_minutos: 7 }));
   assert.throws(() => assertEntry({ ...entry, inicio_en: 'not-an-instant' }));
   assert.throws(() => assertEntry({ ...entry, imputado_en_odoo: null }));
-  assert.doesNotThrow(() => assertEntry({ ...entry, imputado_en_odoo: true }));
+  const imputation = '66666666-6666-4666-8666-666666666666';
+  assert.doesNotThrow(() =>
+    assertEntry({ ...entry, imputado_en_odoo: true, imputacion_odoo_id: imputation }),
+  );
+  // The mark and the imputation reference must agree.
+  assert.throws(() => assertEntry({ ...entry, imputado_en_odoo: true }));
+  assert.throws(() => assertEntry({ ...entry, imputacion_odoo_id: imputation }));
+  assert.throws(() =>
+    assertEntry({ ...entry, imputado_en_odoo: true, imputacion_odoo_id: 'not-a-uuid' }),
+  );
+  assert.throws(() => assertEntry({ ...entry, imputacion_odoo_id: undefined as unknown as null }));
 });
 
 const attendance: Database['public']['Views']['fichajes_detalle']['Row'] = {

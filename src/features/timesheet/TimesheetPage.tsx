@@ -12,9 +12,10 @@ import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
-import { OdooSendButton } from '../time-entries/components/OdooSendButton';
-import { buildTimesheetWeek } from './timesheet.model';
-import type { TimesheetItem } from './timesheet.model';
+import { applyImputationResult, buildTimesheetWeek } from './timesheet.model';
+import type { ImputationResultEntry, TimesheetGroup, TimesheetItem } from './timesheet.model';
+import { TimesheetGroups } from './components/TimesheetGroups';
+import { TimesheetDayHeader } from './components/TimesheetDayHeader';
 import './timesheet.css';
 
 function weekLabel(monday: string, lastDay: string) {
@@ -43,44 +44,54 @@ export default function TimesheetPage() {
   });
   const busy = pending || tracker.busy || tracker.pending;
   const lastDay = week.days.at(-1)?.date ?? monday;
+  const timelineCount = week.days.reduce((total, day) => total + day.items.length, 0);
 
   function moveWeek(weeks: number) {
     setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
   }
 
-  async function setImputed(entry: TimeEntry, imputed: boolean) {
-    // The mark can be set and cleared until automatic Odoo logging exists.
-    if (busy || !entry.fin_en || entry.imputado_en_odoo === imputed) return;
+  /** Keeps the confirmed result even if the follow-up refresh fails (newer versions win). */
+  function applyResult(partes: ImputationResultEntry[]) {
+    if (!user) return;
+    queryClient.setQueryData<WorkspaceData>(['workspace', user.id], (current) =>
+      current ? { ...current, entries: applyImputationResult(current.entries, partes) } : current,
+    );
+  }
+
+  async function impute(group: TimesheetGroup, entries: TimeEntry[]) {
+    if (busy || !entries.length) return false;
     setActionError('');
     try {
-      const saved = await run<{ version?: number; imputado_en_odoo?: boolean }>('editar_parte', {
-        id: entry.id,
-        version: entry.version,
-        imputado_en_odoo: imputed,
+      const saved = await run<{ partes: ImputationResultEntry[] }>('imputar_partes', {
+        partes: entries.map((entry) => ({ id: entry.id, version: entry.version })),
       });
-      // If the follow-up refresh failed, the cache is older than the save: apply the
-      // saved flag and version so the checkbox stays correct and stays reversible.
-      if (user && typeof saved?.version === 'number') {
-        const version = saved.version;
-        queryClient.setQueryData<WorkspaceData>(['workspace', user.id], (current) =>
-          current
-            ? {
-                ...current,
-                entries: current.entries.map((item) =>
-                  item.id === entry.id && item.version < version
-                    ? { ...item, imputado_en_odoo: saved.imputado_en_odoo ?? imputed, version }
-                    : item,
-                ),
-              }
-            : current,
-        );
-      }
+      applyResult(saved.partes);
       notify(
-        imputed ? 'Parte marcado como imputado en Odoo.' : 'Parte marcado como pendiente en Odoo.',
+        entries.length === 1
+          ? `Parte de ${group.title} marcado como imputado en Odoo.`
+          : `${entries.length} partes de ${group.title} marcados como imputados juntos en Odoo.`,
       );
+      return true;
     } catch (cause) {
       setActionError(
-        cause instanceof Error ? cause.message : 'No se pudo guardar la marca de Odoo.',
+        cause instanceof Error ? cause.message : 'No se pudo guardar la imputación en Odoo.',
+      );
+      return false;
+    }
+  }
+
+  async function undo(group: TimesheetGroup, imputationId: string) {
+    if (busy) return;
+    setActionError('');
+    try {
+      const saved = await run<{ partes: ImputationResultEntry[] }>('deshacer_imputacion', {
+        id: imputationId,
+      });
+      applyResult(saved.partes);
+      notify(`Imputación de ${group.title} deshecha: sus partes vuelven a estar pendientes.`);
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : 'No se pudo deshacer la imputación en Odoo.',
       );
     }
   }
@@ -121,65 +132,59 @@ export default function TimesheetPage() {
       {isLoading && !data ? (
         <p role="status">Cargando partes…</p>
       ) : (
-        <div
-          className="timesheet__grid"
-
-          style={{ '--timesheet-days': week.days.length } as CSSProperties}
-        >
-          {week.days.map((day) => {
-            const date = DateTime.fromISO(day.date, { zone: 'UTC' }).setLocale('es');
-            return (
-              <section
-                key={day.date}
-
-                className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
-                aria-labelledby={`timesheet-${day.date}`}
-              >
-                <header className="timesheet__day-header">
-                  <h2 id={`timesheet-${day.date}`}>
-                    <span className="timesheet__weekday">{date.toFormat('ccc')}</span>{' '}
-                    <strong>{date.toFormat('d')}</strong>
-                    <span className="sr-only">{date.toFormat(' LLLL')}</span>
-                  </h2>
-                  <span className="mono dim" aria-label="Total del día">
-                    {day.loggedSeconds ? formatDuration(day.loggedSeconds) : ''}
-                  </span>
-                </header>
-                <ul className="timesheet__items">
-                  {day.items.length ? (
-                    day.items.map((item) => (
-                      <TimesheetRow
-                        key={item.entry.id}
-                        item={item}
-                        busy={busy}
-                        onToggle={(imputed) => void setImputed(item.entry, imputed)}
-                      />
-                    ))
-                  ) : (
-                    <li className="timesheet__empty dim">—</li>
-                  )}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+        <>
+          <TimesheetGroups
+            days={week.days}
+            today={today}
+            busy={busy}
+            onImpute={impute}
+            onUndo={undo}
+          />
+          <section className="timesheet__section" aria-labelledby="timesheet-timeline-title">
+            <header className="timesheet__section-header">
+              <h2 id="timesheet-timeline-title">Timeline</h2>
+              <span className="dim">
+                {timelineCount} {timelineCount === 1 ? 'parte' : 'partes'}
+              </span>
+            </header>
+            <div
+              className="timesheet__grid"
+              style={{ '--timesheet-days': week.days.length } as CSSProperties}
+            >
+              {week.days.map((day) => (
+                <section
+                  key={day.date}
+                  className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
+                  aria-labelledby={`timesheet-${day.date}`}
+                >
+                  <TimesheetDayHeader
+                    id={`timesheet-${day.date}`}
+                    date={day.date}
+                    seconds={day.items.reduce((total, item) => total + (item.realSeconds ?? 0), 0)}
+                    totalLabel="Tiempo real del día"
+                  />
+                  <ul className="timesheet__items">
+                    {day.items.length ? (
+                      day.items.map((item) => <TimesheetRow key={item.entry.id} item={item} />)
+                    ) : (
+                      <li className="timesheet__empty dim">—</li>
+                    )}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
 }
 
-function TimesheetRow({
-  item,
-  busy,
-  onToggle,
-}: {
-  item: TimesheetItem;
-  busy: boolean;
-  onToggle: (imputed: boolean) => void;
-}) {
+function TimesheetRow({ item }: { item: TimesheetItem }) {
   const { entry } = item;
   const imputed = entry.imputado_en_odoo;
   const open = !entry.fin_en;
+  const status = open ? 'En curso' : imputed ? 'Imputado en Odoo' : 'Pendiente de imputar en Odoo';
   return (
     <li
       className={`timesheet__item ${imputed ? 'timesheet__item--imputed' : ''} ${open ? 'timesheet__item--open' : ''}`}
@@ -207,30 +212,19 @@ function TimesheetRow({
       </div>
       <div className="timesheet__item-meta">
         <span className="mono dim">{item.range}</span>
-        <strong className="mono timesheet__logged">
-          {item.loggedSeconds === null ? '—' : formatDuration(item.loggedSeconds)}
+        <strong className="mono timesheet__logged" title="Tiempo real">
+          {item.realSeconds === null ? '—' : formatDuration(item.realSeconds)}
         </strong>
       </div>
       <div className="timesheet__item-actions">
-        <label
-          className="timesheet__check"
-          title={
-            open
-              ? 'Finaliza el parte para marcarlo como imputado.'
-              : imputed
-                ? 'Imputado en Odoo (desmarca para dejarlo pendiente).'
-                : 'Marcar como imputado en Odoo.'
-          }
+        <span
+          className={`timesheet__item-status ${imputed ? 'timesheet__item-status--imputed' : ''}`}
+          role="img"
+          aria-label={status}
+          title={status}
         >
-          <input
-            type="checkbox"
-            checked={imputed}
-            disabled={open || busy}
-            aria-label={`Imputado en Odoo: ${item.title}, ${item.range}`}
-            onChange={(event) => onToggle(event.target.checked)}
-          />
-        </label>
-        <OdooSendButton label={item.title} />
+          <Icon name={open ? 'timer' : imputed ? 'check' : 'clock'} size={13} />
+        </span>
       </div>
     </li>
   );

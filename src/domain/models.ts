@@ -85,6 +85,8 @@ export type TimeRecord = OwnedRecord & {
   modo_redondeo: string;
   descripcion: string | null;
   imputado_en_odoo: boolean;
+  /** Odoo imputation the entry belongs to; null while pending. */
+  imputacion_odoo_id: string | null;
   eliminado_en: string | null;
 };
 
@@ -177,6 +179,8 @@ export type CommandAction =
   | 'editar_jornada'
   | 'crear_parte'
   | 'editar_parte'
+  | 'imputar_partes'
+  | 'deshacer_imputacion'
   | 'eliminar_proyecto'
   | 'eliminar_tarea'
   | 'eliminar_parte'

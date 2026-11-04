@@ -98,6 +98,43 @@ export function isValidCommandResponse(
       Number.isSafeInteger(data.sincronizados) &&
       data.sincronizados >= 0
     );
+  if (action === 'imputar_partes' || action === 'deshacer_imputacion') {
+    const imputing = action === 'imputar_partes';
+    if (!identifier(data.id) || !Array.isArray(data.partes)) return false;
+    if (!imputing && data.id !== payload.id) return false;
+    if (
+      imputing &&
+      (!identifier(data.tarea_id) || !identifier(data.jornada_id) || data.estado !== 'manual')
+    )
+      return false;
+    // Every returned entry must carry the state the action promises, with a bumped version.
+    const parts = data.partes as unknown[];
+    if (
+      !parts.every(
+        (part) =>
+          record(part) &&
+          identifier(part.id) &&
+          typeof part.version === 'number' &&
+          Number.isSafeInteger(part.version) &&
+          part.version > 1 &&
+          (imputing
+            ? part.imputacion_odoo_id === data.id && part.imputado_en_odoo === true
+            : part.imputacion_odoo_id === null && part.imputado_en_odoo === false),
+      )
+    )
+      return false;
+    if (!imputing) return true;
+    const requested = Array.isArray(payload.partes)
+      ? payload.partes.map((part) => (record(part) ? part.id : undefined))
+      : [];
+    const returned = new Set(parts.map((part) => (part as Record<string, unknown>).id));
+    return (
+      requested.length > 0 &&
+      returned.size === parts.length &&
+      returned.size === requested.length &&
+      requested.every((id) => returned.has(id))
+    );
+  }
   if (
     (action === 'crear_parte' || action === 'editar_parte') &&
     (typeof data.imputado_en_odoo !== 'boolean' ||

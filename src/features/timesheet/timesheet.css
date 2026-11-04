@@ -1,11 +1,9 @@
-/* Weekly timesheet: fits the viewport; only an overfull day scrolls internally. */
+/* Weekly timesheet: two aligned day grids (by task, timeline). Columns grow with their
+   content and the page has a single scroll: no nested scroll areas hide entries. */
 .timesheet {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /* Viewport minus workspace header, content padding and footer. */
-  height: calc(100dvh - var(--header-height) - 64px - 92px);
-  min-height: 360px;
+  gap: 22px;
 }
 .timesheet__toolbar {
   display: flex;
@@ -37,8 +35,6 @@
   margin: 0;
 }
 .timesheet__grid {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(var(--timesheet-days, 5), minmax(0, 1fr));
   border: 1px solid var(--border);
@@ -68,7 +64,7 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.timesheet__day-header h2 {
+.timesheet__day-header h3 {
   margin: 0;
   font-size: 13px;
   font-weight: 400;
@@ -90,9 +86,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  overflow-y: auto;
-  min-height: 0;
-  scrollbar-width: thin;
 }
 .timesheet__empty {
   text-align: center;
@@ -182,9 +175,15 @@
 .timesheet__check input:disabled {
   cursor: not-allowed;
 }
-.timesheet__item-actions .odoo-send-button {
-  width: 22px;
-  height: 22px;
+.timesheet__item-status {
+  display: inline-flex;
+  color: var(--warning);
+}
+.timesheet__item--open .timesheet__item-status {
+  color: var(--accent-soft);
+}
+.timesheet__item-status--imputed {
+  color: var(--success);
 }
 /* Narrow day columns (six or seven days): controls move below the times. */
 @container (max-width: 200px) {
@@ -214,9 +213,6 @@
   }
 }
 @media (max-width: 900px) {
-  .timesheet {
-    height: auto;
-  }
   .timesheet__grid {
     grid-template-columns: 1fr;
   }
@@ -239,4 +235,286 @@
   margin-left: 4px;
   vertical-align: -1px;
   opacity: 0.7;
+}
+
+/* Section headings above each grid. */
+.timesheet__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.timesheet__section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+}
+.timesheet__section-header h2 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* Task card: all entries of one task on one day. Same box, spacing and status colours
+   as the timeline cards; the whole head is the expand button. */
+.timesheet-group {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--warning);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.timesheet-group--partial {
+  border-left-color: var(--accent-soft);
+}
+.timesheet-group--imputed {
+  border-left-color: var(--success);
+}
+.timesheet-group__toggle {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'head state'
+    'count times';
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 7px 6px 7px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.timesheet-group__toggle:hover {
+  background: #ffffff05;
+}
+.timesheet-group__toggle:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+.timesheet-group__toggle .timesheet__item-head {
+  grid-area: head;
+}
+/* Break between words; split a word only when it alone is wider than the card. */
+.timesheet-group .timesheet__item-title {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+/* The Odoo ID drops below the title and may use the full card width. */
+.timesheet-group .timesheet__odoo-id {
+  max-width: 100%;
+}
+.timesheet-group__count {
+  grid-area: count;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.timesheet-group__times {
+  /* Real → imputable; when space runs out "→ imputable" wraps below, right-aligned. */
+  grid-area: times;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0 4px;
+  min-width: 0;
+  font-size: 11px;
+}
+.timesheet-group__times .mono,
+.timesheet-group__logged {
+  font-size: inherit;
+  white-space: nowrap;
+}
+.timesheet-group__state {
+  grid-area: state;
+  display: flex;
+  align-items: center;
+  align-self: start;
+  gap: 4px;
+}
+.timesheet-group__status {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--warning);
+}
+.timesheet-group--partial .timesheet-group__status {
+  color: var(--accent-soft);
+}
+.timesheet-group--imputed .timesheet-group__status {
+  color: var(--success);
+}
+.timesheet-group__chevron {
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.timesheet-group__toggle[aria-expanded='true'] .timesheet-group__chevron {
+  transform: rotate(180deg);
+}
+
+/* Expanded card: stacked vertically to fit a narrow day column. */
+.timesheet-group__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+}
+.timesheet-group__odoo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  color: var(--muted);
+  text-decoration: none;
+}
+.timesheet-group__odoo-link:hover,
+.timesheet-group__odoo-link:focus-visible {
+  color: var(--accent-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.timesheet-group__entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.timesheet-group__entry {
+  /* The duration wraps under the range when the day column is narrow. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  padding: 3px 4px;
+  margin: 0 -4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.timesheet-group__entry:hover {
+  background: var(--surface-raised);
+}
+.timesheet-group__entry--running {
+  cursor: not-allowed;
+}
+.timesheet-group__entry input {
+  margin: 0;
+  accent-color: var(--success);
+}
+.timesheet-group__entry .mono {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.timesheet-group__entry .mono:last-child {
+  margin-left: auto;
+}
+/* Ranges may break (after the dash, before "(+1)") instead of overflowing tiny columns. */
+.timesheet-group__entry .mono:first-of-type {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.timesheet-group__description {
+  display: -webkit-box;
+  margin: 0 0 2px 20px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.timesheet-group__imputation {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 7px;
+  border: 1px solid #88cbb230;
+  border-radius: 4px;
+  background: #88cbb208;
+}
+.timesheet-group__imputation-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--success);
+  font-weight: 500;
+}
+.timesheet-group__ranges {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.timesheet-group__imputation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.timesheet-group__imputation-row .mono {
+  font-size: 11px;
+}
+.timesheet-group__pair > * {
+  white-space: nowrap;
+}
+.button.timesheet-group__undo {
+  min-height: 24px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.timesheet-group__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+.timesheet-group__selection {
+  margin: 0;
+}
+.timesheet-group__selection .mono {
+  white-space: nowrap;
+}
+.timesheet-group__footer .form-error {
+  margin: 0;
+  font-size: 11px;
+}
+.timesheet-group__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+.timesheet-group__actions .button {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  gap: 6px;
+  font-size: 11px;
+  white-space: normal;
+}
+/* Narrow day columns: the title takes the full width; status and chevron go next to
+   the totals, like the timeline moves its controls below the times. */
+@container (max-width: 200px) {
+  .timesheet-group__toggle {
+    grid-template-areas:
+      'head head'
+      'count state'
+      'times times';
+    align-items: center;
+  }
+  .timesheet-group__state {
+    align-self: center;
+  }
+}
+/* Wide columns (one column on small screens): two actions per row. */
+@container (min-width: 260px) {
+  .timesheet-group__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

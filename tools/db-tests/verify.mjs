@@ -7,6 +7,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyAttendance } from './attendance.mjs';
 import { verifyOdooStatus } from './odoo-status.mjs';
+import { verifyOdooImputations } from './odoo-imputations.mjs';
 import { verifySelectedStartAndCredentials } from './selected-start-and-credentials.mjs';
 import { verifyCalendar } from './calendar.mjs';
 import { verifyNotes } from './notes.mjs';
@@ -76,6 +77,63 @@ try {
     inicio_en: '2026-09-20T09:07:00+02:00',
     fin_en: '2026-09-20T13:15:00+02:00',
   });
+  async function seedMarkedUpgrade() {
+    const active = await upgradeRpc('crear_parte', {
+      tarea_id: upgradeTask.id,
+      inicio_en: '2026-09-21T09:00:00+02:00',
+      fin_en: '2026-09-21T09:25:00+02:00',
+      imputado_en_odoo: true,
+    });
+    const second = await upgradeRpc('crear_parte', {
+      tarea_id: upgradeTask.id,
+      inicio_en: '2026-09-21T10:00:00+02:00',
+      fin_en: '2026-09-21T10:20:00+02:00',
+      imputado_en_odoo: true,
+    });
+    const doomed = await upgradeRpc('crear_parte', {
+      tarea_id: upgradeTask.id,
+      inicio_en: '2026-09-21T11:00:00+02:00',
+      fin_en: '2026-09-21T11:10:00+02:00',
+      imputado_en_odoo: true,
+    });
+    const tombstone = await upgradeRpc('eliminar_parte', {
+      id: doomed.id,
+      version: doomed.version,
+    });
+    const rows = async () =>
+      (
+        await admin.query(
+          'select id,version,imputado_en_odoo,eliminado_en from public.partes_horas where id = any($1) order by id',
+          [[active.id, second.id, tombstone.id]],
+        )
+      ).rows;
+    return { ids: [active.id, second.id, tombstone.id], before: await rows(), rows };
+  }
+  async function verifyMarkedUpgrade({ ids, before, rows }) {
+    const after = await rows();
+    // Versions, marks and tombstones are untouched by the backfill.
+    assert.deepEqual(after, before);
+    const links = (
+      await admin.query(
+        `select h.id,h.imputacion_odoo_id,i.tarea_id=h.tarea_id and i.jornada_id=h.jornada_id same
+         from public.partes_horas h join public.imputaciones_odoo i on i.id=h.imputacion_odoo_id
+         where h.id = any($1)`,
+        [ids],
+      )
+    ).rows;
+    assert.equal(links.length, 3);
+    assert.ok(links.every((row) => row.same));
+    // One imputation per previously marked entry, so historical totals are unchanged.
+    assert.equal(new Set(links.map((row) => row.imputacion_odoo_id)).size, 3);
+    assert.equal(
+      (
+        await admin.query(
+          'select count(*)::int n from public.partes_horas where imputacion_odoo_id is not null and not imputado_en_odoo',
+        )
+      ).rows[0].n,
+      0,
+    );
+  }
   const columnTypes = async () =>
     (
       await admin.query(`select table_name,column_name,data_type,ordinal_position
@@ -84,8 +142,14 @@ try {
     order by table_name,ordinal_position`)
     ).rows;
   const viewTypesBefore = await columnTypes();
-  for (const file of migrations.slice(1))
+  let markedUpgrade = null;
+  for (const file of migrations.slice(1)) {
+    // Marked entries (active and tombstone) seeded before the Odoo imputation backfill.
+    if (file === '20261104150000_odoo_imputations.sql') markedUpgrade = await seedMarkedUpgrade();
     await admin.query(await readFile(join(root, 'supabase/migrations', file), 'utf8'));
+  }
+  assert.ok(markedUpgrade, 'the Odoo imputation migration is part of the chain');
+  await verifyMarkedUpgrade(markedUpgrade);
   const existingViewColumns = new Set(
     viewTypesBefore.map((row) => `${row.table_name}.${row.column_name}`),
   );
@@ -110,6 +174,7 @@ try {
   assert.equal(upgraded.odoo_url, null);
   assert.equal(upgraded.imputado_en_odoo, false);
   await admin.query('delete from public.partes_horas where usuario_id=$1', [upgradeUser]);
+  await admin.query('delete from public.imputaciones_odoo where usuario_id=$1', [upgradeUser]);
   await admin.query('delete from public.jornadas where usuario_id=$1', [upgradeUser]);
   await admin.query('delete from public.tareas where usuario_id=$1', [upgradeUser]);
   await admin.query('delete from public.proyectos where usuario_id=$1', [upgradeUser]);
@@ -631,6 +696,17 @@ try {
   await verifyNotes({ admin, ca, cb, anonymous, noSession, client, rpc, expectError, ok });
   await verifyVault({ admin, client, rpc, expectError, ok });
   await verifyOdooStatus({ ca, cb, client, rpc, expectError, ok });
+  await verifyOdooImputations({
+    admin,
+    ca,
+    cb,
+    anonymous,
+    noSession,
+    client,
+    rpc,
+    expectError,
+    ok,
+  });
   await verifySelectedStartAndCredentials({
     admin,
     ca,
@@ -653,7 +729,7 @@ try {
     await admin.query(`select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname in ('public','chambapp_private') and c.relkind='r'`)
   ).rows;
-  assert.equal(catalog.length, 17);
+  assert.equal(catalog.length, 18);
   assert.ok(catalog.every((x) => x.relrowsecurity));
   const unsafe = (
     await admin.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
@@ -682,7 +758,7 @@ try {
     false,
   );
   ok(
-    'all seventeen tables have RLS, weekly versions are immutable and public RPCs are security invoker',
+    'all eighteen tables have RLS, weekly versions are immutable and public RPCs are security invoker',
   );
   await admin.query(await readFile(join(root, 'supabase/verify.sql'), 'utf8'));
   console.log(

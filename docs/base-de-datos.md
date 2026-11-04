@@ -6,6 +6,8 @@ La migración `supabase/migrations/20261001181821_initial_chambapp.sql` implemen
 
 `20261002201755_manual_odoo_time_entry_status.sql` añade `partes_horas.imputado_en_odoo`, booleano obligatorio que empieza en `false` para datos existentes y nuevos. Esta marca manual identifica los partes pendientes de imputar en Odoo y no requiere ID o enlace en la tarea. No sincroniza datos ni envía horas a Odoo.
 
+`20261104150000_odoo_imputations.sql` añade `imputaciones_odoo`: cada fila agrupa uno o varios partes de la misma tarea y jornada que se imputan juntos y será una línea de horas en Odoo. Los partes con la marca previa (incluidos los eliminados) reciben una imputación propia cada uno, de modo que los totales históricos no cambian. Desde esta migración `imputado_en_odoo` se deriva de `partes_horas.imputacion_odoo_id`.
+
 La cadena de migraciones se puede aplicar a un proyecto nuevo. La segunda migración actualiza una instalación que ya tiene la inicial, conserva sus registros, permisos y tipos de las vistas. Los modelos anteriores se conservan como documentación; no son migraciones que deban aplicarse por separado.
 
 ## Tablas y lectura
@@ -42,6 +44,14 @@ Los totales persistidos de las vistas no incluyen tiempo provisional de cronóme
 `odoo_id` y `odoo_url` son independientes y opcionales. El ID admite `T` mayúscula seguido de uno o más dígitos, hasta 64 caracteres. El frontend normaliza el ID y guarda la URL canónica del navegador; la base admite HTTP(S), DNS ASCII/punycode, IPv4 e IPv6 válidas y puertos entre 0 y 65535, hasta 2048 caracteres. Se rechazan credenciales, espacios, controles y barras inversas. Las rutas, parámetros y fragmentos propios de Odoo se conservan. Guardar estos datos prepara la navegación; no sincroniza ni envía información a Odoo.
 
 Cada parte tiene su propia marca `imputado_en_odoo`, también expuesta al final de `partes_detalle` para conservar el orden y tipo de sus columnas anteriores. `crear_parte` admite el booleano opcional; si se omite, queda pendiente (`false`). `editar_parte` permite cambiarlo usando `id` y `version`; omitirlo conserva su valor, enviar `false` lo vuelve a pendiente y `null` o valores no booleanos producen `IMPUTACION_ODOO_INVALIDA`. Los cronómetros nuevos comienzan pendientes; detenerlos conserva la marca actual. La marca no modifica instantes, duración, redondeo, jornada ni objetivos, y mantiene los permisos y reglas de versiones de los partes.
+
+### Imputaciones agrupadas
+
+- `public.imputaciones_odoo` (`id`, `usuario_id`, `tarea_id`, `jornada_id`, `estado`, `creado_en`): solo lectura para su propietario (RLS); sin DML directo. `estado` solo admite `manual` hasta que exista el envío automático.
+- `partes_horas.imputacion_odoo_id` referencia `(id, usuario_id, tarea_id, jornada_id)`: la base garantiza que una imputación solo agrupa partes de su tarea y día. `check (imputado_en_odoo = (imputacion_odoo_id is not null))` mantiene la marca coherente; `partes_detalle` expone `imputacion_odoo_id` al final.
+- Tiempo imputable de una imputación: suma del tiempo real de sus partes, redondeada **una vez** hacia arriba con el mayor intervalo de esos partes (25 + 20 + 10 min con R15 → 60 min, no 75). Parte semanal usa esta regla para sus totales; Registro, Mi semana y las vistas `resumen_*` siguen redondeando cada parte.
+- RPC `chambapp_imputaciones`: `imputar_partes` `{ partes: [{ id, version }] }` (1–1000 partes distintos, terminados, sin imputar, de la misma tarea y jornada; errores `IMPUTACION_DATOS_INVALIDOS`, `PARTE_NO_DISPONIBLE`, `CONFLICTO_VERSION`, `PARTE_EN_CURSO`, `PARTE_YA_IMPUTADO`, `PARTES_DE_DISTINTO_GRUPO`) y `deshacer_imputacion` `{ id }` (`IMPUTACION_NO_DISPONIBLE`). Ambas devuelven los partes afectados con su nueva `version`.
+- Ruta anterior: `crear_parte` / `editar_parte` con `imputado_en_odoo` siguen funcionando; un trigger convierte la marca en una imputación de un solo parte, la quita al desmarcar y, si el parte cambia de tarea o día, lo pasa a una imputación propia nueva. Las imputaciones sin partes se borran solas; los partes eliminados conservan su referencia.
 
 El formulario de partes permite marcarlo al crear o editar. La tabla permite cambiar la marca de partes finalizados, filtrar pendientes o imputados y exportar el estado en la columna «Imputado en Odoo» del CSV. El cambio rápido solo envía `id`, `version` y la marca; los tiempos conservan toda su precisión. Tras guardar o recibir un conflicto de versión se recarga el workspace antes de reintentar.
 
