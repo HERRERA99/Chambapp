@@ -1,0 +1,97 @@
+.vault-card {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  max-width: 640px;
+  margin: 24px auto;
+  padding: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(
+      circle at 0 0,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 55%
+    ),
+    var(--surface);
+}
+.vault-card--compact {
+  margin: 0;
+  padding: 18px;
+  gap: 14px;
+  max-width: none;
+}
+.vault-card__mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius);
+  color: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.vault-card--compact .vault-card__mark {
+  width: 40px;
+  height: 40px;
+}
+.vault-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.vault-card__body h2 {
+  font-size: 22px;
+}
+.vault-card--compact .vault-card__body h2 {
+  font-size: 15px;
+}
+.vault-card__body > .muted {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.vault-card__warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: var(--radius);
+  color: var(--warning);
+  font-size: 12px;
+}
+.vault-card__warning .icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.vault-card__form {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+}
+.vault-card__form .form-error {
+  margin: 0;
+}
+
+@media (max-width: 650px) {
+  .vault-card {
+    flex-direction: column;
+    padding: 20px;
+  }
+}
+
+.vault-settings__form {
+  display: grid;
+  gap: 14px;
+  max-width: 460px;
+  margin-bottom: 20px;
+}
+.vault-settings__form .form-error {
+  margin: 0;
+}
+#cifrado {
+  margin-top: 20px;
+}

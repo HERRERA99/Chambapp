@@ -233,3 +233,9 @@
     margin-top: calc(42px + 16px);
   }
 }
+.task-notes__locked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

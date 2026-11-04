@@ -66,7 +66,7 @@ export async function verifyNotes({
         note.usuario_id,
         'intrusion',
       ]),
-    /row-level security/,
+    /permission denied/,
   );
   ok(
     'notes preserve Markdown byte-for-byte, safely retry creation and isolate reads and writes by account',
@@ -96,7 +96,7 @@ export async function verifyNotes({
   }
   await expectError(
     () =>
-      ca.query(
+      admin.query(
         'insert into public.nota_proyectos(nota_id,usuario_id,proyecto_id) values($1,$2,$3)',
         [note.id, note.usuario_id, otherProject.id],
       ),
@@ -104,22 +104,24 @@ export async function verifyNotes({
   );
   await expectError(
     () =>
-      ca.query('insert into public.nota_tareas(nota_id,usuario_id,tarea_id) values($1,$2,$3)', [
+      admin.query('insert into public.nota_tareas(nota_id,usuario_id,tarea_id) values($1,$2,$3)', [
         note.id,
         note.usuario_id,
         otherTask.id,
       ]),
     /foreign key/,
   );
-  await expectError(
-    () =>
-      cb.query('insert into public.nota_tareas(nota_id,usuario_id,tarea_id) values($1,$2,$3)', [
-        note.id,
-        note.usuario_id,
-        task.id,
-      ]),
-    /row-level security/,
-  );
+  // Writes only go through chambapp_notas: direct DML is denied for every account.
+  for (const connection of [ca, cb])
+    for (const [sql, values] of [
+      [
+        'insert into public.nota_tareas(nota_id,usuario_id,tarea_id) values($1,$2,$3)',
+        [note.id, note.usuario_id, task.id],
+      ],
+      ['update public.notas set titulo=$1 where id=$2', ['x', note.id]],
+      ['delete from public.nota_proyectos where nota_id=$1', [note.id]],
+    ])
+      await expectError(() => connection.query(sql, values), /permission denied/);
   ok(
     'note relation validation is atomic and composite foreign keys prevent links across account boundaries',
   );
@@ -267,6 +269,7 @@ export async function verifyNotes({
         tarea_ids: kind === 'task' ? [raceTask.id] : [],
       };
       await admin.query('select pg_advisory_lock($1)', [gate]);
+      let pendingDelete;
       const pendingSave = notes(ca, 'guardar_nota', racePayload).then(
         (value) => ({ value }),
         (error) => ({ error }),
@@ -283,48 +286,72 @@ export async function verifyNotes({
           if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
         }
         assert.ok(waiting, 'note must reach the deterministic pause after link validation');
-        if (kind === 'project')
-          await rpc(concurrent, 'eliminar_proyecto', {
-            id: raceProject.id,
-            version: raceProject.version,
-            confirmar_cascada: true,
-          });
-        else
-          await rpc(concurrent, 'eliminar_tarea', {
-            id: raceTask.id,
-            version: raceTask.version,
-            confirmar_cascada: true,
-          });
+        // The paused save holds the profile lock, so the deletion queues behind it.
+        // Start it without waiting, then release the gate and wait for both.
+        pendingDelete = (
+          kind === 'project'
+            ? rpc(concurrent, 'eliminar_proyecto', {
+                id: raceProject.id,
+                version: raceProject.version,
+                confirmar_cascada: true,
+              })
+            : rpc(concurrent, 'eliminar_tarea', {
+                id: raceTask.id,
+                version: raceTask.version,
+                confirmar_cascada: true,
+              })
+        ).then(
+          (value) => ({ value }),
+          (error) => ({ error }),
+        );
       } finally {
         await admin.query('select pg_advisory_unlock($1)', [gate]);
       }
-      const outcome = await pendingSave;
-      assert.ok(outcome.error, 'concurrent link removal must reject and roll back the save');
-      assert.match(
-        outcome.error.message,
-        kind === 'project' ? /PROYECTO_NO_DISPONIBLE/ : /TAREA_NO_DISPONIBLE/,
-      );
-      assert.equal(
-        (await ca.query('select count(*)::int n from public.notas where id=$1', [racePayload.id]))
-          .rows[0].n,
-        0,
-      );
-      assert.equal(
-        (
-          await ca.query('select count(*)::int n from public.nota_proyectos where nota_id=$1', [
-            racePayload.id,
-          ])
-        ).rows[0].n,
-        0,
-      );
-      assert.equal(
-        (
-          await ca.query('select count(*)::int n from public.nota_tareas where nota_id=$1', [
-            racePayload.id,
-          ])
-        ).rows[0].n,
-        0,
-      );
+      const bounded = (work) =>
+        Promise.race([
+          work,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('concurrent note test timed out')), 15000),
+          ),
+        ]);
+      const [outcome, deletion] = await bounded(Promise.all([pendingSave, pendingDelete]));
+      assert.ok(!deletion.error, 'the deletion runs after the save releases the profile lock');
+      // Serialized: the save committed first with a valid link, then the deletion
+      // hid the link. A rejected save must have rolled back completely.
+      if (outcome.error) {
+        assert.match(
+          outcome.error.message,
+          kind === 'project' ? /PROYECTO_NO_DISPONIBLE/ : /TAREA_NO_DISPONIBLE/,
+        );
+        assert.equal(
+          (await ca.query('select count(*)::int n from public.notas where id=$1', [racePayload.id]))
+            .rows[0].n,
+          0,
+        );
+        assert.equal(
+          (
+            await ca.query('select count(*)::int n from public.nota_proyectos where nota_id=$1', [
+              racePayload.id,
+            ])
+          ).rows[0].n,
+          0,
+        );
+        assert.equal(
+          (
+            await ca.query('select count(*)::int n from public.nota_tareas where nota_id=$1', [
+              racePayload.id,
+            ])
+          ).rows[0].n,
+          0,
+        );
+      } else {
+        const saved = (
+          await ca.query('select * from public.notas_detalle where id=$1', [racePayload.id])
+        ).rows[0];
+        assert.deepEqual(saved.proyecto_ids, []);
+        assert.deepEqual(saved.tarea_ids, []);
+        await notes(ca, 'eliminar_nota', { id: saved.id, version: Number(saved.version) });
+      }
     }
   } finally {
     await admin.query('select pg_advisory_unlock($1)', [gate]);
@@ -332,5 +359,7 @@ export async function verifyNotes({
       'drop trigger notes_test_gate on public.notas; drop function public.notes_test_gate();',
     );
   }
-  ok('concurrent project or task removal after link validation rolls back the complete note save');
+  ok(
+    'a note save and a concurrent project or task removal serialize on the profile without deadlock',
+  );
 }

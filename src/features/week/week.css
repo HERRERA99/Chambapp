@@ -1,85 +1,10 @@
-.week-day-target {
-  margin-top: 12px;
-  font-size: 10px;
-  gap: 4px;
-}
-.week-day-target .icon-button {
-  flex-shrink: 0;
-}
-.week-day-real {
-  font-size: 10px;
-  margin-bottom: 12px;
-}
-.day-card__duration {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  white-space: nowrap;
-}
-.day-card__duration-label {
-  font-size: 10px;
-}
-.week-day-empty {
-  padding: 12px 0;
-  font-size: 11px;
-}
-.week-page .day-block h3,
-.week-page .day-block .eyebrow,
-.week-page .week-day-target > span {
-  overflow-wrap: anywhere;
-}
-.week-block-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.week-block-footer > .mono {
-  font-size: 9px;
-}
-.week-page .calendar-grid--full-week {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.week-page .day-card {
-  border-bottom: 1px solid var(--border);
-}
-.week-page .day-card:nth-child(4) {
-  border-right: 0;
-}
 .week-print-report {
   display: none;
 }
 
-@media (min-width: 1800px) {
-  .week-page .calendar-grid--full-week {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-  .week-page .day-card:nth-child(4) {
-    border-right: 1px solid var(--border);
-  }
-}
-
-@media (max-width: 1000px) {
-  .week-page .calendar-grid--full-week {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .week-page .day-card:nth-child(2n) {
-    border-right: 0;
-  }
-}
-
 @media (max-width: 650px) {
-  .week-page .calendar-grid--full-week {
-    grid-template-columns: 1fr;
-  }
   .week-navigation {
     flex-wrap: wrap;
-  }
-  .week-page .day-card {
-    border-right: 0;
-  }
-  .week-page .day-blocks {
-    display: flex;
   }
 }
 
@@ -104,7 +29,6 @@
   .week-page .page-actions,
   .week-page .week-navigation,
   .week-page .week-insights,
-  .week-page .calendar-panel,
   .week-page .notice,
   .week-page button,
   .week-page .button,

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { Note } from '../../domain/models';
+import type { Note, NoteRow } from '../../domain/models';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { PageHeader } from '../../shared/ui/PageHeader';
-import { Notice, Badge } from '../../shared/ui/Panel';
+import { Notice, Badge, Progress } from '../../shared/ui/Panel';
 import { SelectField } from '../../shared/ui/FormField';
 import { SearchSuggest } from '../../shared/ui/SearchSuggest';
 import { paginate } from '../../lib/paginate';
@@ -14,9 +14,13 @@ import { useWorkspace } from '../workspace/useWorkspace';
 import { useAuth } from '../auth/useAuth';
 import { readableError } from '../../lib/supabase/errors';
 import { NoteEditor } from './NoteEditor';
-import { readNoteSession } from './notesDraft';
-import type { NoteSession } from './notesDraft';
-import { noteMatchesSearch, readMarkdownFile } from './notes.model';
+import { clearNoteDraft, encryptNoteSession, restoreNoteSession } from './notesDraft';
+import type { NoteSession, RestoredDraft } from './notesDraft';
+import { useNotes } from './useNotes';
+import type { DecryptedNotes } from './useNotes';
+import { VaultGate } from '../vault/VaultGate';
+import { useVault } from '../vault/useVault';
+import { noteMatchesSearch, noteSearchExcerpt, readMarkdownFile } from './notes.model';
 import './notes.css';
 
 const NOTES_PAGE_SIZE = 8;
@@ -30,26 +34,168 @@ function readCollapsed() {
   }
 }
 
-export default function NotesPage() {
-  const { user } = useAuth();
-  return <NotesWorkspace key={user?.id} />;
+/** Body excerpt; with a search, centred on the first match and highlighted. */
+function NoteExcerpt({
+  content,
+  query,
+  length = 100,
+}: {
+  content: string;
+  query: string;
+  length?: number;
+}) {
+  const parts = noteSearchExcerpt(content, query, length);
+  if (!parts.length) return <>Sin contenido todavía</>;
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.match ? (
+          <mark key={index} className="notes-match">
+            {part.text}
+          </mark>
+        ) : (
+          <span key={index}>{part.text}</span>
+        ),
+      )}
+    </>
+  );
 }
 
-function NotesWorkspace() {
+export default function NotesPage() {
+  const { user } = useAuth();
+  return (
+    <VaultGate purpose="Tus notas">
+      <NotesLoader key={user?.id} />
+    </VaultGate>
+  );
+}
+
+const sameIds = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+/** Waits for decryption, the encryption of old notes and the stored draft. */
+function NotesLoader() {
+  const { user } = useAuth();
+  const vault = useVault();
+  const decrypted = useNotes();
+  const draftKey = `chambapp:notes-draft:${user?.id}`;
+  const [restored, setRestored] = useState<RestoredDraft | null>(null);
+  const [legacyDraftKept, setLegacyDraftKept] = useState(false);
+  const key = vault.key;
+  useEffect(() => {
+    if (!key || !user) return;
+    let cancelled = false;
+    void restoreNoteSession(draftKey, key, user.id).then(async (value) => {
+      // A plaintext draft from an earlier version is replaced by its encrypted copy now.
+      if (value.kind === 'restored' && value.legacy) {
+        try {
+          sessionStorage.setItem(draftKey, await encryptNoteSession(key, user.id, value.session));
+        } catch {
+          if (!cancelled) setLegacyDraftKept(true);
+        }
+      }
+      if (!cancelled) setRestored(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, key, user]);
+
+  const { migration } = vault;
+  if (migration.running)
+    return (
+      <Notice
+        title={`Cifrando ${migration.total} ${migration.total === 1 ? 'nota' : 'notas'}…`}
+        icon="lock"
+      >
+        <p>Tus notas anteriores se están cifrando con tu clave maestra. No cierres esta pestaña.</p>
+        <Progress
+          value={(100 * (migration.done + migration.failed)) / Math.max(1, migration.total)}
+          label="Progreso del cifrado de notas"
+        />
+      </Notice>
+    );
+  if (!restored || decrypted.status !== 'ready')
+    return (
+      <div className="empty-state" role="status">
+        Descifrando tus notas…
+      </div>
+    );
+  if (restored.kind === 'unreadable')
+    return (
+      <Notice title="No se pudo recuperar un borrador anterior" icon="info">
+        <p>
+          Hay un borrador guardado en esta pestaña que no se puede leer con tu clave maestra actual.
+          Si lo descartas, se perderá.
+        </p>
+        <Button
+          variant="danger"
+          icon="trash"
+          onClick={() => {
+            clearNoteDraft(draftKey);
+            setRestored({ kind: 'none' });
+          }}
+        >
+          Descartar borrador
+        </Button>
+      </Notice>
+    );
+  let initial: NoteSession | null = null;
+  if (restored.kind === 'restored') {
+    initial = restored.session;
+    // A plaintext draft of a note that was just encrypted: same content, newer version.
+    const latest = decrypted.notes.find((note) => note.id === initial!.baseline.id);
+    const base = initial.baseline;
+    if (
+      restored.legacy &&
+      latest &&
+      latest.version > base.version &&
+      latest.titulo === base.titulo &&
+      latest.contenido_md === base.contenido_md &&
+      sameIds(latest.proyecto_ids, base.proyecto_ids) &&
+      sameIds(latest.tarea_ids, base.tarea_ids)
+    )
+      initial = { baseline: latest, draft: { ...initial.draft, version: latest.version } };
+  }
+  return (
+    <NotesWorkspace
+      legacyDraftKept={legacyDraftKept}
+      decrypted={decrypted}
+      initialSession={initial}
+      restoredDraft={restored.kind === 'restored'}
+      draftKey={draftKey}
+      cryptoKey={key!}
+    />
+  );
+}
+
+function NotesWorkspace({
+  legacyDraftKept,
+  decrypted,
+  initialSession,
+  restoredDraft,
+  draftKey,
+  cryptoKey,
+}: {
+  legacyDraftKept: boolean;
+  decrypted: DecryptedNotes;
+  initialSession: NoteSession | null;
+  restoredDraft: boolean;
+  draftKey: string;
+  cryptoKey: CryptoKey;
+}) {
   const { data, isLoading, error, reload } = useWorkspace();
   const { user } = useAuth();
+  const vault = useVault();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [libraryPage, setLibraryPage] = useState({ key: '', page: 1 });
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [fullscreen, setFullscreen] = useState(false);
   const [handledRequest, setHandledRequest] = useState<string | null>(null);
-  const draftKey = `chambapp:notes-draft:${user?.id}`;
-  const [restoredDraft] = useState(() => !!readNoteSession(draftKey));
-  const [selection, setSelection] = useState<NoteSession | null>(() => {
-    const saved = readNoteSession(draftKey);
-    return saved?.draft.usuario_id === user?.id ? saved : null;
-  });
+  const [selection, setSelection] = useState<NoteSession | null>(() =>
+    initialSession?.draft.usuario_id === user?.id ? initialSession : null,
+  );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
@@ -153,7 +299,7 @@ function NotesWorkspace() {
   // Wait while a save or import is running; the request is handled afterwards.
   if (requestedId && data && !busy && !importing && handledRequest !== requestedId) {
     setHandledRequest(requestedId);
-    const note = data.notes.find((item) => item.id === requestedId);
+    const note = decrypted.notes.find((item) => item.id === requestedId);
     if (note && selection?.baseline.id !== note.id) {
       const open = () => setSelection({ baseline: note, draft: note });
       if (dirty || restoredDraft) setDiscardAction(() => open);
@@ -175,7 +321,14 @@ function NotesWorkspace() {
       </Notice>
     );
 
-  const notes = data.notes;
+  const notes = decrypted.notes;
+  const unreadable: NoteRow[] = decrypted.unreadable;
+  const rows = new Map(data.notes.map((row) => [row.id, row]));
+  // Shown once the migration of this unlock has finished (not before it starts).
+  const plaintextLeft =
+    vault.migration.running || !vault.migration.total
+      ? 0
+      : data.notes.filter((row) => row.cifrado === null).length;
   const projects = data.projects.filter((project) => !project.eliminado_en);
   const tasks = data.tasks.filter((task) => !task.eliminado_en);
   const taskProjects = new Map(tasks.map((task) => [task.id, task.proyecto_id]));
@@ -203,7 +356,7 @@ function NotesWorkspace() {
   const suggestions = visible.map((note) => ({
     id: note.id,
     title: note.titulo || 'Sin título',
-    detail: note.contenido_md.trim().slice(0, 90) || 'Sin contenido todavía',
+    detail: <NoteExcerpt content={note.contenido_md} query={query} length={90} />,
   }));
 
   return (
@@ -212,9 +365,12 @@ function NotesWorkspace() {
         <PageHeader
           eyebrow="Mi espacio / Documentación"
           title="Notas"
-          description="Ideas, decisiones y documentación en Markdown, conectadas con tu trabajo."
+          description="Ideas, decisiones y documentación en Markdown, cifradas con tu clave maestra."
           actions={
             <>
+              <Button icon="lock" variant="ghost" disabled={busy} onClick={vault.lock}>
+                Bloquear
+              </Button>
               <Button
                 icon="file"
                 disabled={importing || busy}
@@ -247,6 +403,30 @@ function NotesWorkspace() {
           if (file) void importFile(file);
         }}
       />
+      {plaintextLeft ? (
+        <Notice
+          title={`${plaintextLeft} ${plaintextLeft === 1 ? 'nota sigue' : 'notas siguen'} sin cifrar`}
+          icon="lock"
+        >
+          <p>
+            No se pudieron cifrar todas tus notas anteriores; su texto aún es legible en el
+            servidor. Guardar una de ellas también la cifra.
+          </p>
+          <Button
+            icon="refresh"
+            disabled={busy || dirty || vault.migration.running}
+            title={dirty ? 'Guarda o descarta los cambios antes de reintentar' : undefined}
+            onClick={vault.retryMigration}
+          >
+            Reintentar cifrado
+          </Button>
+        </Notice>
+      ) : null}
+      {legacyDraftKept ? (
+        <Notice title="Tu borrador anterior sigue sin cifrar en esta pestaña" icon="info">
+          No se pudo sustituir por una copia cifrada. Guarda la nota o descarta el borrador.
+        </Notice>
+      ) : null}
       {importError ? (
         <p className="form-error" role="alert">
           {importError}
@@ -319,7 +499,7 @@ function NotesWorkspace() {
                     <span className="mono dim">.md</span>
                   </span>
                   <span className="notes-library__excerpt">
-                    {note.contenido_md.trim().slice(0, 100) || 'Sin contenido todavía'}
+                    <NoteExcerpt content={note.contenido_md} query={query} />
                   </span>
                   <span className="notes-library__metadata">
                     <time dateTime={note.actualizado_en}>
@@ -336,7 +516,23 @@ function NotesWorkspace() {
                   </span>
                 </button>
               ))}
-              {!visible.length ? (
+              {unreadable.map((row) => (
+                <button
+                  type="button"
+                  key={row.id}
+                  disabled
+                  className="notes-library__note notes-library__note--unreadable"
+                >
+                  <span className="notes-library__note-title">
+                    <Icon name="lock" size={16} />
+                    <strong>Nota no legible</strong>
+                  </span>
+                  <span className="notes-library__excerpt">
+                    No se puede descifrar con tu clave maestra actual.
+                  </span>
+                </button>
+              ))}
+              {!visible.length && !unreadable.length ? (
                 <p className="notes-library__empty muted">
                   {notes.length
                     ? 'No hay notas con estos filtros.'
@@ -361,6 +557,10 @@ function NotesWorkspace() {
             key={active.baseline.id}
             session={active}
             latest={latest}
+            latestVersion={rows.get(active.baseline.id)?.version ?? null}
+            encrypted={rows.get(active.baseline.id)?.cifrado != null}
+            cryptoKey={cryptoKey}
+            userId={user!.id}
             projects={projects}
             tasks={tasks}
             draftKey={draftKey}
@@ -404,11 +604,7 @@ function NotesWorkspace() {
         confirmLabel="Descartar y continuar"
         onClose={() => setDiscardAction(null)}
         onConfirm={async () => {
-          try {
-            sessionStorage.removeItem(draftKey);
-          } catch {
-            /* Storage may be unavailable. */
-          }
+          clearNoteDraft(draftKey);
           setDirty(false);
           discardAction?.();
         }}

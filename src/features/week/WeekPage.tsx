@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
-import type { TimeEntry, Workday } from '../../domain/models';
+import type { TimeEntry } from '../../domain/models';
 import { formatClock, formatDuration, mondayForDate } from '../../domain/time';
 import { downloadCsv } from '../../lib/export';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { StatGrid } from '../../shared/ui/StatGrid';
 import { Panel, Notice, Progress, Badge } from '../../shared/ui/Panel';
-import { DayCard } from './components/DayCard';
-import { DayGoalModal } from './components/DayGoalModal';
 import { WeekChart } from './components/WeekChart';
 import { WeekReport } from './components/WeekReport';
 import { EntryModal } from '../time-entries/components/EntryModal';
@@ -29,7 +27,6 @@ export default function WeekPage() {
   const attendance = useAttendance();
   const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState<EntryForm | null>(null);
-  const [goal, setGoal] = useState<Workday | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const today = DateTime.fromISO(attendance.now, {
     zone: data?.profile.zona_horaria ?? 'Europe/Madrid',
@@ -46,14 +43,6 @@ export default function WeekPage() {
       await run('generar_semana', { lunes: monday });
     } catch (cause) {
       setCommandError(cause instanceof Error ? cause.message : 'No se pudo generar la semana.');
-    }
-  }
-  async function stopTimer() {
-    setCommandError(null);
-    try {
-      await tracker.stop();
-    } catch (cause) {
-      setCommandError(cause instanceof Error ? cause.message : 'No se pudo detener el cronómetro.');
     }
   }
   function moveWeek(weeks: number) {
@@ -122,9 +111,27 @@ export default function WeekPage() {
       <PageHeader
         eyebrow="Operaciones / Planificación / Mi semana"
         title="Mi Semana Laboral & Balances"
-        description="Objetivos diarios y horas fichadas de tu jornada laboral."
+        description={`Semana ${startDate.weekNumber} · ${startDate.toFormat('dd LLL')} — ${endDate.toFormat('dd LLL yyyy')}`}
         actions={
           <>
+            <div className="actions week-navigation" role="group" aria-label="Cambiar de semana">
+              <IconButton
+                icon="left"
+                label="Semana anterior"
+                onClick={() => moveWeek(-1)}
+                disabled={pending}
+              />
+              <Button variant="ghost" onClick={() => setSelectedMonday(null)} disabled={pending}>
+                Hoy
+              </Button>
+              <Badge>{monday === mondayForDate(today) ? 'Esta semana' : startDate.weekYear}</Badge>
+              <IconButton
+                icon="right"
+                label="Semana siguiente"
+                onClick={() => moveWeek(1)}
+                disabled={pending}
+              />
+            </div>
             <ButtonLink to="/calendario" icon="calendar">
               Festivos y vacaciones
             </ButtonLink>
@@ -210,50 +217,6 @@ export default function WeekPage() {
           detener el cronómetro.
         </Notice>
       ) : null}
-      <Panel
-        title={`Semana ${startDate.weekNumber} · ${startDate.toFormat('dd LLL')} — ${endDate.toFormat('dd LLL yyyy')}`}
-        icon="calendar"
-        className="calendar-panel"
-        action={
-          <div className="actions week-navigation">
-            <IconButton
-              icon="left"
-              label="Semana anterior"
-              onClick={() => moveWeek(-1)}
-              disabled={pending}
-            />
-            <Button variant="ghost" onClick={() => setSelectedMonday(null)} disabled={pending}>
-              Hoy
-            </Button>
-            <Badge>{monday === mondayForDate(today) ? 'Esta semana' : startDate.weekYear}</Badge>
-            <IconButton
-              icon="right"
-              label="Semana siguiente"
-              onClick={() => moveWeek(1)}
-              disabled={pending}
-            />
-          </div>
-        }
-      >
-        <div className="calendar-grid calendar-grid--full-week">
-          {week.days.map((day) => (
-            <DayCard
-              key={day.date}
-              day={day}
-              canAdd={canAdd}
-              activeId={tracker.active?.id}
-              elapsedSeconds={tracker.elapsedSeconds}
-              timerBusy={tracker.busy || tracker.pending}
-              onAdd={() => setEntryForm({ date: day.date })}
-              onEdit={(entry) => setEntryForm({ entry })}
-              onEditGoal={() => {
-                if (day.jornada) setGoal(day.jornada);
-              }}
-              onStop={() => void stopTimer()}
-            />
-          ))}
-        </div>
-      </Panel>
       <Panel title="Horas fichadas frente al objetivo">
         <WeekChart
           hoursLabel="fichadas"
@@ -281,9 +244,9 @@ export default function WeekPage() {
             </div>
             <div>
               <span className="eyebrow">Flexibilidad</span>
-              <h3>Objetivos por día</h3>
+              <h3>Reparto semanal</h3>
               <p className="muted">
-                Edita una jornada para adaptar su objetivo sin cambiar el reparto semanal.
+                Los objetivos de cada día salen del reparto que configuras en Ajustes.
               </p>
             </div>
           </div>
@@ -327,13 +290,6 @@ export default function WeekPage() {
           onClose={() => setEntryForm(null)}
           entry={entryForm.entry}
           date={entryForm.date}
-        />
-      ) : null}
-      {goal ? (
-        <DayGoalModal
-          key={`${goal.id}:${goal.version}`}
-          jornada={goal}
-          onClose={() => setGoal(null)}
         />
       ) : null}
     </div>

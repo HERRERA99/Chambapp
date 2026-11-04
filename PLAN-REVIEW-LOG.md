@@ -121,3 +121,48 @@ Resultado: scratchpad/p5i1/claudex-ax8hbmoj/result.json. Ambos ACEPTADOS y corre
 Resultado: scratchpad/p5i2/claudex-8ry_v178/result.json. Presupuesto de inspección agotado (2/2).
 - P5-R2-001 (medium) arrastrar para seleccionar el valor completo también copiaba → se distingue el gesto: si el puntero se mueve > 4 px entre pulsar y soltar no se copia. SIN inspección independiente. Verificado con ratón real: clic copia, arrastre no copia.
 Pruebas: typecheck, lint, 135 tests, build, prettier OK.
+
+# Ronda 6 (PLAN-6.md) — cifrado de notas, gestor de contraseñas, búsqueda en notas, Mi semana
+- Roles: host/coordinador y builder = Claude (Opus 5.5); revisor del plan e inspector final = Codex (modelo por configuración del CLI).
+- Autorización: el usuario pidió implementar (planificar + construir). Commit/push no autorizados. Migración remota no autorizada.
+- Decisiones del usuario: D1 clave maestra con cifrado en navegador; D2 navegación de semana a la cabecera y se elimina la edición del objetivo diario.
+- Límites: 5 rondas de revisión, 2 de corrección, 2 inspecciones.
+
+## Plan 6 ronda 1 — Codex (gpt-6.1-sol según rollout) — REVISE
+Resultado: scratchpad/p6r1/claudex-lifbtd6q/result.json. 9 hallazgos (2 high, 6 medium, 1 low), todos ACEPTADOS e incorporados al plan:
+R01 permisos RPC (definer privado + envoltorio invoker); R02 generación de bóveda en escrituras cifradas; R03 invariante sin texto en claro en tabla (trigger); R04 límites de tamaño del sobre (formato binario para notas, límites de credenciales); R05 aislamiento de sobres corruptos por nota; R06 borrado lógico de proyectos borra credenciales; R07 petición pendiente persistida en el borrador cifrado; R08 migración de borradores antiguos en claro; R09 /contrasenas en returnTo.
+
+## Plan 6 ronda 2 — Codex (sesión reanudada) — REVISE
+Resultado: scratchpad/p6r2/claudex-tpvij35t/result.json. 3 hallazgos, ACEPTADOS: R10 cambiar_clave valida generación+versión; R11 petición pendiente separada del borrador y reconciliada antes de reenviar; R12 orden único de bloqueos (perfil primero), sin advisory lock, DML directo de notas revocado.
+
+## Plan 6 ronda 3 — Codex (sesión reanudada) — REVISE
+Resultado: scratchpad/p6r3/claudex-f411j6pw/result.json. R13 (fixture de concurrencia de notes.mjs colgaría con el bloqueo de perfil) y R14 (tests existentes de DML directo y recuentos de catálogo) ACEPTADAS; plan ampliado con las adaptaciones de verificación.
+
+## Plan 6 ronda 4 — Codex (sesión reanudada) — APPROVED
+Resultado: scratchpad/p6r4/claudex-8zd00i3q/result.json. Sin hallazgos. Aprobación ligada al hash actual de PLAN-6.md.
+- Desviación conocida (registrada, sin cambiar el plan aprobado): en D, `EntryModal` se mantiene en WeekPage porque también lo abre el botón «Registrar bloque manual» de la cabecera; solo se elimina su apertura desde DayCard.
+
+## Plan 6 — build (Claude), commit base a78b84d
+Implementado por Claude (único autor del código). Base a78b84d.
+- Migración `20261104120000_encrypted_notes_and_credentials.sql`; cliente: `src/lib/crypto/vault.ts`, `src/features/vault/*`, `src/features/passwords/*`, notas cifradas (`useNotes`, `notesDraft`, `NoteEditor`, `NotesPage`), `TaskNotes`, Ajustes (`VaultSettings`), Mi semana sin `DayCard`/`DayGoalModal`, búsqueda con fragmento resaltado.
+- Desviaciones: `EntryModal` se mantiene en Mi semana (lo usa el botón de la cabecera); `#cifrado` vive dentro de la sección Seguridad de Ajustes y no usa `<form>` propio porque Ajustes ya es un formulario; generador de contraseñas acotado a 4096 valores por llamada (límite de `getRandomValues` detectado por un test).
+- Pruebas: typecheck, lint, 150 tests, build, prettier (eol auto), db:test 45 grupos (PostgreSQL 17.10) OK.
+- Navegador (Playwright con Supabase simulado por rutas interceptadas, porque el remoto no tiene la migración y no hay sesión): Mi semana sin tarjetas y navegación en cabecera; búsqueda por cuerpo con fragmento resaltado; crear clave maestra cifra las 2 notas antiguas (servidor: título/contenido vacíos, sobre v1); guardar/crear nota sin texto en claro en la red; borrador cifrado en sessionStorage y restaurado tras recarga + desbloqueo; clave errónea rechazada; bloqueo; gestor: entrada por defecto Usuario+Contraseña, 2 campos personalizados, generar, mostrar, copiar, buscar (no busca en ocultos), editar, eliminar, sin texto en claro en la red; cambiar clave (la antigua deja de servir); restablecer; vista móvil 560 px. Corregidos durante la verificación: título de pestaña de /contrasenas, `<form>` anidado en Ajustes, alineación de filas de campos, insignia estirada en móvil.
+
+## Plan 6 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p6i1/claudex-d9vyp8gg/result.json. 9 hallazgos, todos ACEPTADOS:
+P6-IR-001 (high) cambiar clave tras reset en otra pestaña conservaba la clave antigua con la generación nueva; IR-002 el guardia de conflicto impedía reconciliar un guardado pendiente; IR-003 refs desactualizadas tras confirmar el pendiente; IR-004 clave y textos descifrados retenidos tras bloquear; IR-005 caché de notas con vínculos obsoletos; IR-006 fallos de migración silenciosos y notas en claro etiquetadas como cifradas; IR-007 cambios de los últimos 250 ms perdidos al bloquear; IR-008 credencial confirmada sin refrescar al cerrar el modal; IR-009 borrador antiguo en claro sin aviso si falla su cifrado.
+Arreglos (Claude): IR-001 `changePassword` conserva la clave solo si coincide la generación; IR-002 un pendiente se reconcilia antes del guardia de conflicto (botón habilitado); IR-003 `accept` actualiza las refs de forma síncrona; IR-004 `useNotes` borra caché y resultado al bloquear, la migración se detiene y no retiene la clave; IR-005 la caché guarda solo texto y los vínculos salen siempre de la fila actual; IR-006 aviso «N notas siguen sin cifrar» con «Reintentar cifrado», estado «Guardada · sin cifrar todavía» y `handleError` en la migración; IR-007 volcado del borrador al bloquear (`registerFlush`) con secuencia de escritura global por clave; IR-008 refresco de credenciales al cerrar el editor; IR-009 el borrador antiguo se cifra al restaurarlo y, si falla, se avisa; aviso también si falla guardar el borrador.
+Pruebas tras los arreglos: typecheck, lint, 150 tests, build, prettier, db:test 45 grupos OK. Navegador (Supabase simulado): bloquear justo después de teclear conserva el último cambio; dos pestañas (reset + recreación en B, cambio de clave en A) → A queda bloqueada.
+
+## Plan 6 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p6i2/claudex-u4vmkr8i/result.json. Presupuesto de inspección agotado (2/2). 5 hallazgos, todos ACEPTADOS y corregidos SIN inspección independiente posterior:
+- P6-IR2-001 (high) «Reintentar cifrado» con cambios sin guardar remontaba el espacio y perdía el borrador → el botón se deshabilita mientras hay cambios sin guardar.
+- P6-IR2-002 (medium) `es_uuid` devolvía NULL con la generación ausente: reset sin generación borraba la bóveda → `es_uuid`/`es_sobre` nunca devuelven NULL y las generaciones se comparan con `is distinct from`; tests db de generación ausente en reset, cambio de clave, nota y credencial.
+- P6-IR2-003 (medium) las claves tecleadas en Ajustes sobrevivían al bloqueo → se vacían al perder la clave en memoria.
+- P6-IR2-004 (medium) el botón Atrás antes del debounce perdía el último cambio → volcado al desmontar salvo descarte explícito (`clearNoteDraft` invalida escrituras pendientes); test unitario.
+- P6-IR2-005 (medium) la confirmación de borrar proyecto no avisaba de que borra sus contraseñas → texto del diálogo y del aviso actualizado.
+Pruebas: typecheck, lint, 151 tests, build, prettier, db:test 45 grupos OK. Navegador (Supabase simulado): Atrás inmediato conserva el texto; descartar no recrea el borrador.
+
+## Plan 6 — Corrección tras uso real (Claude, sin inspección independiente)
+- Con la migración sin aplicar en el Supabase remoto, `notas_detalle` no devuelve `cifrado`/`boveda_generacion` y `assertNote` rechazaba la nota, bloqueando todo el espacio («La nota contiene datos incompletos o no válidos»). `withNoteDefaults` trata las columnas ausentes como nota en claro; test añadido. VaultGate indica que falta la migración (PGRST205). Pruebas: typecheck, lint, 152 tests, build OK.

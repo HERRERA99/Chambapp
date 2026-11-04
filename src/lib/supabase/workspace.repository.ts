@@ -7,6 +7,7 @@ import {
   assertProfile,
   assertTask,
   assertNote,
+  withNoteDefaults,
 } from './rowValidation';
 import { isRetryableStatus, isValidCommandResponse } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
@@ -45,9 +46,13 @@ export async function executeCommand<T = unknown>(
     .rpc(
       ['guardar_nota', 'eliminar_nota'].includes(action)
         ? 'chambapp_notas'
-        : ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
-          ? 'chambapp_calendario'
-          : 'chambapp_operar',
+        : ['crear_boveda', 'cambiar_clave', 'restablecer_boveda'].includes(action)
+          ? 'chambapp_boveda'
+          : ['guardar_credencial', 'eliminar_credencial'].includes(action)
+            ? 'chambapp_credenciales'
+            : ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
+              ? 'chambapp_calendario'
+              : 'chambapp_operar',
       { p_accion: action, p_datos: payload },
     )
     .abortSignal(signal);
@@ -221,7 +226,8 @@ export async function loadWorkspace(
       assertTask(row);
       return row;
     }),
-    notes: notes.map((row) => {
+    notes: notes.map((stored) => {
+      const row = withNoteDefaults(stored);
       assertNote(row);
       return row;
     }),

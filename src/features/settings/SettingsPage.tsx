@@ -15,6 +15,8 @@ import { WorkdaySettings } from './components/WorkdaySettings';
 import { RoundingSettings } from './components/RoundingSettings';
 import { RegionalSettings } from './components/RegionalSettings';
 import { SecuritySettings } from './components/SecuritySettings';
+import { VaultSettings } from './components/VaultSettings';
+import '../vault/vault.css';
 import { initialSchedule, minimumScheduleMonday, profileDraft } from './settingsDraft';
 import type { Profile, WorkspaceData } from '../../domain/models';
 
@@ -314,6 +316,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           </div>
           <div hidden={active !== 'seguridad'}>
             <SecuritySettings disabled={saving} />
+            <VaultSettings disabled={saving} />
           </div>
           {dirty || changedElsewhere ? (
             <div className="settings-savebar" role="region" aria-label="Guardar cambios">

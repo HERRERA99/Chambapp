@@ -18,6 +18,8 @@ El último comando aplica la migración a PostgreSQL 17 aislado y verifica sus r
 
 `supabase/project.json` ya guarda la referencia pública `azylnnujzpqwpzedkoxv` del proyecto [Chambapp](https://supabase.com/dashboard/project/azylnnujzpqwpzedkoxv), creado en la organización Aitor, región París. Las cinco migraciones están aplicadas mediante el plugin y sus versiones locales coinciden con el historial remoto: `20261001181821`, `20261001213125`, `20261002190139`, `20261002201755` y `20261005185736`. La tercera añade Odoo y fichajes; su versión local coincide con la registrada por el plugin al desplegarla. `db:migrate` se reserva para futuras migraciones pendientes.
 
+Pendiente de aplicar: `20261104120000_encrypted_notes_and_credentials.sql` (notas cifradas y gestor de contraseñas). Aplícala con `npm run db:migrate` **antes** de desplegar el frontend que la usa; sin ella, Notas y Contraseñas no pueden cargar.
+
 Como alternativa, establece `SUPABASE_PROJECT_REF` en el entorno o en `.env.local`. No es una contraseña. Para cambiar de destino en una ejecución, usa `--project-ref <ref>`.
 
 El plugin de Supabase y la CLI tienen autenticaciones independientes. Para ejecutar tú los comandos remotos, inicia sesión con la CLI:

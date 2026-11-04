@@ -24,6 +24,11 @@ export function useCommand() {
       await queryClient
         .invalidateQueries({ queryKey: ['workspace', user.id] })
         .catch(() => undefined);
+      // Deleting a project also deletes its stored credentials.
+      if (action === 'eliminar_proyecto')
+        await queryClient
+          .invalidateQueries({ queryKey: ['credenciales', user.id] })
+          .catch(() => undefined);
       inFlight.current = false;
       setPending(false);
     }
