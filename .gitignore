@@ -6,3 +6,5 @@ dist/
 supabase/.branches/
 supabase/.temp/
 tsconfig.tsbuildinfo
+public/downloads/
+extension/dist-firefox/

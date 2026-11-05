@@ -3,3 +3,4 @@ dist
 supabase/.temp
 package-lock.json
 tools/db-tests/node_modules
+extension/dist-firefox
