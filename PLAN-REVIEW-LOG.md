@@ -225,3 +225,80 @@ Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
 Resultado: scratchpad/p8i2/claudex-m7117p45/result.json. Presupuesto de inspección agotado (2/2).
 - P8-IR2-001 (medium) rangos nocturnos («22:00–01:30 (+1)») desbordan columnas de ~105 px al desplegar. ACEPTADO y corregido: el rango puede partir línea (tras el guion, antes de «(+1)»). Verificado a 1000x800 con la tarjeta del sábado (21:00–00:30 (+1)) desplegada. SIN inspección independiente.
 Pruebas tras el arreglo: typecheck, lint, 159 tests, build, prettier OK. Sin commit ni push.
+
+# Ronda de cambios 9 (PLAN-9.md) — Extensión de navegador
+- Fecha: 2026-11-05. Host/planificador y builder: Claude Code (Opus 5.5). Revisor del plan e inspector final: Codex (modelo por defecto de su CLI, sin override).
+- Petición: extensión integrada con Chambapp: importar tarea de Odoo, enviar partes a Odoo desde los botones de Parte semanal (sin API, automatizando el DOM), gestor de contraseñas estilo Bitwarden conectado a la bóveda de la app; analizar Extension_App antes de reutilizar; estética de la app; explicar cómo probarla. Implementación autorizada. Sin commit ni push.
+- Decisiones del usuario: U1 botones de Parte semanal; U2 email + OAuth; U3 contraseñas completo sin captura; U4 dominio Odoo configurable.
+- Base: main 9fd1999 (árbol limpio). Rondas máx.: 5. Fix rounds máx.: 2. Inspección: on.
+
+## Plan 9 ronda 1 — Codex — REVISE
+Resultado: scratchpad/p9r1/claudex-dfpyo_du/result.json (plan sha d7ff6bca…). Modelo efectivo de Codex: gpt-6.1-sol (ultra).
+- P9-001 (high) coincidencia por «dominio base» une inquilinos de hostings compartidos (vercel.app). ACEPTADO → solo host exacto sin confirmación; subdominio con confirmación.
+- P9-002 (high) detección de guardado del ejemplo (firma visual/palabras) puede dar falso éxito. ACEPTADO → errores explícitos + recarga y recuento n0/n1.
+- P9-003 (high) sin revalidar partes antes de escribir en Odoo. ACEPTADO → revalidación en SW + bloqueo de edición en la pestaña.
+- P9-004 (high) script inyectado sigue vivo tras timeout/reinicio → doble intento. ACEPTADO → attemptId/deadline/cancel, estado uncertain que bloquea reenvío.
+- P9-005 (medium) minutos fraccionarios con intervalo 0. ACEPTADO → ceil al minuto.
+- P9-006 (medium) odoo_id no es único entre instancias. ACEPTADO → same/possible.
+- P9-007 (medium) importación no atómica. ACEPTADO → cerrojo + importaciones en curso; límite multi-navegador documentado.
+Plan revisado sha 8874b046….
+
+## Plan 9 ronda 2 — Codex — REVISE
+Resultado: scratchpad/p9r2/claudex-nhzqzipa/result.json (plan sha 8874b046…). Confirma resueltos P9-001…007.
+- P9-008 (high) fase informada de forma asíncrona → recuperación podía creer seguro reintentar tras un guardado. ACEPTADO → about-to-write / write-ack tras persistir may-have-written.
+- P9-009 (high) la recarga de verificación corta el puerto y dispararía la recuperación. ACEPTADO → fase reloading persistida y verificador por executeScript(func).
+- P9-010 (high) recuento de filas ignora la paginación del x2many. ACEPTADO → recorrido de todas las páginas; tras la frontera solo n0+1 es éxito, resto uncertain.
+- P9-011 (medium) faltaba bloquear cambios de la tarea/proyecto padre. ACEPTADO → bloqueo en TaskForm/TaskDetail/ProjectsPage y taskVersion revalidada antes de Odoo y de marcar.
+Plan revisado sha 782c1575….
+
+## Plan 9 ronda 3 — Codex — APPROVED
+Resultado: scratchpad/p9r3/claudex-leu9pdt9/result.json. Sin hallazgos. Aprobación ligada a PLAN-9.md sha 782c1575…; `check` OK.
+
+## Plan 9 — Build (Claude)
+Base: 9fd1999 (rama feat/extension-navegador creada desde main, sin commits).
+Autoría: todo el código lo escribe Claude (host). Dependencia nueva: `@types/chrome` (dev).
+Hecho: `extension/` (MV3: service worker con sesión Supabase propia, bóveda en storage.session con autobloqueo, credenciales, autocompletar, cola de Odoo con frontera de escritura/verificación paginada/estados uncertain y sent-unmarked, importación serializada; content scripts app-bridge, odoo-detect, odoo-timesheet, autofill-page; popup y ajustes en React con tokens de la app; iconos generados de la marca; ID fijo bpaahhebkaiaihnkjhgnkojhagpaepoc), `src/features/extension/` (protocolo validado + ExtensionProvider), Parte semanal (envío, chips de cola, confirmación > 5 h), bloqueos en Registro/editor/TaskForm/TaskDetail/ProjectsPage, `rpcForAction` compartido, `openCredential`/`encryptCredential` movidos al modelo puro, `unlockVaultExtractable`/`exportRawKey`/`importRawKey`, docs/extension.md, tools/ext-smoke.
+Desviaciones: (1) la deduplicación con envíos `success` solo bloquea un reenvío idéntico (mismas versiones), para permitir reenviar tras deshacer la imputación; (2) el borrado del portapapeles a los 30 s solo ocurre con el popup abierto y si no se copió otra cosa desde él (sin permiso clipboardRead); (3) un fallo informado por el script antes de la frontera deja la ventana de Odoo abierta para revisión (las interrupciones antes de la frontera la cierran, como dice el plan); (4) el bloque «Esta web» del popup incluye también las entradas de subdominio (rellenarlas pide confirmación).
+Pruebas: typecheck (app + extensión), lint, 190 tests, build, ext:build, prettier sobre los archivos tocados: OK. Navegador (Edge 156 con la extensión cargada, tools/ext-smoke/run.mjs): 16/16 — normal, lento 3 s sin falso positivo, rechazado → failed, inválido → failed, sin ack → no pulsa guardar, paginado (nueva línea en página 2) → verificada, mismos clics y valores que Extension_App, ajustes/permiso, detección e insignia, recuento desde el mundo aislado, autocompletar, popup de acceso, sin errores del SW. Popup con sesión simulada (capturas Odoo/contraseñas/detalle/editor). ui-smoke Parte semanal con mensajes de extensión simulados: motivos de deshabilitado (sin extensión / sin sesión / otro Odoo), solicitud correcta (02:00, versión de tarea, partes), chips processing/uncertain, Marcar bloqueado, acción confirm-created enviada; Registro con 5/5 filas bloqueadas.
+Sin probar: flujo completo con Supabase y Odoo reales (requiere cuenta del usuario; documentado en docs/extension.md).
+Nota: `prettier --write src` reescribió saltos de línea (CRLF→LF) en ~100 archivos no relacionados; se restauraron con git checkout (contenido idéntico).
+
+## Plan 9 — Inspección 1 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p9i1/claudex-sb4w7blw/result.json. 12 hallazgos, todos ACEPTADOS y corregidos (ronda de arreglos 1/2, autor: Claude):
+- P9-IR-001 (high) error inesperado → siempre `error`. → `failureStatus(fase)`: error solo antes de la frontera, `uncertain` después, `sent-unmarked` si ya estaba verificado; cancela el intento.
+- P9-IR-002 (high) autobloqueo no cerraba vistas ni caché. → `onLock` central: borra caché descifrada y emite `vault-locked`; el popup recarga el estado y desmonta las vistas con secretos.
+- P9-IR-003 (high) HTTP rellenaba antes de avisar. → toda página sin HTTPS y todo host no exacto pide confirmación ligada al origen completo; la función inyectada compara `location.origin`.
+- P9-IR-004 (high) fecha ambigua dd/mm vs mm/dd y coincidencia por subcadena. → formato de fecha configurable en Ajustes (dd/mm/aaaa por defecto) usado para escribir y comparar; solo celdas exactas; sin celdas → no verificable. Test de navegador «día y mes cambiados no cuenta».
+- P9-IR-005 (medium) importaciones sin cuenta fijada. → `userId` en la entrada y la clave, lecturas/escrituras con `expectedUserId`, `command()` fija el token. Test de cambio de cuenta.
+- P9-IR-006 (medium) crear credencial duplicable al reintentar. → id estable por formulario; el worker reconcilia con la fila guardada antes de crear.
+- P9-IR-007 (medium) doble «Sí se creó». → reclamación atómica (`marking`) en la cola, finalización condicionada al token, limpieza de reclamaciones huérfanas; botones deshabilitados mientras actúan (app y popup).
+- P9-IR-008 (medium) Completar/Reabrir saltaba el bloqueo. → comprobado en el manejador y botón deshabilitado.
+- P9-IR-009 (medium) cambiar el autobloqueo no afectaba a la bóveda abierta. → `applyAutoLock()` inmediato.
+- P9-IR-010 (medium) cerrar sesión dejaba trabajo pendiente. → `clearSessionWork`: quita pendientes/errores, interrumpe intentos por la frontera.
+- P9-IR-011 (medium) mapa de detección con carreras. → una clave por pestaña.
+- P9-IR-012 (medium) minutos con precisión de ms. → microsegundos enteros (60,000001 s → 2 min).
+Plan actualizado (autocompletar HTTP, formato de fecha) → sha 7a9092a8…. docs/extension.md actualizado.
+Pruebas re-ejecutadas: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 17/17 (nuevo: fecha con día/mes cambiados). ui-smoke Parte semanal y Registro (5/5 bloqueadas): OK.
+
+## Plan 9 — Inspección 2 — Codex (sesión nueva) — REVISE
+Resultado: scratchpad/p9i2/claudex-2pvt3zvx/result.json. Presupuesto de inspección agotado (2/2). 6 hallazgos, todos ACEPTADOS y corregidos en la ronda de arreglos 2/2 (autor: Claude). **Estos arreglos NO tienen inspección independiente.**
+- P9-IR2-001 (high) una operación en vuelo podía reescribir la clave tras bloquear. → época de bloqueo: ninguna operación iniciada antes de un bloqueo guarda la clave, publica entradas descifradas ni devuelve secretos.
+- P9-IR2-002 (high) el intento solo comprobaba el origen, no la tarea. → `recordId` de la tarea en cada intento y en la verificación (URL + ficha cargada); el SW comprueba la URL de la pestaña. Test de navegador «otra tarea: no empieza ni cuenta».
+- P9-IR2-003 (medium) el popup tardaba en ocultar secretos tras bloquear. → paso inmediato a «bloqueada» y descarte de respuestas de estado antiguas.
+- P9-IR2-004 (medium) la bóveda restablecida en la app seguía sirviendo caché. → comprobación de generación antes de cada acceso a secretos; `BOVEDA_*` al guardar bloquea.
+- P9-IR2-005 (medium) reconciliar una creación podía sobrescribir cambios posteriores. → si la fila existe y difiere, conflicto (no se sobrescribe).
+- P9-IR2-006 (low) el borrado del portapapeles podía borrar otra copia. → solo borra si puede leer y confirmar que sigue el mismo valor; si no, no toca nada.
+Pruebas finales: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 18/18. Popup con sesión simulada: OK.
+Estado final: sin commit ni push. Hallazgos abiertos: ninguno conocido; los arreglos de la ronda 2 quedan sin revisión independiente.
+
+# Cambio 10 — Descarga de la extensión, tutorial, indicador y landing (sin Claudex Loop)
+- Fecha: 2026-11-05. Petición directa del usuario; hecho por Claude sin revisión de Codex (no se pidió el loop).
+- Hecho: `npm run ext:pack` (zip sin dependencias en public/downloads, incluido en `npm run build`); botón «Descargar extensión» bajo la zona horaria; tutorial interactivo de 8 pasos con detección en vivo (descarga, carpeta, chrome/edge://extensions con copiar, modo desarrollador, cargar, sesión, Odoo, resumen) que recuerda el paso tras recargar; Ajustes → Extensión (estado, ver tutorial, descargar); el chip R{n} de la cabecera pasa a indicador verde/rojo de la extensión (latido cada 10 s); ExtensionProvider envuelve todo el layout; la extensión inyecta el puente en las pestañas de Chambapp ya abiertas al instalarse (sin recargar; guarda contra puentes muertos de versiones anteriores); sección «Nuevo · Extensión de navegador» en la landing con enlace en el menú.
+- Pruebas: typecheck, lint, 192 tests, build (con zip), prettier: OK. Navegador (Edge): sin extensión chip rojo, descarga real de chambapp-extension.zip, tutorial (pasos 1, 3 con Edge detectado, 5), móvil; con la extensión cargada chip verde y «¡Extensión detectada! Versión 0.1.0»; Ajustes con estado; landing escritorio y nav.
+
+# Cambio 11 — Extensión para Firefox (.xpi) (sin Claudex Loop)
+- Fecha: 2026-11-05. Petición directa del usuario; hecho por Claude sin revisión de Codex.
+- Hecho: build doble (`extension/dist` + `extension/dist-firefox` con background.scripts, gecko id `extension@chambapp-tracker.vercel.app`, strict_min_version 140, data_collection_permissions [authenticationInfo, personallyIdentifyingInfo, websiteContent], patrones sin puerto); `ext:pack` genera zip + xpi (firmado si existe extension/signed/chambapp-firefox-<versión>.xpi) + extension.json; `ext:sign:firefox` (web-ext sign, canal unlisted, credenciales AMO desde .env.local, sube código fuente e instrucciones); vercel.json sirve .xpi como application/x-xpinstall. Código: origen del remitente desde la URL si falta `sender.origin`; ventana de Odoo con reintento si no admite `focused:false`; rutas absolutas `/content/...` al inyectar; `originPattern` sin puerto (Firefox ignora los patrones con puerto) y filtro por origen exacto. Web: tutorial con selector Chrome/Edge/Firefox, pasos de Firefox (instalación firmada o complemento temporal), descarga del .xpi.
+- Fallos reales encontrados por la prueba en Firefox y corregidos: patrones con puerto no coincidían (bridge en dev, Odoo con puerto, tabs.query); rutas relativas de `scripting.executeScript` resueltas desde la página que llama.
+- Pruebas: typecheck, lint, 192 tests, build (zip + xpi), prettier, `web-ext lint` (0 errores, 2 avisos de innerHTML de React). Firefox 159 real (Selenium, tools/ext-smoke/run-firefox.mjs): 13/13. Chrome/Edge (tools/ext-smoke/run.mjs): 18/18; web con la extensión en Edge: indicador verde y detección.
+- Pendiente del usuario: cuenta AMO + `npm run ext:sign:firefox` para el .xpi firmado; Redirect URL de Firefox en Supabase para OAuth. Sin probar: flujo con cuenta real en Firefox (OAuth, bóveda, envío a Odoo real).
