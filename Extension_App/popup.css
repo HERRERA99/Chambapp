@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Partes de Horas → Odoo",
+  "version": "0.2.0",
+  "description": "Procesa partes de horas de Odoo en segundo plano.",
+  "permissions": ["storage", "tabs", "alarms"],
+  "action": {
+    "default_title": "Último parte",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

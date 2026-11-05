@@ -1,0 +1,127 @@
+const estado = document.getElementById('estado');
+const datos = document.getElementById('datos');
+const copiar = document.getElementById('copiar');
+const pegar = document.getElementById('pegar');
+const resultado = document.getElementById('resultado');
+const importarTarea = document.getElementById('importarTarea');
+const colaResumen = document.getElementById('colaResumen');
+const reintentarFallidos = document.getElementById('reintentarFallidos');
+let ultimoParte;
+
+const UMBRAL_ADVERTENCIA_ODOO_MINUTOS = 5 * 60;
+
+function obtenerMinutosParteOdoo(parte) {
+  const coincidencia = String(parte?.horasFormato || '').trim().match(/^(\d+):([0-5]\d)$/);
+  if (!coincidencia) return null;
+  return Number(coincidencia[1]) * 60 + Number(coincidencia[2]);
+}
+
+function formatearHorasOdoo(minutos) {
+  return (minutos / 60).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+}
+
+function renderCola(cola) {
+  const items = Array.isArray(cola) ? cola : [];
+  const activos = items.filter(item => item.status === 'processing').length;
+  const fallidos = items.filter(item => item.status === 'error');
+  const correctos = items.filter(item => item.status === 'success').length;
+  colaResumen.textContent = `${activos} procesando · ${correctos} procesados · ${fallidos.length} fallidos · ${items.filter(item => item.status === 'pending').length} pendientes`;
+  reintentarFallidos.hidden = fallidos.length === 0;
+  reintentarFallidos.onclick = () => {
+    const largas = fallidos
+      .map(item => ({ item, minutos: obtenerMinutosParteOdoo(item.parte) }))
+      .filter(({ minutos }) => minutos > UMBRAL_ADVERTENCIA_ODOO_MINUTOS);
+    if (largas.length) {
+      const detalle = largas.map(({ item, minutos }) =>
+        `• ${item.parte.descripcion || '(sin descripción)'} — ${formatearHorasOdoo(minutos)} h (${item.parte.horasFormato})`
+      ).join('\n');
+      const mensaje = largas.length === 1
+        ? `Vas a meter ${formatearHorasOdoo(largas[0].minutos)} horas en Odoo:\n${detalle}\n\n¿Quieres continuar?`
+        : `Vas a reintentar ${largas.length} partes de más de 5 horas:\n${detalle}\n\n¿Quieres continuar?`;
+      if (!window.confirm(mensaje)) return;
+    }
+    chrome.runtime.sendMessage({
+      type: 'reintentar-partes-odoo',
+      ids: fallidos.map(item => item.id),
+      confirmarHorasLargas: largas.length > 0
+    });
+  };
+}
+
+chrome.runtime.sendMessage({ type: 'obtener-cola-odoo' }, respuesta => {
+  if (!chrome.runtime.lastError && respuesta?.ok) renderCola(respuesta.cola);
+});
+chrome.runtime.onMessage.addListener(mensaje => {
+  if (mensaje.type === 'odoo-cola-actualizada') renderCola(mensaje.cola);
+});
+
+chrome.storage.local.get('ultimoParte', ({ ultimoParte: parte }) => {
+  ultimoParte = parte;
+  if (!parte) return;
+  estado.hidden = true;
+  datos.hidden = false;
+  copiar.hidden = false;
+  pegar.hidden = false;
+  document.getElementById('fecha').textContent = parte.fecha;
+  document.getElementById('url').textContent = parte.url || '(sin URL)';
+  document.getElementById('descripcion').textContent = parte.descripcion || '(sin descripción)';
+  document.getElementById('horas').textContent = `${parte.horas} h (${parte.horasFormato})`;
+});
+
+pegar.addEventListener('click', async () => {
+  resultado.textContent = 'Comprobando URL…';
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  chrome.tabs.sendMessage(tab.id, { type: 'pegar-parte-odoo', parte: ultimoParte }, (response) => {
+    if (chrome.runtime.lastError) {
+      resultado.textContent = 'No se puede acceder a esta pestaña.';
+      return;
+    }
+    resultado.textContent = response?.ok ? 'Datos rellenados.' : (response?.error || 'No se han podido rellenar los datos.');
+  });
+});
+
+copiar.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(JSON.stringify(ultimoParte));
+  copiar.textContent = 'Copiado';
+  setTimeout(() => copiar.textContent = 'Copiar JSON', 1200);
+});
+
+importarTarea.addEventListener('click', async () => {
+  resultado.textContent = 'Leyendo tarea de Odoo…';
+  const [origen] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!origen?.id) {
+    resultado.textContent = 'No se ha encontrado la pestaña activa.';
+    return;
+  }
+  chrome.tabs.sendMessage(origen.id, { type: 'extraer-tarea-odoo' }, async (respuesta) => {
+    if (chrome.runtime.lastError || !respuesta?.ok) {
+      resultado.textContent = respuesta?.error || 'No se encontraron los datos de la tarea.';
+      return;
+    }
+    const pestañas = await chrome.tabs.query({});
+    let enviada = false;
+    let paginaEncontrada = false;
+    for (const pestaña of pestañas) {
+      if (pestaña.id === origen.id || !pestaña.id) continue;
+      try {
+        await new Promise((resolve) => chrome.tabs.sendMessage(
+          pestaña.id,
+          { type: 'guardar-pendiente', tarea: respuesta.tarea },
+          respuestaPendiente => {
+            if (!chrome.runtime.lastError) {
+              paginaEncontrada = true;
+              if (respuestaPendiente?.ok) enviada = true;
+            }
+            resolve();
+          }
+        ));
+      } catch { /* La pestaña puede no admitir scripts */ }
+    }
+    resultado.textContent = enviada
+      ? 'Tarea importada en Pendientes.'
+      : paginaEncontrada
+        ? 'Se encontró una página, pero no confirmó la importación. Recarga Partes de Horas.'
+        : 'Tarea leída, pero no se encontró abierta la página de Partes de Horas. Recarga esa página y la extensión.';
+  });
+});

@@ -1,0 +1,386 @@
+window.addEventListener('message', (event) => {
+  if (event.source !== window || event.data?.source !== 'partes-horas') return;
+  if (event.data.type === 'encolar-partes-odoo') {
+    const responder = respuesta => window.postMessage({ source: 'odoo-partes-extension', type: 'cola-respuesta', respuesta }, '*');
+    try {
+      chrome.runtime.sendMessage({
+        type: 'encolar-partes-odoo',
+        partes: event.data.partes || [event.data.parte]
+      }, respuesta => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          console.warn('[Partes de Horas] No se pudo comunicar con la extensión.', error.message);
+          responder({ ok: false, error: error.message });
+          return;
+        }
+        responder(respuesta);
+      });
+    } catch (error) {
+      const detalle = String(error?.message || error);
+      if (detalle.includes('Extension context invalidated')) {
+        console.info('[Partes de Horas] La extensión se actualizó. Recarga esta pestaña y la de Odoo.');
+      } else {
+        console.warn('[Partes de Horas] No se pudo comunicar con la extensión.', detalle);
+      }
+      responder({ ok: false, error: detalle });
+    }
+    return;
+  }
+  if (event.data.type === 'reintentar-partes-odoo') {
+    chrome.runtime.sendMessage({
+      type: 'reintentar-partes-odoo',
+      ids: event.data.ids || [],
+      parte: event.data.parte,
+      confirmarHorasLargas: event.data.confirmarHorasLargas === true
+    });
+    return;
+  }
+  if (event.data.type === 'configurar-odoo') {
+    chrome.runtime.sendMessage({ type: 'configurar-odoo', maxConcurrent: event.data.maxConcurrent });
+    return;
+  }
+  if (event.data.type !== 'odoo-parte') return;
+  try {
+    chrome.runtime.sendMessage({ type: 'guardar-ultimo-parte', parte: event.data.parte });
+  } catch (error) {
+    // Al actualizar la extensión, Chrome invalida los scripts ya inyectados.
+    // Hay que recargar la página para crear un contexto nuevo.
+    if (String(error?.message).includes('Extension context invalidated')) {
+      console.info('[Partes de Horas] Recarga la página para aplicar la actualización.');
+      return;
+    }
+    console.warn('[Partes de Horas] No se pudo guardar el parte.', error.message);
+  }
+});
+
+chrome.runtime.onMessage.addListener((mensaje) => {
+  if (mensaje.type === 'odoo-cola-actualizada') {
+    window.postMessage({ source: 'odoo-partes-extension', type: 'cola-actualizada', cola: mensaje.cola }, '*');
+  }
+});
+
+chrome.runtime.sendMessage({ type: 'obtener-cola-odoo' }, respuesta => {
+  if (!chrome.runtime.lastError && respuesta?.ok) {
+    window.postMessage({ source: 'odoo-partes-extension', type: 'cola-actualizada', cola: respuesta.cola }, '*');
+  }
+});
+
+
+function rellenar(selector, valor) {
+  const campo = document.querySelector(selector);
+  if (!campo) return false;
+  const prototipo = campo instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototipo, 'value')?.set;
+  setter ? setter.call(campo, valor) : campo.value = valor;
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  campo.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
+const UMBRAL_ADVERTENCIA_ODOO_MINUTOS = 5 * 60;
+
+function obtenerMinutosParteOdoo(parte) {
+  const coincidencia = String(parte?.horasFormato || '').trim().match(/^(\d+):([0-5]\d)$/);
+  if (!coincidencia) return null;
+  const minutos = Number(coincidencia[1]) * 60 + Number(coincidencia[2]);
+  if (!Number.isSafeInteger(minutos)) return null;
+  if (parte?.horas !== undefined && parte.horas !== null && String(parte.horas).trim() !== '') {
+    const horas = Number(parte.horas);
+    if (!Number.isFinite(horas) || horas <= 0) return null;
+  }
+  return minutos;
+}
+
+function validarParteOdoo(parte) {
+  const errores = [];
+  if (!String(parte?.fecha || '').trim()) errores.push('falta la fecha');
+  if (!String(parte?.descripcion || '').trim()) errores.push('falta la descripción');
+  if (!String(parte?.url || '').trim()) errores.push('falta la URL de Odoo');
+  const minutos = obtenerMinutosParteOdoo(parte);
+  if (minutos === null || minutos <= 0) errores.push('el tiempo debe ser mayor que 00:00');
+  if (minutos > UMBRAL_ADVERTENCIA_ODOO_MINUTOS && parte?.confirmacionHorasLargas !== true) {
+    errores.push('el parte supera las 5 horas y requiere confirmación');
+  }
+  return { ok: errores.length === 0, errores };
+}
+
+chrome.runtime.onMessage.addListener((mensaje, sender, responder) => {
+  if (mensaje.type === 'procesar-parte-odoo') {
+    procesarParteOdoo(mensaje.parte)
+      .then(resultado => responder(resultado))
+      .catch(error => responder({ ok: false, error: error.message }));
+    return true;
+  }
+  if (mensaje.type === 'extraer-tarea-odoo') {
+    const leerCampo = (selectores) => {
+      for (const selector of selectores) {
+        const elemento = document.querySelector(selector);
+        const valor = elemento?.value ?? elemento?.textContent ?? '';
+        if (String(valor).trim()) return String(valor).trim();
+      }
+      return '';
+    };
+
+    // Odoo cambia los IDs según la versión y según el modo del formulario.
+    const proyectoTexto = leerCampo([
+      '#display_project_id', '[name="project_id"] input',
+      '[name="project_id"]', '#project_id',
+      'input[id*="project_id"]', '[name*="project"] input'
+    ]);
+    const proyecto = proyectoTexto.replace(/^\s*\[[^\]]*\]\s*/, '').trim();
+    const identificador = leerCampo([
+      '[name="code"] input', '[name="code"] span', '[name="code"]',
+      '#code', 'input[id*="code"]', '[name*="identificador"]',
+      '[name*="reference"]'
+    ]);
+    const descripcion = leerCampo([
+      '#name', '[name="name"] textarea', '[name="name"] input',
+      '[name="name"]', 'textarea[id*="name"]'
+    ]);
+    // El identificador es opcional en Partes de Horas y muchas tareas de Odoo
+    // no tienen un campo `code`.
+    const faltan = [!proyecto && 'proyecto', !descripcion && 'descripción'].filter(Boolean);
+    responder({
+      ok: faltan.length === 0,
+      error: faltan.length ? `No se encontraron: ${faltan.join(', ')}. Abre la tarea en Odoo y vuelve a intentarlo.` : undefined,
+      tarea: { proyecto, identificador, descripcion, url: location.href }
+    });
+    return;
+  }
+  if (mensaje.type === 'guardar-pendiente') {
+    window.postMessage({ source: 'odoo-partes', type: 'importar-pendiente', tarea: mensaje.tarea }, '*');
+    responder({ ok: true });
+    return;
+  }
+  if (mensaje.type !== 'pegar-parte-odoo') return;
+  const parte = mensaje.parte;
+  const validacion = validarParteOdoo(parte);
+  if (!validacion.ok) {
+    responder({ ok: false, error: `No se puede rellenar el parte: ${validacion.errores.join('; ')}.` });
+    return;
+  }
+  const fecha = parte.fecha.split('-').reverse().join('/');
+  const fechaOk = rellenar('#date', fecha);
+  const descripcionOk = rellenar('#name', parte.descripcion || '');
+  const tiempoOk = rellenar('#unit_amount', parte.horasFormato || '00:00');
+  responder({ ok: fechaOk && descripcionOk && tiempoOk, error: 'No se encontraron todos los campos de Odoo.' });
+});
+
+function esperarElemento(descripcion, buscar, timeout = 45000) {
+  return new Promise((resolve, reject) => {
+    const inicio = Date.now();
+    const comprobar = () => {
+      const elemento = buscar();
+      if (elemento) return resolve(elemento);
+      if (Date.now() - inicio >= timeout) return reject(new Error(`No aparece: ${descripcion}`));
+      setTimeout(comprobar, 250);
+    };
+    comprobar();
+  });
+}
+
+function buscarEnlacePorTexto(texto) {
+  return [...document.querySelectorAll('a,button,[role="button"]')]
+    .find(elemento => elemento.textContent.trim().toLowerCase() === texto.toLowerCase());
+}
+
+function buscarAñadirParte() {
+  return document.querySelector('.o_field_x2many_list_row_add a[role="button"]')
+    || buscarEnlacePorTexto('Añadir una línea');
+}
+
+function buscarPestanaPartes() {
+  const esPartes = elemento => (
+    normalizarNombre(elemento.textContent) === 'partes de horas' &&
+    (elemento.offsetParent !== null || elemento.getClientRects().length > 0)
+  );
+
+  // Hay dos enlaces con el mismo texto. Solo se debe pulsar la pestaña del
+  // formulario; nunca el enlace del menú lateral.
+  return document.querySelector('.o_notebook_headers a[role="tab"]') &&
+    esPartes(document.querySelector('.o_notebook_headers a[role="tab"]'))
+    ? document.querySelector('.o_notebook_headers a[role="tab"]')
+    : [...document.querySelectorAll('a[role="tab"], [role="tab"]')].find(esPartes);
+}
+
+function hacerClickCuandoEsteDisponible(elemento) {
+  const objetivo = elemento.matches('li')
+    ? (elemento.querySelector('a,button') || elemento)
+    : elemento;
+  objetivo.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  objetivo.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  objetivo.click();
+}
+
+function normalizarNombre(valor) {
+  return String(valor || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('es');
+}
+
+function buscarBotonGuardar() {
+  return document.querySelector('button.o_form_button_save[data-hotkey="c"]')
+    || document.querySelector('button.o_form_button_save')
+    || [...document.querySelectorAll('button, a[role="button"]')]
+      .find(elemento => ['guardar y cerrar', 'guardar', 'save'].includes(normalizarNombre(elemento.textContent)));
+}
+
+function buscarGuardarManual() {
+  return document.querySelector('button.o_form_button_save[data-hotkey="s"][aria-label="Save manually"]')
+    || document.querySelector('button.o_form_button_save[data-hotkey="s"]')
+    || document.querySelector('button.o_form_button_save[title="Guardar manualmente"]');
+}
+
+function formularioVisible(selector) {
+  const elemento = document.querySelector(selector);
+  return elemento && (elemento.offsetParent !== null || elemento.getClientRects().length > 0);
+}
+
+function elementoVisible(elemento) {
+  if (!elemento?.isConnected) return false;
+  for (let actual = elemento; actual; actual = actual.parentElement) {
+    const estilo = window.getComputedStyle(actual);
+    if (actual.hidden || actual.getAttribute('aria-hidden') === 'true' || estilo.display === 'none' ||
+      estilo.visibility === 'hidden' || estilo.visibility === 'collapse' ||
+      estilo.contentVisibility === 'hidden' || Number(estilo.opacity) === 0) return false;
+  }
+  const rectangulo = elemento.getBoundingClientRect();
+  return rectangulo.width > 0 && rectangulo.height > 0 && elemento.getClientRects().length > 0;
+}
+
+function firmaVisual(elemento) {
+  if (!elemento?.isConnected) return 'desconectado';
+  const estilo = window.getComputedStyle(elemento);
+  const rectangulo = elemento.getBoundingClientRect();
+  const redondear = valor => Math.round(valor * 10) / 10;
+  return JSON.stringify({
+    clase: elemento.getAttribute('class'),
+    estilo: elemento.getAttribute('style'),
+    oculto: elemento.hidden,
+    ariaOculto: elemento.getAttribute('aria-hidden'),
+    display: estilo.display,
+    visibility: estilo.visibility,
+    opacity: estilo.opacity,
+    transform: estilo.getPropertyValue('transform'),
+    translate: estilo.getPropertyValue('translate'),
+    clipPath: estilo.getPropertyValue('clip-path'),
+    rectangulo: [rectangulo.left, rectangulo.top, rectangulo.width, rectangulo.height].map(redondear)
+  });
+}
+
+function capturarNotificacionesGuardado() {
+  return new Map([...document.querySelectorAll('.o_notification, .o_dialog')]
+    .map(elemento => [elemento, (elemento.textContent || '').replace(/\s+/g, ' ').trim()]));
+}
+
+function hayNotificacionGuardadoNueva(notificacionesPrevias) {
+  return [...document.querySelectorAll('.o_notification, .o_dialog')].some(elemento => {
+    const texto = (elemento.textContent || '').replace(/\s+/g, ' ').trim();
+    return /creado|guardado|success|éxito|successfully/i.test(texto) && notificacionesPrevias.get(elemento) !== texto;
+  });
+}
+
+function esperarCambioTrasGuardar(boton, timeout = 20000) {
+  return new Promise((resolve, reject) => {
+    const inicio = Date.now();
+    const comprobar = () => {
+      const visible = boton.isConnected && (boton.offsetParent !== null || boton.getClientRects().length > 0);
+      const notificacion = [...document.querySelectorAll('.o_notification, .o_dialog')]
+        .some(elemento => /creado|guardado|success|éxito|successfully/i.test(elemento.textContent || ''));
+      if (!visible || boton.disabled || notificacion) return resolve();
+      if (Date.now() - inicio >= timeout) return reject(new Error('Odoo no confirmó el guardado del parte.'));
+      setTimeout(comprobar, 250);
+    };
+    comprobar();
+  });
+}
+
+function esperarFinGuardadoManual(boton, estadoInicial, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    const inicio = Date.now();
+    let botonOcultoDesde = null;
+    let nubeOcultaDesde = null;
+    let firmaVisualAnterior = '';
+    let firmaVisualEstableDesde = null;
+    const firmaInicial = `${estadoInicial.firmaBoton}|${estadoInicial.firmaNube}`;
+    const comprobar = () => {
+      const botonVisibleAhora = elementoVisible(boton);
+      const nube = boton.querySelector('.fa-cloud-upload');
+      const nubeVisibleAhora = elementoVisible(nube);
+      const firmaAhora = `${firmaVisual(boton)}|${firmaVisual(nube)}`;
+      if (estadoInicial.botonVisible && !botonVisibleAhora) {
+        botonOcultoDesde ??= Date.now();
+        if (Date.now() - botonOcultoDesde >= 500) return resolve();
+      } else {
+        botonOcultoDesde = null;
+      }
+      if (nubeVisibleAhora) {
+        nubeOcultaDesde = null;
+      } else if (estadoInicial.nubeVisible) {
+        nubeOcultaDesde ??= Date.now();
+        if (Date.now() - nubeOcultaDesde >= 500) return resolve();
+      } else {
+        nubeOcultaDesde = null;
+      }
+      if (firmaAhora !== firmaInicial) {
+        if (firmaVisualAnterior !== firmaAhora) {
+          firmaVisualAnterior = firmaAhora;
+          firmaVisualEstableDesde = Date.now();
+        } else if (Date.now() - firmaVisualEstableDesde >= 700) {
+          return resolve();
+        }
+      } else {
+        firmaVisualAnterior = '';
+        firmaVisualEstableDesde = null;
+      }
+      if (hayNotificacionGuardadoNueva(estadoInicial.notificaciones)) return resolve();
+      if (Date.now() - inicio >= timeout) return reject(new Error('Odoo no confirmó que terminara el guardado manual.'));
+      setTimeout(comprobar, 100);
+    };
+    comprobar();
+  });
+}
+
+async function procesarParteOdoo(parte) {
+  const validacion = validarParteOdoo(parte);
+  if (!validacion.ok) throw new Error(`No se puede crear el parte: ${validacion.errores.join('; ')}.`);
+  const menuPartes = await esperarElemento('pestaña Partes de horas', buscarPestanaPartes);
+  hacerClickCuandoEsteDisponible(menuPartes);
+  await esperarElemento('tabla de partes', () => document.querySelector('tbody.ui-sortable, .o_field_x2many_list tbody'));
+  const añadir = await esperarElemento('Añadir una línea', buscarAñadirParte);
+  hacerClickCuandoEsteDisponible(añadir);
+  await esperarElemento('campo fecha', () => formularioVisible('#date'));
+  await esperarElemento('campo descripción', () => formularioVisible('#name'));
+  await esperarElemento('campo tiempo', () => formularioVisible('#unit_amount'));
+
+  const valores = {
+    '#date': parte.fecha.split('-').reverse().join('/'),
+    '#name': parte.descripcion || '',
+    '#unit_amount': parte.horasFormato
+  };
+  for (const [selector, valor] of Object.entries(valores)) {
+    if (!rellenar(selector, valor)) throw new Error(`No se encontró el campo ${selector}.`);
+    if (String(document.querySelector(selector).value).trim() !== String(valor).trim()) {
+      throw new Error(`Odoo no aceptó el valor del campo ${selector}.`);
+    }
+  }
+
+  const boton = await esperarElemento('botón Guardar y cerrar', buscarBotonGuardar);
+  if (boton.disabled) throw new Error('El botón Guardar y cerrar está deshabilitado.');
+  hacerClickCuandoEsteDisponible(boton);
+  await esperarElemento('cierre de la línea y botón Guardar manualmente', () => {
+    const dialogoCerrado = !boton.isConnected || (boton.offsetParent === null && boton.getClientRects().length === 0);
+    return dialogoCerrado ? buscarGuardarManual() : null;
+  }, 30000);
+  const guardarFormulario = buscarGuardarManual();
+  if (!guardarFormulario || guardarFormulario.disabled) throw new Error('El botón Guardar manualmente no está disponible.');
+  const estadoInicial = {
+    botonVisible: elementoVisible(guardarFormulario),
+    nubeVisible: elementoVisible(guardarFormulario.querySelector('.fa-cloud-upload')),
+    firmaBoton: firmaVisual(guardarFormulario),
+    firmaNube: firmaVisual(guardarFormulario.querySelector('.fa-cloud-upload')),
+    notificaciones: capturarNotificacionesGuardado()
+  };
+  hacerClickCuandoEsteDisponible(guardarFormulario);
+  await esperarFinGuardadoManual(guardarFormulario, estadoInicial);
+  return { ok: true };
+}
+

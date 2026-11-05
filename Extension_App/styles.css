@@ -1,0 +1,2537 @@
+const fechaElemento = document.getElementById("fecha");
+const inputInicio = document.getElementById("inicio");
+const tabla = document.querySelector("#tabla tbody");
+const contenedorFecha = document.getElementById("contenedorFecha");
+const toggleFechaBtn = document.getElementById("toggleFecha");
+const cancelarBtn = document.getElementById("cancelar");
+const contenedorPendientes = document.getElementById("pendientes");
+const togglePendientesBtn = document.getElementById("togglePendientes");
+const toggleAgruparURLBtn = document.getElementById("toggleAgruparURL");
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+if (searchResults) searchResults.style.display = 'none';
+// Referencias globales a inputs (algunas funciones las usan por nombre directo)
+const proyectoInput = document.getElementById("proyecto");
+const proyecto = proyectoInput;
+const identificador = document.getElementById("identificador");
+const url = document.getElementById("url");
+const descripcion = document.getElementById("descripcion");
+const inicio = document.getElementById("inicio");
+const fin = document.getElementById("fin");
+
+let indiceEditando = null;
+let selectedRows = new Set();
+let editingMultiple = false;
+let multipleIndices = [];
+let fechaSeleccionada = new Date();
+let calendarioMesActual = new Date();
+let mostrarCalendario = localStorage.getItem("mostrarCalendario") === "true";
+let agruparPorURL = localStorage.getItem("agruparPorURL") === "true";
+let colaOdoo = [];
+const ESTADOS_MANUALES_ODOO_KEY = 'odoo_estados_manuales_v1';
+
+function estadosManualesOdoo() {
+    try { return JSON.parse(localStorage.getItem(ESTADOS_MANUALES_ODOO_KEY) || '{}'); }
+    catch { return {}; }
+}
+
+function guardarEstadoManualOdoo(queueKey, estado) {
+    const estados = estadosManualesOdoo();
+    estados[queueKey] = estado;
+    localStorage.setItem(ESTADOS_MANUALES_ODOO_KEY, JSON.stringify(estados));
+}
+
+const UMBRAL_AVISO_ODOO_MINUTOS = 5 * 60;
+
+function obtenerMinutosParteOdoo(parte) {
+    const coincidencia = String(parte?.horasFormato || '').trim().match(/^(\d+):([0-5]\d)$/);
+    if (!coincidencia) return null;
+    const minutos = Number(coincidencia[1]) * 60 + Number(coincidencia[2]);
+    if (!Number.isSafeInteger(minutos)) return null;
+    if (parte?.horas !== undefined && parte.horas !== null && String(parte.horas).trim() !== '') {
+        const horas = Number(parte.horas);
+        if (!Number.isFinite(horas) || horas <= 0) return null;
+    }
+    return minutos;
+}
+
+function validarParteOdoo(parte) {
+    const errores = [];
+    if (!String(parte?.fecha || '').trim()) errores.push('fecha vacía');
+    if (!String(parte?.descripcion || '').trim()) errores.push('descripción vacía');
+    if (!String(parte?.url || '').trim()) errores.push('URL de Odoo vacía');
+    const minutos = obtenerMinutosParteOdoo(parte);
+    if (minutos === null || minutos <= 0) errores.push('tiempo vacío, inválido o igual a 00:00');
+    return { errores, minutos };
+}
+
+function formatearHorasOdoo(minutos) {
+    return (minutos / 60).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+}
+
+function prepararPartesOdoo(partes) {
+    const lista = Array.isArray(partes) ? partes : [partes];
+    const validaciones = lista.map(parte => ({ parte, ...validarParteOdoo(parte) }));
+    const invalidas = validaciones.filter(item => item.errores.length > 0);
+    if (invalidas.length) {
+        const detalle = invalidas.map(({ parte, errores }) =>
+            `• ${String(parte?.descripcion || '').trim() || '(sin descripción)'}: ${errores.join(', ')}`
+        ).join('\n');
+        window.alert(`No se pueden crear partes en Odoo. Revisa los campos obligatorios:\n${detalle}`);
+        return null;
+    }
+
+    const largas = validaciones.filter(item => item.minutos > UMBRAL_AVISO_ODOO_MINUTOS);
+    if (largas.length) {
+        const detalle = largas.map(({ parte, minutos }) =>
+            `• ${String(parte.descripcion).trim()} — ${formatearHorasOdoo(minutos)} h (${parte.horasFormato})`
+        ).join('\n');
+        const mensaje = largas.length === 1
+            ? `Vas a meter ${formatearHorasOdoo(largas[0].minutos)} horas en Odoo:\n${detalle}\n\n¿Quieres continuar?`
+            : `Vas a meter ${largas.length} partes de más de 5 horas en Odoo:\n${detalle}\n\n¿Quieres continuar?`;
+        if (!window.confirm(mensaje)) return null;
+    }
+
+    return validaciones.map(({ parte, minutos }) => ({
+        ...parte,
+        confirmacionHorasLargas: minutos > UMBRAL_AVISO_ODOO_MINUTOS
+    }));
+}
+
+function construirParteOdoo(fecha, resumen, minutos) {
+    const descripcion = resumen.descripcion || [...new Set(
+        (resumen.tareas || []).map(t => t.descripcion || '').filter(Boolean)
+    )].join(' | ');
+    return {
+        fecha,
+        url: resumen.url || '',
+        descripcion,
+        horas: Number((minutos / 60).toFixed(2)),
+        horasFormato: minutesToHM(minutos),
+        summaryKey: resumen.key,
+        queueKey: `${fecha}|${resumen.key}|${minutos}`,
+        exportadoEn: Date.now()
+    };
+}
+
+function solicitarColaOdoo(partes, yaPreparadas = false) {
+    const partesPreparadas = yaPreparadas
+        ? (Array.isArray(partes) ? partes : [partes])
+        : prepararPartesOdoo(partes);
+    if (!partesPreparadas) return false;
+    const estados = estadosManualesOdoo();
+    partesPreparadas.forEach(parte => { delete estados[parte.queueKey]; });
+    localStorage.setItem(ESTADOS_MANUALES_ODOO_KEY, JSON.stringify(estados));
+    window.postMessage({ source: 'partes-horas', type: 'encolar-partes-odoo', partes: partesPreparadas }, '*');
+    return true;
+}
+
+function reintentarParteOdoo(item, parte = item?.parte) {
+    if (!item?.id) return false;
+    const partesPreparadas = prepararPartesOdoo([parte]);
+    if (!partesPreparadas) return false;
+    const partePreparada = partesPreparadas[0];
+    window.postMessage({
+        source: 'partes-horas',
+        type: 'reintentar-partes-odoo',
+        ids: [item.id],
+        parte: partePreparada,
+        confirmarHorasLargas: partePreparada.confirmacionHorasLargas
+    }, '*');
+    return true;
+}
+
+function estadoParteOdoo(parte) {
+    const clave = parte.queueKey;
+    return estadosManualesOdoo()[clave] || colaOdoo.find(item => item.queueKey === clave)?.status || '';
+}
+
+function marcarParteProcesado(parte) {
+    if (!parte?.fecha || !parte?.summaryKey) return;
+    const tareas = cargarTareas(parte.fecha);
+    let cambiado = false;
+    tareas.forEach(tarea => {
+        if (tarea.proyecto.toLowerCase() === 'descanso' || tarea.hecho) return;
+        const clave = agruparPorURL
+            ? (tarea.url || '(sin URL)')
+            : `${tarea.proyecto}||${tarea.identificador || ''}||${tarea.descripcion || ''}`;
+        if (clave === parte.summaryKey) { tarea.hecho = true; cambiado = true; }
+    });
+    if (cambiado) guardarTareas(parte.fecha, tareas);
+}
+
+window.addEventListener('message', event => {
+    if (event.source !== window || event.data?.source !== 'odoo-partes-extension') return;
+    if (event.data.type === 'cola-actualizada') {
+        colaOdoo = Array.isArray(event.data.cola) ? event.data.cola : [];
+        colaOdoo.filter(item => item.status === 'success').forEach(item => marcarParteProcesado(item.parte));
+        render();
+        verPendientesGlobal();
+    }
+});
+
+// Inicializar control del modal de descripción (opcional)
+function initDescriptionModal() {
+    const openDescModalBtn = document.getElementById('openDescModal');
+    const descModal = document.getElementById('descModal');
+    const descripcionModal = document.getElementById('descripcionModal');
+    const saveDescModal = document.getElementById('saveDescModal');
+    const closeDescModal = document.getElementById('closeDescModal');
+    if (!openDescModalBtn || !descModal) return;
+
+    const openModal = () => {
+        if (descripcionModal) descripcionModal.value = descripcion ? descripcion.value : '';
+        descModal.style.display = 'flex';
+        descModal.setAttribute('aria-hidden', 'false');
+        setTimeout(() => { if (descripcionModal) descripcionModal.focus(); }, 50);
+    };
+
+    const closeModal = () => {
+        descModal.style.display = 'none';
+        descModal.setAttribute('aria-hidden', 'true');
+        openDescModalBtn.focus();
+    };
+
+    openDescModalBtn.addEventListener('click', openModal);
+    if (saveDescModal) saveDescModal.addEventListener('click', () => {
+        if (descripcion && descripcionModal) descripcion.value = descripcionModal.value;
+        closeModal();
+    });
+    if (closeDescModal) closeDescModal.addEventListener('click', closeModal);
+    const backdrop = descModal.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && descModal.getAttribute('aria-hidden') === 'false') closeModal();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initDescriptionModal);
+
+const odooMaxConcurrentInput = document.getElementById('odooMaxConcurrent');
+if (odooMaxConcurrentInput) {
+    odooMaxConcurrentInput.value = localStorage.getItem('odooMaxConcurrent') || '5';
+    window.postMessage({ source: 'partes-horas', type: 'configurar-odoo', maxConcurrent: Number(odooMaxConcurrentInput.value) }, '*');
+    odooMaxConcurrentInput.addEventListener('change', () => {
+        const valor = Math.min(5, Math.max(1, Number(odooMaxConcurrentInput.value) || 5));
+        odooMaxConcurrentInput.value = String(valor);
+        localStorage.setItem('odooMaxConcurrent', String(valor));
+        window.postMessage({ source: 'partes-horas', type: 'configurar-odoo', maxConcurrent: valor }, '*');
+    });
+}
+
+function obtenerFechaISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Fecha hoy
+const hoy = new Date();
+fechaSeleccionada = new Date(hoy);
+
+function renderizarFecha() {
+    if (mostrarCalendario) {
+        generarCalendario();
+        render();
+    } else {
+        const inputDate = document.createElement("input");
+        inputDate.type = "date";
+        inputDate.id = "fechaTarea";
+        inputDate.value = obtenerFechaISO(fechaSeleccionada);
+        inputDate.addEventListener("change", (e) => {
+            const [year, month, day] = e.target.value.split('-').map(Number);
+            fechaSeleccionada = new Date(year, month - 1, day);
+            actualizarMostradoFecha();
+            render();
+        });
+        contenedorFecha.innerHTML = "";
+        contenedorFecha.appendChild(inputDate);
+        render();
+    }
+}
+
+actualizarMostradoFecha();
+renderizarFecha();
+
+toggleFechaBtn.addEventListener("click", () => {
+    mostrarCalendario = !mostrarCalendario;
+    localStorage.setItem("mostrarCalendario", mostrarCalendario);
+    renderizarFecha();
+});
+
+// --- Lógica del Planificador ---
+let plannerMonday = getMonday(new Date());
+let weeklyHoursGoal = parseFloat(localStorage.getItem('weeklyHoursGoal')) || 39;
+let automaticBreakMinutes = parseInt(localStorage.getItem('automaticBreakMinutes'), 10) || 20;
+let automaticBreakEnabled = localStorage.getItem('automaticBreakEnabled') === 'true';
+let workingDaysPerWeek = parseInt(localStorage.getItem('workingDaysPerWeek'), 10) || 5;
+
+const BACKUP_VERSION = 1;
+const APPLICATION_STORAGE_KEYS = new Set([
+    'mostrarCalendario', 'agruparPorURL', 'weeklyHoursGoal', 'automaticBreakMinutes',
+    'automaticBreakEnabled', 'workingDaysPerWeek', 'mis_pendientes_v1',
+    'mis_pendientes_minimized_v1', 'odoo_ultimo_parte',
+    'odoo_estados_manuales_v1', 'odooMaxConcurrent'
+]);
+const APPLICATION_STORAGE_PREFIXES = ['registro_', 'planner_', 'desiredTodayHours_'];
+
+function isApplicationStorageKey(key) {
+    return APPLICATION_STORAGE_KEYS.has(key) || APPLICATION_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
+function setBackupStatus(message, isError = false) {
+    const status = document.getElementById('backupStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+}
+
+function exportBackup() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && isApplicationStorageKey(key)) data[key] = localStorage.getItem(key);
+    }
+
+    const backup = {
+        application: 'partes-horas',
+        version: BACKUP_VERSION,
+        exportedAt: new Date().toISOString(),
+        data
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `partes-horas-copia-${obtenerFechaISO(new Date())}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+    setBackupStatus('Copia exportada correctamente.');
+}
+
+function importBackupFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        let backup;
+        try {
+            backup = JSON.parse(reader.result);
+        } catch {
+            setBackupStatus('El archivo no contiene un JSON válido.', true);
+            return;
+        }
+
+        if (backup?.application !== 'partes-horas' || backup.version !== BACKUP_VERSION || !backup.data || Array.isArray(backup.data)) {
+            setBackupStatus('El archivo no es una copia válida de Partes de Horas.', true);
+            return;
+        }
+
+        const entries = Object.entries(backup.data);
+        const isValid = entries.every(([key, value]) => isApplicationStorageKey(key) && typeof value === 'string');
+        if (!isValid) {
+            setBackupStatus('La copia contiene datos no válidos.', true);
+            return;
+        }
+
+        if (!window.confirm('La importación reemplazará todos los datos actuales de Partes de Horas. ¿Deseas continuar?')) return;
+
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && isApplicationStorageKey(key)) keysToRemove.push(key);
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        entries.forEach(([key, value]) => localStorage.setItem(key, value));
+        setBackupStatus('Copia importada. Recargando la aplicación…');
+        window.location.reload();
+    };
+    reader.onerror = () => setBackupStatus('No se ha podido leer el archivo seleccionado.', true);
+    reader.readAsText(file);
+}
+
+function getMonday(d) {
+    d = new Date(d);
+    const day = d.getDay(),
+        diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
+
+function initPlanner() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const views = {
+        registros: document.getElementById('view-registros'),
+        planificador: document.getElementById('view-planificador')
+    };
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const viewKey = btn.dataset.view;
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            Object.keys(views).forEach(k => {
+                views[k].style.display = k === viewKey ? 'block' : 'none';
+            });
+
+            if (viewKey === 'planificador') {
+                renderPlanner();
+            }
+        });
+    });
+
+    const weeklyGoalInput = document.getElementById('weeklyHoursGoal');
+    if (weeklyGoalInput) {
+        weeklyGoalInput.value = weeklyHoursGoal;
+        weeklyGoalInput.addEventListener('change', (e) => {
+            weeklyHoursGoal = parseFloat(e.target.value) || 0;
+            localStorage.setItem('weeklyHoursGoal', weeklyHoursGoal);
+            renderPlanner();
+        });
+    }
+
+    const settingsPanel = document.getElementById('plannerSettingsPanel');
+    const openPlannerSettings = () => {
+        if (!settingsPanel) return;
+        settingsPanel.style.display = 'flex';
+        settingsPanel.setAttribute('aria-hidden', 'false');
+        document.getElementById('weeklyHoursGoal')?.focus();
+    };
+    const closePlannerSettings = () => {
+        if (!settingsPanel) return;
+        settingsPanel.style.display = 'none';
+        settingsPanel.setAttribute('aria-hidden', 'true');
+        document.getElementById('openPlannerSettings')?.focus();
+    };
+    document.getElementById('openPlannerSettings')?.addEventListener('click', openPlannerSettings);
+    document.getElementById('closePlannerSettings')?.addEventListener('click', closePlannerSettings);
+    settingsPanel?.querySelector('.modal-backdrop')?.addEventListener('click', closePlannerSettings);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && settingsPanel?.getAttribute('aria-hidden') === 'false') closePlannerSettings();
+    });
+    document.getElementById('automaticBreakMinutes').value = automaticBreakMinutes;
+    document.getElementById('automaticBreakEnabled').checked = automaticBreakEnabled;
+    document.getElementById('workingDaysPerWeek').value = workingDaysPerWeek;
+    document.getElementById('savePlannerSettings')?.addEventListener('click', () => {
+        weeklyHoursGoal = parseFloat(document.getElementById('weeklyHoursGoal').value) || 0;
+        automaticBreakMinutes = Math.max(0, parseInt(document.getElementById('automaticBreakMinutes').value, 10) || 0);
+        automaticBreakEnabled = document.getElementById('automaticBreakEnabled').checked;
+        workingDaysPerWeek = Math.min(6, Math.max(1, parseInt(document.getElementById('workingDaysPerWeek').value, 10) || 5));
+        localStorage.setItem('weeklyHoursGoal', weeklyHoursGoal);
+        localStorage.setItem('automaticBreakMinutes', automaticBreakMinutes);
+        localStorage.setItem('automaticBreakEnabled', automaticBreakEnabled);
+        localStorage.setItem('workingDaysPerWeek', workingDaysPerWeek);
+        closePlannerSettings();
+        renderPlanner();
+    });
+
+    document.getElementById('exportBackup')?.addEventListener('click', exportBackup);
+    document.getElementById('importBackup')?.addEventListener('click', () => {
+        document.getElementById('importBackupFile')?.click();
+    });
+    document.getElementById('importBackupFile')?.addEventListener('change', importBackupFile);
+
+    document.getElementById('prevWeek').addEventListener('click', () => {
+        plannerMonday.setDate(plannerMonday.getDate() - 7);
+        renderPlanner();
+    });
+    document.getElementById('nextWeek').addEventListener('click', () => {
+        plannerMonday.setDate(plannerMonday.getDate() + 7);
+        renderPlanner();
+    });
+
+    document.querySelectorAll('.planner-input').forEach(input => {
+        input.addEventListener('change', savePlannerDay);
+    });
+
+    const desiredTodayHoursInput = document.getElementById('desiredTodayHours');
+    if (desiredTodayHoursInput) {
+        desiredTodayHoursInput.addEventListener('input', () => {
+            renderSuggestedExit();
+        });
+        desiredTodayHoursInput.addEventListener('change', () => {
+            const todayISO = obtenerFechaISO(new Date());
+            localStorage.setItem(`desiredTodayHours_${todayISO}`, desiredTodayHoursInput.value);
+            renderSuggestedExit();
+        });
+    }
+}
+
+function savePlannerDay(e) {
+    const day = e.target.dataset.day;
+    let type;
+    if (e.target.classList.contains('entry')) type = 'entry';
+    else if (e.target.classList.contains('exit')) type = 'exit';
+    else if (e.target.classList.contains('entry2')) type = 'entry2';
+    else if (e.target.classList.contains('exit2')) type = 'exit2';
+    else if (e.target.classList.contains('estimate')) type = 'estimate';
+    
+    const value = e.target.value;
+    const mondayISO = obtenerFechaISO(plannerMonday);
+    
+    let data = JSON.parse(localStorage.getItem(`planner_${mondayISO}`)) || {};
+    if (!data[day]) data[day] = {};
+    data[day][type] = value;
+    
+    localStorage.setItem(`planner_${mondayISO}`, JSON.stringify(data));
+    renderPlanner();
+}
+
+function renderPlanner() {
+    // Sincronizar la semana del planificador con la fecha seleccionada si acabamos de entrar o si no hay semana fijada
+    if (!plannerMonday) {
+        plannerMonday = getMonday(fechaSeleccionada);
+    }
+    
+    const mondayISO = obtenerFechaISO(plannerMonday);
+    const sunday = new Date(plannerMonday);
+    sunday.setDate(sunday.getDate() + 6);
+    
+    const rangeEl = document.getElementById('currentWeekRange');
+    if (rangeEl) {
+        rangeEl.textContent = `Semana del ${plannerMonday.toLocaleDateString()} al ${sunday.toLocaleDateString()}`;
+    }
+    
+    const goalEl = document.getElementById('displayWeeklyGoal');
+    if (goalEl) {
+        goalEl.textContent = weeklyHoursGoal;
+    }
+    
+    // Actualizar cabeceras de la tabla con los números de día
+    for (let i = 1; i <= 6; i++) {
+        const d = new Date(plannerMonday);
+        d.setDate(d.getDate() + (i - 1));
+        const th = document.querySelector(`.planner-table thead th[data-day-name="${i}"]`);
+        if (th) {
+            const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
+            th.textContent = `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+        }
+    }
+    
+    const data = JSON.parse(localStorage.getItem(`planner_${mondayISO}`)) || {};
+    
+    // Limpiar y rellenar inputs
+    document.querySelectorAll('.planner-input').forEach(input => {
+        const day = input.dataset.day;
+        let type;
+        if (input.classList.contains('entry')) type = 'entry';
+        else if (input.classList.contains('exit')) type = 'exit';
+        else if (input.classList.contains('entry2')) type = 'entry2';
+        else if (input.classList.contains('exit2')) type = 'exit2';
+        else if (input.classList.contains('estimate')) type = 'estimate';
+        
+        const val = (data[day] && data[day][type]) || '';
+        input.value = val;
+    });
+
+    let totalClockedMinutes = 0;
+    let totalPartesMinutes = 0;
+
+    for (let i = 1; i <= 6; i++) {
+        const dayData = data[i] || {};
+        const entry = dayData.entry;
+        const exit = dayData.exit;
+        const estimate = dayData.estimate;
+        
+        const workedMinutes = getPlannerWorkedMinutes(dayData);
+        
+        // Si no hay horas de fichado (entrada/salida), usar la estimación si existe
+        let effectiveWorkedMinutes = workedMinutes;
+        if (workedMinutes === 0 && estimate) {
+            const [estH, estM] = estimate.split(':').map(Number);
+            if (!isNaN(estH) && !isNaN(estM)) {
+                effectiveWorkedMinutes = estH * 60 + estM;
+            }
+        }
+        
+        // Fila "Imputadas (Fichado)"
+        const permCell = document.querySelector(`.row-permanencia td[data-day="${i}"]`);
+        if (permCell) permCell.textContent = minutesToHM(workedMinutes);
+        totalClockedMinutes += effectiveWorkedMinutes;
+
+        // Fila "Partes (Tareas)"
+        const dayDate = new Date(plannerMonday);
+        dayDate.setDate(dayDate.getDate() + (i - 1));
+        const dayISO = obtenerFechaISO(dayDate);
+        const dayPartesMinutes = getImputedMinutesForDay(dayISO);
+        totalPartesMinutes += dayPartesMinutes;
+
+        const partesCell = document.querySelector(`.row-imputadas td[data-day="${i}"]`);
+        if (partesCell) partesCell.textContent = minutesToHM(dayPartesMinutes);
+
+        // % Partes / Imputadas
+        const pctCell = document.querySelector(`.row-porcentaje td[data-day="${i}"]`);
+        if (pctCell) {
+            if (workedMinutes > 0) {
+                const pct = Math.round((dayPartesMinutes / workedMinutes) * 100);
+                pctCell.textContent = `${pct}%`;
+                
+                // Aplicar colores según el porcentaje
+                if (pct >= 90) {
+                    pctCell.style.color = '#22c55e'; // Verde (Hexadecimal directo)
+                } else if (pct >= 80) {
+                    pctCell.style.color = '#f59e0b'; // Naranja
+                } else {
+                    pctCell.style.color = '#ef4444'; // Rojo
+                }
+            } else {
+                pctCell.textContent = workedMinutes === 0 && dayPartesMinutes > 0 ? '!!!' : '0%';
+                pctCell.style.color = 'inherit';
+            }
+        }
+    }
+
+    // Cabecera: Horas Imputadas (Total fichado)
+    const hoursImputedTotalInput = document.getElementById('hoursImputedTotal');
+    if (hoursImputedTotalInput) hoursImputedTotalInput.value = minutesToHM(totalClockedMinutes);
+    
+    const totalWeeklyWorkedEl = document.getElementById('totalWeeklyWorked');
+    if (totalWeeklyWorkedEl) totalWeeklyWorkedEl.textContent = minutesToHM(totalClockedMinutes);
+
+    const goalMinutes = weeklyHoursGoal * 60;
+    const remainingMinutes = goalMinutes - totalClockedMinutes;
+    
+    const balanceEl = document.getElementById('weeklyBalance');
+    if (balanceEl) {
+        if (remainingMinutes > 0) {
+            balanceEl.textContent = `Faltan ${minutesToHM(remainingMinutes)} para el objetivo`;
+            balanceEl.style.color = 'var(--muted)';
+        } else {
+            balanceEl.textContent = `¡Objetivo cumplido! Sobran ${minutesToHM(Math.abs(remainingMinutes))}`;
+            balanceEl.style.color = 'green';
+        }
+    }
+
+    const desiredTodayHoursInput = document.getElementById('desiredTodayHours');
+    if (desiredTodayHoursInput) {
+        desiredTodayHoursInput.value = localStorage.getItem(`desiredTodayHours_${obtenerFechaISO(new Date())}`) || '';
+    }
+
+    calculateSuggestedExit(data, goalMinutes, totalClockedMinutes);
+}
+
+function diffMinutes(start, end) {
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = end.split(':').map(Number);
+    return (h2 * 60 + m2) - (h1 * 60 + m1);
+}
+
+function getPlannerWorkedMinutes(dayData) {
+    return [['entry', 'exit'], ['entry2', 'exit2']].reduce((total, [entryKey, exitKey]) => {
+        if (!dayData[entryKey] || !dayData[exitKey]) return total;
+        const minutes = diffMinutes(dayData[entryKey], dayData[exitKey]);
+        return total + (minutes > 0 ? minutes : 0);
+    }, 0);
+}
+
+function minutesToHM(minutes) {
+    const h = Math.floor(Math.abs(minutes) / 60);
+    const m = Math.abs(minutes) % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function getImputedMinutesForDay(dateISO) {
+    const tareas = cargarTareas(dateISO);
+    let totalMinutosRaw = 0;
+
+    tareas.forEach(t => {
+        if (!t.inicio || !t.fin || t.proyecto.toLowerCase() === "descanso") return;
+        const [h1, m1] = t.inicio.split(":").map(Number);
+        const [h2, m2] = t.fin.split(":").map(Number);
+        totalMinutosRaw += (h2 * 60 + m2) - (h1 * 60 + m1);
+    });
+
+    // Aplicar el redondeo al cuarto de hora por tarea (igual que en el Parte de Horas)
+    // Nota: El Parte de Horas redondea el acumulado por 'clave' (identificador/url).
+    // Para ser exactos, replicamos la lógica de calcularParteHoras:
+    const resumen = {};
+    tareas.forEach(t => {
+        if (!t.inicio || !t.fin || t.proyecto.toLowerCase() === "descanso") return;
+        let key;
+        if (agruparPorURL) {
+            key = t.url || `(sin URL)`;
+        } else {
+            key = `${t.proyecto}||${t.identificador || ''}||${t.descripcion || ''}`;
+        }
+        const [h1, m1] = t.inicio.split(":").map(Number);
+        const [h2, m2] = t.fin.split(":").map(Number);
+        const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (resumen[key]) {
+            resumen[key] += minutos;
+        } else {
+            resumen[key] = minutos;
+        }
+    });
+
+    let totalRedondeado = 0;
+    Object.values(resumen).forEach(mins => {
+        totalRedondeado += redondearMinutosParte(mins);
+    });
+
+    return totalRedondeado;
+}
+
+function calculateSuggestedExit(currentPlannerData, goalMinutes, totalWorkedSoFar) {
+    const today = new Date();
+    const todayISO = obtenerFechaISO(today);
+    const monday = getMonday(today);
+    const mondayISO = obtenerFechaISO(monday);
+    
+    const suggestedExitEl = document.getElementById('suggestedExitTime');
+    if (!suggestedExitEl) return;
+    
+    if (mondayISO !== obtenerFechaISO(plannerMonday)) {
+        suggestedExitEl.textContent = "--:--";
+        return;
+    }
+
+    let dayOfWeek = today.getDay();
+    if (dayOfWeek === 0) dayOfWeek = 7;
+    if (dayOfWeek > 6) {
+        suggestedExitEl.textContent = "Fin de semana";
+        return;
+    }
+    
+    const todayData = currentPlannerData[dayOfWeek] || {};
+    const entry = todayData.entry;
+
+    if (!entry) {
+        suggestedExitEl.textContent = "Sin entrada";
+        return;
+    }
+
+    const desiredTodayHours = document.getElementById('desiredTodayHours')?.value;
+    if (desiredTodayHours) {
+        calculateExitForDailyGoal(todayData, desiredTodayHours);
+        return;
+    }
+
+    let workedPreviousDays = 0;
+    let simulatedFutureDays = 0;
+    for (let i = 1; i <= 6; i++) {
+        if (i === dayOfWeek) continue; // Saltamos hoy
+
+        const d = currentPlannerData[i] || {};
+        let dayMinutes = 0;
+        if ((d.entry && d.exit) || (d.entry2 && d.exit2)) {
+            dayMinutes = getPlannerWorkedMinutes(d);
+        } else if (d.estimate) {
+            const [estH, estM] = d.estimate.split(':').map(Number);
+            if (!isNaN(estH) && !isNaN(estM)) {
+                dayMinutes = estH * 60 + estM;
+            }
+        }
+        
+        if (i < dayOfWeek) {
+            workedPreviousDays += dayMinutes;
+        } else {
+            simulatedFutureDays += dayMinutes;
+        }
+    }
+
+    const remainingForGoal = goalMinutes - workedPreviousDays - simulatedFutureDays;
+    
+    // Contar cuántos días laborales (L-V) quedan por trabajar (sin imputadas y sin estimadas)
+    // incluyendo el día de hoy si aún no ha terminado
+    let daysWithWork = 0;
+    for (let i = dayOfWeek; i <= workingDaysPerWeek; i++) {
+        const d = currentPlannerData[i] || {};
+        const hasClocked = d.entry && d.exit;
+        const hasEstimate = d.estimate && d.estimate !== '' && d.estimate !== '00:00';
+        
+        // Si es hoy, cuenta siempre. 
+        // Si es futuro, solo cuenta si NO tiene estimación (porque si la tiene, ya la hemos restado arriba)
+        if (i === dayOfWeek || (!hasClocked && !hasEstimate)) {
+            daysWithWork++;
+        }
+    }
+    
+    // Si es sábado y estamos trabajando, daysWithWork será 0 por el bucle anterior, ajustamos a 1
+    if (dayOfWeek === 6) daysWithWork = 1;
+    // Asegurar al menos 1 para evitar división por cero
+    if (daysWithWork === 0) daysWithWork = 1;
+
+    const neededToday = Math.max(0, remainingForGoal / daysWithWork);
+    const firstShiftMinutes = todayData.entry && todayData.exit
+        ? Math.max(0, diffMinutes(todayData.entry, todayData.exit))
+        : 0;
+    const referenceTime = todayData.entry2 || entry;
+    const remainingFromCurrentShift = todayData.entry2
+        ? Math.max(0, neededToday - firstShiftMinutes)
+        : neededToday;
+
+    const [h, m] = referenceTime.split(':').map(Number);
+    const entryTotalMinutes = h * 60 + m;
+    const automaticBreak = automaticBreakEnabled && !todayData.entry2 ? automaticBreakMinutes : 0;
+    const exitTotalMinutes = Math.round(entryTotalMinutes + remainingFromCurrentShift + automaticBreak);
+
+    const exitH = Math.floor(exitTotalMinutes / 60);
+    const exitM = exitTotalMinutes % 60;
+    
+    if (exitH >= 24) {
+        suggestedExitEl.textContent = "+24h";
+    } else {
+        suggestedExitEl.textContent = `${String(exitH).padStart(2, '0')}:${String(exitM).padStart(2, '0')}`;
+    }
+    
+    const noteEl = document.getElementById('exitCalculationNote');
+    if (noteEl) {
+        const secondEntryNote = todayData.entry2 ? ' Se descuenta el tiempo realizado antes de la segunda entrada.' : '';
+        noteEl.textContent = `Para cumplir ${weeklyHoursGoal}h repartiendo lo que falta en ${daysWithWork} día(s).${secondEntryNote}`;
+    }
+}
+
+function renderSuggestedExit() {
+    const monday = getMonday(new Date());
+    if (obtenerFechaISO(monday) !== obtenerFechaISO(plannerMonday)) return;
+
+    const data = JSON.parse(localStorage.getItem(`planner_${obtenerFechaISO(plannerMonday)}`)) || {};
+    calculateSuggestedExit(data, weeklyHoursGoal * 60, 0);
+}
+
+function calculateExitForDailyGoal(todayData, desiredTodayHours) {
+    const suggestedExitEl = document.getElementById('suggestedExitTime');
+    const noteEl = document.getElementById('exitCalculationNote');
+    const desiredMinutes = diffMinutes('00:00', desiredTodayHours);
+    const firstShiftMinutes = todayData.entry && todayData.exit
+        ? Math.max(0, diffMinutes(todayData.entry, todayData.exit))
+        : 0;
+
+    let referenceTime = todayData.entry;
+    let remainingMinutes = desiredMinutes;
+    let addBreak = automaticBreakEnabled;
+
+    if (todayData.entry2) {
+        referenceTime = todayData.entry2;
+        remainingMinutes = Math.max(0, desiredMinutes - firstShiftMinutes);
+        addBreak = false;
+    }
+
+    const [hours, minutes] = referenceTime.split(':').map(Number);
+    const exitTotalMinutes = hours * 60 + minutes + remainingMinutes + (addBreak ? automaticBreakMinutes : 0);
+    if (exitTotalMinutes >= 24 * 60) {
+        suggestedExitEl.textContent = '+24h';
+    } else {
+        suggestedExitEl.textContent = minutesToTime(exitTotalMinutes);
+    }
+
+    if (noteEl) {
+        const breakNote = addBreak ? `, con ${automaticBreakMinutes} min de descanso` : '';
+        noteEl.textContent = `Objetivo de hoy: ${desiredTodayHours}${breakNote}.`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initPlanner();
+});
+
+
+
+function actualizarMostradoFecha() {
+    fechaElemento.textContent = `Fecha: ${fechaSeleccionada.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+}
+
+/* ================= CALENDARIO ================= */
+function generarCalendario() {
+    const año = calendarioMesActual.getFullYear();
+    const mes = calendarioMesActual.getMonth();
+    
+    const nombreMes = calendarioMesActual.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+    const diasEnMes = ultimoDia.getDate();
+    const diaInicio = primerDia.getDay();
+    
+    let html = `<div id="calendario" class="calendario">
+        <div class="calendario-header">
+            <button onclick="cambiarMes(-1)">◀</button>
+            <span>${nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
+            <button onclick="cambiarMes(1)">▶</button>
+        </div>
+        <div class="calendario-grid">
+    `;
+    
+    const diasSemana = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sab"];
+    diasSemana.forEach(dia => {
+        html += `<div class="calendario-dia-nombre">${dia}</div>`;
+    });
+    
+    // Días del mes anterior
+    for (let i = diaInicio - 1; i >= 0; i--) {
+        const diaAnterior = new Date(año, mes, -i);
+        html += `<div class="calendario-dia otro-mes">${diaAnterior.getDate()}</div>`;
+    }
+    
+    // Días del mes actual
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+        const fecha = new Date(año, mes, dia);
+        const esHoy = fecha.toDateString() === hoy.toDateString();
+        const esSeleccionado = fecha.toDateString() === fechaSeleccionada.toDateString();
+        
+        let clase = "calendario-dia";
+        if (esHoy) clase += " hoy";
+        if (esSeleccionado) clase += " seleccionado";
+        
+        const fechaISO = obtenerFechaISO(fecha);
+        html += `<div class="${clase}" onclick="seleccionarFecha('${fechaISO}')">${dia}</div>`;
+    }
+    
+    // Días del mes siguiente
+    const diasRestantes = 42 - (diaInicio + diasEnMes);
+    for (let dia = 1; dia <= diasRestantes; dia++) {
+        html += `<div class="calendario-dia otro-mes">${dia}</div>`;
+    }
+    
+    html += `</div></div>`;
+    contenedorFecha.innerHTML = html;
+}
+
+function cambiarMes(direction) {
+    calendarioMesActual = new Date(calendarioMesActual.getFullYear(), calendarioMesActual.getMonth() + direction, 1);
+    generarCalendario();
+}
+
+function seleccionarFecha(fechaISO) {
+    const [year, month, day] = fechaISO.split('-').map(Number);
+    fechaSeleccionada = new Date(year, month - 1, day);
+    actualizarMostradoFecha();
+    generarCalendario();
+    render();
+}
+
+/* ================= LOCALSTORAGE ================= */
+function getClaveDia(fecha) {
+    const d = new Date(fecha);
+    const str = d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return `registro_${str}`;
+}
+
+function cargarTareas(fecha) {
+    return JSON.parse(localStorage.getItem(getClaveDia(fecha))) || [];
+}
+
+function guardarTareas(fecha, tareas) {
+    localStorage.setItem(getClaveDia(fecha), JSON.stringify(tareas));
+}
+
+/* ================= ORDEN ================= */
+function ordenarPorHora(tareas) {
+    return tareas.sort((a, b) => {
+        if (!a.inicio) return 1;
+        if (!b.inicio) return -1;
+        return a.inicio.localeCompare(b.inicio);
+    });
+}
+
+function calcularInicio(tareas) {
+    tareas = ordenarPorHora([...tareas]);
+    if (tareas.length === 0) return "08:00";
+    return tareas[tareas.length - 1].fin || "08:00";
+}
+
+function timeToMinutes(t) {
+    if (!t) return null;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+}
+
+/* ================= RENDER ================= */
+function render() {
+    const fecha = obtenerFechaISO(fechaSeleccionada);
+    let tareas = cargarTareas(fecha);
+
+    if (document.getElementById('view-planificador') && document.getElementById('view-planificador').style.display !== 'none') {
+        renderPlanner();
+    }
+
+    tareas = ordenarPorHora(tareas);
+    guardarTareas(fecha, tareas);
+
+    tabla.innerHTML = "";
+
+    // Clean selection to current range
+    selectedRows = new Set(Array.from(selectedRows).map(n => Number(n)).filter(n => n >= 0 && n < tareas.length));
+
+    let prevEnd = null;
+    if (tareas.length > 0) prevEnd = "08:00";
+
+    for (let i = 0; i < tareas.length; i++) {
+        const t = tareas[i];
+
+        // Si existe hueco entre prevEnd y t.inicio, mostrar fila intermedia
+        if (prevEnd && t.inicio && timeToMinutes(prevEnd) < timeToMinutes(t.inicio)) {
+            const gapTr = document.createElement("tr");
+            gapTr.className = "hueco-row";
+            gapTr.innerHTML = `<td colspan="8">Crear registro ${prevEnd} → ${t.inicio}</td>`;
+            gapTr.onclick = () => llenarHueco(prevEnd, t.inicio);
+            tabla.appendChild(gapTr);
+        }
+
+        const identificadorHTML = t.url
+            ? `<a href="${t.url}" target="_blank" rel="noopener noreferrer">${t.identificador || "(sin nombre)"}</a>`
+            : t.identificador || "";
+
+        const tr = document.createElement("tr");
+            tr.innerHTML = `
+            <td class="select-col"><input type="checkbox" class="row-select" data-index="${i}" ${selectedRows.has(i) ? 'checked' : ''}></td>
+            <td>${t.proyecto}</td>
+                <td>${identificadorHTML}</td>
+                <td>${t.descripcion || ""}</td>
+                <td>${t.inicio}</td>
+                <td>${t.fin}</td>
+                <td class="${t.hecho ? 'hecho' : ''}">${t.hecho ? '✔' : ''}</td>
+                <td>
+                    <div class="actions-cell">
+                        <button class="action-btn" data-action="marcar" data-fecha="${fecha}" data-index="${i}" title="Marcar">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.285 6.708l-11.39 11.39-5.18-5.18 1.414-1.414 3.766 3.766 9.976-9.976z"/></svg>
+                        </button>
+                        <button class="action-btn" data-action="copiar" data-fecha="${fecha}" data-index="${i}" title="Copiar">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zM19 5H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/></svg>
+                        </button>
+                        <button class="action-btn" data-action="editar" data-fecha="${fecha}" data-index="${i}" title="Editar">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        </button>
+                        <button class="action-btn" data-action="borrar" data-fecha="${fecha}" data-index="${i}" title="Borrar">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 7h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7zm3-4h6l1 1H8l1-1z"/></svg>
+                        </button>
+                    </div>
+                </td>
+                `;
+        // Marcar fila visualmente si está seleccionada
+        if (selectedRows.has(i)) tr.classList.add('row-selected');
+
+        // Hacer que la celda del identificador sea clicable en toda su área
+        const tdIdent = tr.querySelectorAll('td')[1];
+        if (tdIdent) {
+            const a = tdIdent.querySelector('a');
+            if (a && a.href) {
+                tdIdent.style.cursor = 'pointer';
+                tdIdent.addEventListener('click', () => window.open(a.href, '_blank', 'noopener'));
+                a.addEventListener('click', (e) => e.stopPropagation());
+            }
+        }
+        tabla.appendChild(tr);
+
+        prevEnd = t.fin || null;
+    }
+
+    inputInicio.value = calcularInicio(tareas);
+    calcularParteHoras();
+    verPendientesGlobal();
+    // Update select-all checkbox state
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) selectAll.checked = (tareas.length > 0 && selectedRows.size === tareas.length);
+}
+
+function redondearMinutosParte(minutos) {
+    // Ajuste al cuarto de hora mas cercano para el total del parte.
+    return Math.round(minutos / 15) * 15;
+}
+
+function agregar() {
+    const proyectoVal = proyecto.value.trim();
+    const identificadorVal = identificador.value.trim();
+    const urlVal = url.value.trim();
+    const descripcionVal = descripcion.value.trim();
+    let inicioVal = inicio.value;
+    const finVal = fin.value;
+    const fecha = obtenerFechaISO(fechaSeleccionada);
+
+    if (!proyectoVal || !finVal) {
+        alert("Debes rellenar proyecto y fin");
+        return;
+    }
+
+    let tareas = cargarTareas(fecha);
+    if (!inicioVal) inicioVal = calcularInicio(tareas);
+
+    const iniMin = timeToMinutes(inicioVal);
+    const finMin = timeToMinutes(finVal);
+
+    if (finMin <= iniMin) {
+        alert("La hora de fin debe ser posterior a la de inicio");
+        return;
+    }
+
+    let nuevasTareas = [];
+    let solapadoParcial = false;
+
+    tareas.forEach(t => {
+        const tIni = timeToMinutes(t.inicio);
+        const tFin = timeToMinutes(t.fin);
+
+        // Caso 1: El nuevo parte está totalmente contenido en uno existente (División)
+        if (iniMin > tIni && finMin < tFin) {
+            // Parte antes
+            nuevasTareas.push({ ...t, fin: minutesToTime(iniMin) });
+            // El nuevo se añadirá al final del loop o fuera
+            // Parte después
+            nuevasTareas.push({ ...t, inicio: minutesToTime(finMin) });
+        }
+        // Caso 2: El nuevo parte contiene totalmente a uno existente (Sobrescribir/Eliminar el viejo)
+        else if (iniMin <= tIni && finMin >= tFin) {
+            // No añadimos la tarea vieja, será reemplazada por la nueva
+        }
+        // Caso 3: Solapamiento parcial (No permitido según requisitos)
+        else if ((iniMin < tFin && finMin > tFin) || (iniMin < tIni && finMin > tIni)) {
+            solapadoParcial = true;
+            nuevasTareas.push(t);
+        }
+        // Caso 4: No hay solapamiento
+        else {
+            nuevasTareas.push(t);
+        }
+    });
+
+    if (solapadoParcial) {
+        alert("No se permiten solapamientos parciales.");
+        return;
+    }
+
+    nuevasTareas.push({ 
+        proyecto: proyectoVal, 
+        identificador: identificadorVal, 
+        url: urlVal, 
+        descripcion: descripcionVal, 
+        inicio: inicioVal, 
+        fin: finVal, 
+        hecho: false 
+    });
+
+    guardarTareas(fecha, ordenarPorHora(nuevasTareas));
+    render();
+    limpiarInputs();
+}
+
+function minutesToTime(min) {
+    const h = Math.floor(min / 60).toString().padStart(2, "0");
+    const m = (min % 60).toString().padStart(2, "0");
+    return `${h}:${m}`;
+}
+
+/* ================= DESCANSO ================= */
+function agregarDescanso() {
+    const fecha = obtenerFechaISO(fechaSeleccionada);
+    let tareas = cargarTareas(fecha);
+
+    if (tareas.length === 0) return;
+
+    tareas = ordenarPorHora(tareas);
+    const ultima = tareas[tareas.length - 1];
+
+    if (!ultima.fin) return;
+
+    const [h, m] = ultima.fin.split(":").map(Number);
+
+    let inicioMin = h * 60 + m;
+    let finMin = inicioMin + automaticBreakMinutes;
+
+    const f = (min) =>
+        `${Math.floor(min / 60).toString().padStart(2, "0")}:${(min % 60)
+            .toString()
+            .padStart(2, "0")}`;
+
+    tareas.push({
+        proyecto: "descanso",
+        identificador: "",
+        url: "",
+        descripcion: "descanso",
+        inicio: f(inicioMin),
+        fin: f(finMin),
+        hecho: false
+    });
+
+    guardarTareas(fecha, ordenarPorHora(tareas));
+    render();
+}
+
+/* ================= EDITAR ================= */
+function editar(fecha, i) {
+    const t = cargarTareas(fecha)[i];
+
+    indiceEditando = i;
+
+    proyecto.value = t.proyecto;
+    identificador.value = t.identificador;
+    url.value = t.url;
+    descripcion.value = t.descripcion;
+    inicio.value = t.inicio;
+    fin.value = t.fin;
+
+    const btn = document.getElementById("agregar");
+    btn.textContent = "Guardar";
+    btn.onclick = guardarEdicion;
+    // Mostrar botón cancelar
+    if (cancelarBtn) {
+        cancelarBtn.style.display = 'inline-block';
+        cancelarBtn.onclick = cancelarEdicion;
+    }
+}
+
+function guardarEdicion() {
+    const fecha = obtenerFechaISO(fechaSeleccionada);
+    let tareas = cargarTareas(fecha);
+
+    tareas[indiceEditando] = {
+        ...tareas[indiceEditando],
+        proyecto: proyecto.value,
+        identificador: identificador.value,
+        url: url.value,
+        descripcion: descripcion.value,
+        inicio: inicio.value,
+        fin: fin.value
+    };
+
+    if (editingMultiple && multipleIndices.length > 0) {
+        let tareas = cargarTareas(fecha);
+        multipleIndices.forEach(i => {
+            if (!tareas[i]) return;
+            if (proyecto.value) tareas[i].proyecto = proyecto.value;
+            if (identificador.value) tareas[i].identificador = identificador.value;
+            if (url.value) tareas[i].url = url.value;
+            if (descripcion.value) tareas[i].descripcion = descripcion.value;
+            if (inicio.value) tareas[i].inicio = inicio.value;
+            if (fin.value) tareas[i].fin = fin.value;
+        });
+        guardarTareas(fecha, ordenarPorHora(tareas));
+        editingMultiple = false;
+        multipleIndices = [];
+        selectedRows.clear();
+    } else {
+        guardarTareas(fecha, ordenarPorHora(tareas));
+    }
+
+    indiceEditando = null;
+    document.getElementById("agregar").textContent = "Agregar";
+    document.getElementById("agregar").onclick = agregar;
+    if (cancelarBtn) cancelarBtn.style.display = 'none';
+
+    render();
+    limpiarInputs();
+}
+
+/* ================= OTROS ================= */
+function limpiarInputs() {
+    proyecto.value = "";
+    identificador.value = "";
+    url.value = "";
+    descripcion.value = "";
+    inicio.value = "";
+    fin.value = "";
+}
+
+function cancelarEdicion() {
+    indiceEditando = null;
+    const btn = document.getElementById("agregar");
+    btn.textContent = "Agregar";
+    btn.onclick = agregar;
+    limpiarInputs();
+    if (cancelarBtn) cancelarBtn.style.display = 'none';
+    // Reset multi-edit state
+    editingMultiple = false;
+    multipleIndices = [];
+    selectedRows.clear();
+}
+
+function llenarHueco(inicioStr, finStr) {
+    inicio.value = inicioStr;
+    fin.value = finStr;
+    proyectoInput.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function marcar(fecha, i) {
+    let tareas = cargarTareas(fecha);
+    tareas[i].hecho = !tareas[i].hecho;
+    guardarTareas(fecha, tareas);
+    render();
+}
+
+function marcarParte(fecha, key, estado) {
+    const [proyecto, identificador, descripcion] = key.split("||");
+    let tareas = cargarTareas(fecha);
+
+    tareas = tareas.map((t) => {
+        if (
+            t.proyecto === proyecto &&
+            (t.identificador || "") === identificador &&
+            (t.descripcion || "") === descripcion
+        ) {
+            return { ...t, hecho: estado };
+        }
+        return t;
+    });
+
+    guardarTareas(fecha, tareas);
+    render();
+}
+
+function marcarTodasLasTareasPorURL(fecha, urlValue, estado) {
+    let tareas = cargarTareas(fecha);
+
+    tareas = tareas.map((t) => {
+        if ((t.url || "") === urlValue) {
+            return { ...t, hecho: estado };
+        }
+        return t;
+    });
+
+    guardarTareas(fecha, tareas);
+    render();
+}
+
+function copiarDatos(fecha, i) {
+    const tareas = cargarTareas(fecha);
+    const t = tareas[i];
+    if (!t) return;
+
+    proyecto.value = t.proyecto || "";
+    identificador.value = t.identificador || "";
+    descripcion.value = t.descripcion || "";
+    url.value = t.url || "";
+    
+    const horaReferencia = calcularInicio(tareas);
+    inicio.value = horaReferencia;
+    fin.value = horaReferencia;
+}
+
+function copiarMultiple(fecha, indices) {
+    const tareas = cargarTareas(fecha);
+    const textos = indices.map(i => {
+        const t = tareas[i];
+        return `${t.proyecto} - ${t.identificador || ''} ${t.url ? '(' + t.url + ')' : ''}`.trim();
+    });
+    copyToClipboard(textos.join('\n'));
+}
+
+function marcarMultiple(fecha, indices) {
+    let tareas = cargarTareas(fecha);
+    const allDone = indices.every(i => tareas[i] && tareas[i].hecho);
+    const setTo = !allDone;
+    indices.forEach(i => {
+        if (tareas[i]) tareas[i].hecho = setTo;
+    });
+    guardarTareas(fecha, tareas);
+    render();
+}
+
+function borrarMultiple(fecha, indices) {
+    let tareas = cargarTareas(fecha);
+    const set = new Set(indices);
+    tareas = tareas.filter((_, idx) => !set.has(idx));
+    guardarTareas(fecha, tareas);
+    selectedRows.clear();
+    render();
+}
+
+function editarMultiple(fecha, indices) {
+    const tareas = cargarTareas(fecha);
+    const vals = (key) => {
+        const first = tareas[indices[0]] ? tareas[indices[0]][key] : '';
+        for (let i = 1; i < indices.length; i++) {
+            const v = tareas[indices[i]] ? tareas[indices[i]][key] : '';
+            if (v !== first) return '';
+        }
+        return first || '';
+    };
+
+    editingMultiple = true;
+    multipleIndices = indices.slice();
+
+    proyecto.value = vals('proyecto');
+    identificador.value = vals('identificador');
+    url.value = vals('url');
+    descripcion.value = vals('descripcion');
+    inicio.value = vals('inicio');
+    fin.value = vals('fin');
+
+    const btn = document.getElementById('agregar');
+    btn.textContent = 'Guardar';
+    btn.onclick = guardarEdicion;
+    if (cancelarBtn) {
+        cancelarBtn.style.display = 'inline-block';
+        cancelarBtn.onclick = cancelarEdicion;
+    }
+}
+
+function borrar(fecha, i) {
+    let tareas = cargarTareas(fecha);
+    tareas.splice(i, 1);
+    guardarTareas(fecha, tareas);
+    render();
+}
+
+/* ================= PARTE HORAS ================= */
+/* ================= PARTE HORAS ================= */
+function mostrarTotalHorasDia(totalMinutos) {
+    const elementoTotal = document.getElementById("totalHorasDia");
+    
+    if (totalMinutos === 0) {
+        elementoTotal.innerHTML = "";
+        return;
+    }
+
+    const totalHoras = Math.floor(totalMinutos / 60);
+    const totalMin = totalMinutos % 60;
+    const totalStr = `${String(totalHoras).padStart(2, '0')}:${String(totalMin).padStart(2, '0')}`;
+
+    elementoTotal.innerHTML = `
+        <div class="total-horas-dia-contenido">
+            <div>
+                <div class="total-horas-dia-label">Total del día</div>
+                <div class="total-horas-dia-valor">${totalStr}</div>
+            </div>
+        </div>
+    `;
+}
+
+function copyToClipboard(text) {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+        });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        return Promise.resolve();
+    }
+}
+
+function flashEl(el) {
+    if (!el) return;
+    const prev = el.style.backgroundColor || '';
+    el.style.transition = 'background-color 0.18s ease';
+    el.style.backgroundColor = '#d4edda';
+    setTimeout(() => {
+        el.style.backgroundColor = prev;
+    }, 400);
+}
+
+function calcularParteHoras() {
+    const fecha = obtenerFechaISO(fechaSeleccionada);
+    const tareas = cargarTareas(fecha);
+
+    const resumen = {};
+    let totalMinutosRedondeados = 0;
+
+    tareas.forEach(t => {
+        if (!t.inicio || !t.fin || t.proyecto.toLowerCase() === "descanso") return;
+
+        let key;
+        
+        if (agruparPorURL) {
+            // Agrupar por URL (tarea)
+            key = t.url || `(sin URL)`;
+        } else {
+            // Agrupar por proyecto, identificador y descripción (vista original)
+            key = `${t.proyecto}||${t.identificador || ''}||${t.descripcion || ''}`;
+        }
+
+        const [h1, m1] = t.inicio.split(":").map(Number);
+        const [h2, m2] = t.fin.split(":").map(Number);
+
+        const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
+
+        if (resumen[key]) {
+            resumen[key].minutos += minutos;
+            resumen[key].tareas.push(t);
+            resumen[key].todosHechos = resumen[key].todosHechos && !!t.hecho;
+        } else {
+            resumen[key] = {
+                key,
+                proyecto: agruparPorURL ? "(agrupado)" : t.proyecto,
+                descripcion: agruparPorURL ? "" : (t.descripcion || ""),
+                identificador: agruparPorURL ? "" : (t.identificador || ""),
+                url: t.url || "",
+                minutos,
+                tareas: [t],
+                todosHechos: !!t.hecho
+            };
+        }
+    });
+
+    const tbody = document.querySelector("#parteHoras tbody");
+    tbody.innerHTML = "";
+
+    Object.values(resumen).forEach(r => {
+        const minutosRedondeados = redondearMinutosParte(r.minutos);
+        totalMinutosRedondeados += minutosRedondeados;
+        
+        const horasNum = Math.floor(minutosRedondeados / 60);
+        const minutosNum = minutosRedondeados % 60;
+        const horasStr = `${String(horasNum).padStart(2, '0')}:${String(minutosNum).padStart(2, '0')}`;
+
+        let identificadorHTML;
+        
+        if (agruparPorURL) {
+            // En vista por URL, mostrar identificadores como enmascarados en link
+            const identificadores = [...new Set(r.tareas.map(t => t.identificador || "").filter(id => id))];
+            const textoIdent = identificadores.length > 0 ? identificadores.join(", ") : r.url;
+            
+            if (r.url && r.url !== "(sin URL)") {
+                identificadorHTML = `<a href="${r.url}" target="_blank" rel="noopener noreferrer">${textoIdent}</a>`;
+            } else {
+                identificadorHTML = textoIdent;
+            }
+        } else {
+            // Vista original: mostrar identificador con link a URL si existe
+            identificadorHTML = r.url
+                ? `<a href="${r.url}" target="_blank" rel="noopener noreferrer">${r.identificador || "(sin nombre)"}</a>`
+                : r.identificador || "";
+        }
+
+        const tr = document.createElement("tr");
+
+        const tdProyecto = document.createElement('td');
+        
+        if (agruparPorURL) {
+            // En vista por URL, mostrar lista de proyectos únicos
+            const proyectos = [...new Set(r.tareas.map(t => t.proyecto))].join(", ");
+            tdProyecto.textContent = proyectos;
+        } else {
+            tdProyecto.textContent = r.proyecto;
+        }
+
+        const tdIdent = document.createElement('td');
+        tdIdent.innerHTML = identificadorHTML;
+        if (r.url && r.url !== "(sin URL)") {
+            tdIdent.style.cursor = 'pointer';
+            tdIdent.addEventListener('click', () => window.open(r.url, '_blank', 'noopener'));
+            const innerA = tdIdent.querySelector('a');
+            if (innerA) innerA.addEventListener('click', (e) => e.stopPropagation());
+        }
+
+        const tdDesc = document.createElement('td');
+        
+        if (agruparPorURL) {
+            // En vista por URL, mostrar lista de descripciones únicas
+            const descripciones = [...new Set(r.tareas.map(t => t.descripcion || "").filter(d => d))];
+            tdDesc.textContent = descripciones.join(" | ");
+        } else {
+            tdDesc.textContent = r.descripcion || '';
+        }
+        
+        tdDesc.style.cursor = 'pointer';
+        tdDesc.title = 'Click para copiar descripción';
+        tdDesc.addEventListener('click', () => {
+            const textToCopy = agruparPorURL ? tdDesc.textContent : r.descripcion || '';
+            copyToClipboard(textToCopy);
+            flashEl(tdDesc);
+        });
+
+        const tdHoras = document.createElement('td');
+        tdHoras.textContent = horasStr;
+        tdHoras.style.cursor = 'pointer';
+        tdHoras.title = 'Click para copiar horas';
+        tdHoras.addEventListener('click', () => {
+            copyToClipboard(horasStr);
+            flashEl(tdHoras);
+        });
+
+        const tdCheck = document.createElement('td');
+        const inputCheck = document.createElement('input');
+        inputCheck.type = 'checkbox';
+        if (r.todosHechos) inputCheck.checked = true;
+        tdCheck.appendChild(inputCheck);
+
+        const tdOdoo = document.createElement('td');
+        const exportButton = document.createElement('button');
+        exportButton.type = 'button';
+        exportButton.className = 'action-btn';
+        const parteOdoo = construirParteOdoo(fecha, r, minutosRedondeados);
+        const estado = estadoParteOdoo(parteOdoo);
+        exportButton.textContent = estado === 'processing' ? '…' : estado === 'success' ? '✓' : estado === 'error' ? '!' : '↗';
+        exportButton.title = estado === 'error' ? 'Reintentar este parte en Odoo' : 'Procesar este parte en Odoo';
+        exportButton.disabled = estado === 'processing' || estado === 'success';
+        exportButton.addEventListener('click', () => {
+            const actual = estadoParteOdoo(parteOdoo);
+            if (actual === 'error') {
+                const item = colaOdoo.find(elemento => elemento.queueKey === parteOdoo.queueKey);
+                if (item) reintentarParteOdoo(item, parteOdoo);
+            } else {
+                solicitarColaOdoo([parteOdoo]);
+            }
+        });
+        tdOdoo.appendChild(exportButton);
+
+        tr.appendChild(tdProyecto);
+        tr.appendChild(tdIdent);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdHoras);
+        tr.appendChild(tdCheck);
+        tr.appendChild(tdOdoo);
+
+        inputCheck.addEventListener('change', (e) => {
+            if (agruparPorURL) {
+                // Marcar todas las tareas de esta URL
+                marcarTodasLasTareasPorURL(fecha, r.url, e.target.checked);
+            } else {
+                marcarParte(fecha, r.key, e.target.checked);
+            }
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    mostrarTotalHorasDia(totalMinutosRedondeados);
+}
+
+
+/* ================= MIS PENDIENTES (tareas) ================= */
+const MIS_PENDIENTES_KEY = 'mis_pendientes_v1';
+
+function getPendientesStorage() {
+    const list = JSON.parse(localStorage.getItem(MIS_PENDIENTES_KEY) || '[]');
+    let modified = false;
+    list.forEach(it => {
+        if (!it.id) {
+            it.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+            modified = true;
+        }
+        if (!it.createdAt) {
+            const timestamp = Number(String(it.id).match(/^\d+/)?.[0]);
+            it.createdAt = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now();
+            modified = true;
+        }
+    });
+    if (modified) savePendientesStorage(list);
+    return list;
+}
+
+function savePendientesStorage(list) {
+    localStorage.setItem(MIS_PENDIENTES_KEY, JSON.stringify(list));
+}
+
+function formatearFechaCorta(fecha) {
+    const date = new Date(fecha);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function importarPendienteDesdeOdoo(tarea) {
+    if (!tarea || !tarea.url) return;
+    const lista = getPendientesStorage();
+    const existente = lista.find(item => item.url === tarea.url && item.identificador === tarea.identificador);
+    if (existente) {
+        savePendientesStorage(lista);
+        renderPendientes();
+        return;
+    }
+    lista.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 5), createdAt: Date.now(), proyecto: tarea.proyecto || '', identificador: tarea.identificador || '', url: tarea.url, descripcion: tarea.descripcion || '', notas: '', done: false });
+    savePendientesStorage(lista);
+    renderPendientes();
+}
+
+window.addEventListener('message', event => {
+    if (event.source === window && event.data?.source === 'odoo-partes' && event.data.type === 'importar-pendiente') {
+        importarPendienteDesdeOdoo(event.data.tarea);
+    }
+});
+
+function renderPendientes(showDone = false) {
+    const listEl = document.getElementById('pendientesList');
+    if (!listEl) return;
+    const items = getPendientesStorage();
+    listEl.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '8px';
+
+    const count = document.createElement('div');
+    count.style.color = 'var(--muted)';
+    count.textContent = `${items.filter(i => !i.done).length} pendientes`; 
+    header.appendChild(count);
+
+    const showWrapper = document.createElement('label');
+    showWrapper.style.fontSize = '0.9rem';
+    showWrapper.style.color = 'var(--muted)';
+    showWrapper.innerHTML = `<input type="checkbox" id="showDoneToggle"> Mostrar hechos`;
+    header.appendChild(showWrapper);
+
+    listEl.appendChild(header);
+
+    const container = document.createElement('div');
+    items.forEach((it) => {
+        if (it.done && !showDone) return;
+
+        const div = document.createElement('div');
+        div.className = 'pendiente-item' + (it.done ? ' done' : '');
+        div.dataset.id = it.id;
+
+        const meta = document.createElement('div');
+        meta.className = 'pendiente-meta';
+
+        const badge = document.createElement('div');
+        badge.className = 'badge-date';
+        badge.textContent = formatearFechaCorta(it.createdAt || Date.now());
+
+        const textWrap = document.createElement('div');
+        textWrap.style.minWidth = '0';
+
+        const title = document.createElement('div');
+        title.className = 'pendiente-title';
+        if (it.url) {
+            const a = document.createElement('a');
+            a.href = it.url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = it.identificador || '(sin nombre)';
+            title.appendChild(document.createTextNode(`${it.proyecto} - `));
+            title.appendChild(a);
+        } else {
+            title.textContent = `${it.proyecto} - ${it.identificador || ''}`;
+        }
+
+        const desc = document.createElement('div');
+        desc.className = 'pendiente-desc';
+        if (typeof marked !== 'undefined' && it.descripcion) {
+            desc.innerHTML = marked.parse(it.descripcion);
+        } else {
+            desc.textContent = it.descripcion || '';
+        }
+
+        const notes = document.createElement('div');
+        notes.className = 'pendiente-notes-md';
+        notes.style.fontSize = '0.85rem';
+        notes.style.color = 'var(--muted)';
+        if (typeof marked !== 'undefined' && it.notas) {
+            notes.innerHTML = marked.parse(it.notas);
+        } else {
+            notes.textContent = it.notas || '';
+        }
+
+        textWrap.appendChild(title);
+        textWrap.appendChild(desc);
+        if (it.notas) textWrap.appendChild(notes);
+
+        meta.appendChild(badge);
+        meta.appendChild(textWrap);
+
+        // done badge
+        if (it.done) {
+            const doneBadge = document.createElement('div');
+            doneBadge.className = 'pendiente-badge-done';
+            doneBadge.textContent = 'Hecho';
+            meta.appendChild(doneBadge);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'pendiente-actions';
+
+        const btnMark = document.createElement('button');
+        btnMark.className = 'action-btn';
+        btnMark.dataset.action = 'pendiente-marcar';
+        btnMark.dataset.id = it.id;
+        btnMark.title = it.done ? 'Desmarcar' : 'Marcar como hecho';
+        btnMark.innerHTML = it.done
+            ? '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 15.172l-3.95-3.95-1.414 1.414L10 18 20.364 7.636 18.95 6.222z"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.285 6.708l-11.39 11.39-5.18-5.18 1.414-1.414 3.766 3.766 9.976-9.976z"/></svg>';
+
+        const btnCopy = document.createElement('button');
+        btnCopy.className = 'action-btn';
+        btnCopy.dataset.action = 'pendiente-copiar';
+        btnCopy.dataset.id = it.id;
+        btnCopy.title = 'Copiar al parte';
+        btnCopy.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'action-btn';
+        btnEdit.dataset.action = 'pendiente-editar';
+        btnEdit.dataset.id = it.id;
+        btnEdit.title = 'Editar';
+        btnEdit.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+
+        const btnDel = document.createElement('button');
+        btnDel.className = 'action-btn';
+        btnDel.dataset.action = 'pendiente-borrar';
+        btnDel.dataset.id = it.id;
+        btnDel.title = 'Borrar';
+        btnDel.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 7h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7zm3-4h6l1 1H8l1-1z"/></svg>';
+
+        if (it.done) btnMark.classList.add('done');
+
+        actions.appendChild(btnMark);
+        actions.appendChild(btnCopy);
+        actions.appendChild(btnEdit);
+        actions.appendChild(btnDel);
+
+        div.appendChild(meta);
+        div.appendChild(actions);
+
+        container.appendChild(div);
+    });
+
+    listEl.appendChild(container);
+
+    const toggle = document.getElementById('showDoneToggle');
+    if (toggle) toggle.checked = showDone;
+    if (toggle) toggle.addEventListener('change', () => renderPendientes(toggle.checked));
+
+    // Update minimized UI (count and visibility of form)
+    if (typeof updatePendientesMinimizedUI === 'function') updatePendientesMinimizedUI();
+}
+
+function addPendienteFromForm() {
+    const proyectoEl = document.getElementById('pendienteProyecto');
+    const identificadorEl = document.getElementById('pendienteIdentificador');
+    const urlEl = document.getElementById('pendienteUrl');
+    const descEl = document.getElementById('pendienteDescripcion');
+    const notasEl = document.getElementById('pendienteNotas');
+    const editingEl = document.getElementById('pendienteEditingId');
+
+    if (!proyectoEl || !identificadorEl) return;
+
+    const proyectoVal = proyectoEl.value.trim();
+    if (!proyectoVal) { alert('Rellena el campo Proyecto'); return; }
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+    const item = {
+        id,
+        proyecto: proyectoVal,
+        identificador: identificadorEl.value.trim(),
+        url: urlEl.value.trim(),
+        descripcion: descEl.value.trim(),
+        notas: notasEl.value.trim(),
+        done: false
+    };
+
+    const list = getPendientesStorage();
+    list.unshift(item);
+    savePendientesStorage(list);
+    renderPendientes();
+    document.getElementById('pendiente-form').reset();
+    if (editingEl) editingEl.value = '';
+}
+
+function startEditPendiente(id) {
+    const list = getPendientesStorage();
+    const it = list.find(i => i.id === id);
+    if (!it) return;
+
+    // Al editar, asegurar que el formulario está visible
+    setPendientesMinimized(false);
+    updatePendientesMinimizedUI();
+
+    document.getElementById('pendienteProyecto').value = it.proyecto || '';
+    document.getElementById('pendienteIdentificador').value = it.identificador || '';
+    document.getElementById('pendienteUrl').value = it.url || '';
+    document.getElementById('pendienteDescripcion').value = it.descripcion || '';
+    document.getElementById('pendienteNotas').value = it.notas || '';
+    document.getElementById('pendienteEditingId').value = it.id;
+    document.getElementById('pendienteAdd').textContent = 'Guardar pendiente';
+
+    // Scroll al formulario y foco
+    document.getElementById('pendiente-form').scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => document.getElementById('pendienteProyecto').focus(), 100);
+}
+
+function savePendienteEdit(id) {
+    const list = getPendientesStorage();
+    const it = list.find(i => i.id === id);
+    if (!it) return;
+    it.proyecto = document.getElementById('pendienteProyecto').value.trim();
+    it.identificador = document.getElementById('pendienteIdentificador').value.trim();
+    it.url = document.getElementById('pendienteUrl').value.trim();
+    it.descripcion = document.getElementById('pendienteDescripcion').value.trim();
+    it.notas = document.getElementById('pendienteNotas').value.trim();
+    savePendientesStorage(list);
+    document.getElementById('pendiente-form').reset();
+    document.getElementById('pendienteEditingId').value = '';
+    document.getElementById('pendienteAdd').textContent = 'Agregar pendiente';
+    renderPendientes();
+}
+
+function togglePendienteDone(id) {
+    const list = getPendientesStorage();
+    const it = list.find(i => i.id === id);
+    if (!it) return;
+    it.done = !it.done;
+    savePendientesStorage(list);
+    renderPendientes();
+}
+
+function borrarPendiente(id) {
+    let list = getPendientesStorage();
+    list = list.filter(i => i.id !== id);
+    savePendientesStorage(list);
+    renderPendientes();
+}
+
+function copiarPendiente(id) {
+    const list = getPendientesStorage();
+    const it = list.find(i => i.id === id);
+    if (!it) return;
+
+    if (proyectoInput) proyectoInput.value = it.proyecto || '';
+    if (identificador) identificador.value = it.identificador || '';
+    if (url) url.value = it.url || '';
+    
+    // Calcular horas: usar la fecha seleccionada para calcular el inicio del nuevo registro
+    const fechaISO = obtenerFechaISO(fechaSeleccionada);
+    const tareas = cargarTareas(fechaISO);
+    const horaReferencia = calcularInicio(tareas);
+    if (inicio) inicio.value = horaReferencia;
+    if (fin) fin.value = horaReferencia;
+
+    // Scroll a la zona de agregar horas y foco
+    const form = document.getElementById('time-form');
+    if (form) form.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+        if (proyectoInput) proyectoInput.focus();
+    }, 300);
+}
+
+function initPendientes() {
+    const form = document.getElementById('pendiente-form');
+    if (!form) return;
+    const addBtn = document.getElementById('pendienteAdd');
+    const clearBtn = document.getElementById('pendienteClear');
+    const listEl = document.getElementById('pendientesList');
+
+    addBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const editing = document.getElementById('pendienteEditingId').value;
+        if (editing) savePendienteEdit(editing);
+        else addPendienteFromForm();
+    });
+
+    // Permitir guardar con Enter en el formulario de pendientes
+    form.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            const editing = document.getElementById('pendienteEditingId').value;
+            if (editing) savePendienteEdit(editing);
+            else addPendienteFromForm();
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        form.reset();
+        document.getElementById('pendienteEditingId').value = '';
+        document.getElementById('pendienteAdd').textContent = 'Agregar pendiente';
+    });
+
+    listEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        if (action === 'pendiente-marcar') return togglePendienteDone(id);
+        if (action === 'pendiente-editar') return startEditPendiente(id);
+        if (action === 'pendiente-borrar') return borrarPendiente(id);
+        if (action === 'pendiente-copiar') return copiarPendiente(id);
+    });
+
+    renderPendientes();
+
+    // attach after DOM ready
+    attachPendientesMinimizeHandlers();
+    updatePendientesMinimizedUI();
+}
+
+/* ================= MINIMIZAR PANELES ================= */
+const MIS_PENDIENTES_MINIMIZED_KEY = 'mis_pendientes_minimized_v1';
+
+function isPendientesMinimized() {
+    return localStorage.getItem(MIS_PENDIENTES_MINIMIZED_KEY) === '1';
+}
+
+function setPendientesMinimized(val) {
+    localStorage.setItem(MIS_PENDIENTES_MINIMIZED_KEY, val ? '1' : '0');
+}
+
+function updatePendientesMinimizedUI() {
+    const minimized = isPendientesMinimized();
+    const panel = document.getElementById('misPendientes');
+    const form = document.getElementById('pendiente-form');
+    const bar = document.getElementById('pendienteMinimizedBar');
+    const toggleBtn = document.getElementById('toggleMinimizePendientes');
+    const countEl = document.getElementById('pendienteMinimizedCount');
+    const items = getPendientesStorage();
+
+    if (countEl) countEl.textContent = `${items.filter(i => !i.done).length}`;
+
+    if (minimized) {
+        // hide only the form, keep pendientes list visible
+        if (form) form.style.display = 'none';
+        if (bar) { bar.style.display = 'flex'; bar.classList.remove('oculto'); }
+        if (toggleBtn) toggleBtn.textContent = 'Abrir';
+    } else {
+        if (form) form.style.display = 'flex';
+        if (bar) { bar.style.display = 'none'; bar.classList.add('oculto'); }
+        if (toggleBtn) toggleBtn.textContent = 'Minimizar';
+    }
+}
+
+function attachPendientesMinimizeHandlers() {
+    const toggleBtn = document.getElementById('toggleMinimizePendientes');
+    const expandBtn = document.getElementById('pendienteExpandBtn');
+    if (toggleBtn) toggleBtn.addEventListener('click', () => {
+        const now = !isPendientesMinimized();
+        setPendientesMinimized(now);
+        updatePendientesMinimizedUI();
+    });
+    if (expandBtn) expandBtn.addEventListener('click', () => {
+        setPendientesMinimized(false);
+        updatePendientesMinimizedUI();
+    });
+}
+
+/* ================= PENDIENTES GLOBAL ================= */
+function verPendientesGlobal() {
+    contenedorPendientes.innerHTML = "";
+
+    const claves = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const clave = localStorage.key(i);
+        if (!clave.startsWith("registro_")) continue;
+        claves.push(clave);
+    }
+
+    // Ordenar por fecha descendente
+    claves.sort((a, b) => {
+        const pa = a.replace('registro_', '').split('/');
+        const pb = b.replace('registro_', '').split('/');
+        const da = new Date(`${pa[2]}-${pa[1]}-${pa[0]}`);
+        const db = new Date(`${pb[2]}-${pb[1]}-${pb[0]}`);
+        return db - da;
+    });
+
+    claves.forEach((clave) => {
+        const tareas = JSON.parse(localStorage.getItem(clave)) || [];
+
+        tareas.forEach((t, idx) => {
+            if (!t.hecho && t.proyecto.toLowerCase() !== 'descanso') {
+                const div = document.createElement('div');
+                div.className = 'pendiente-item';
+
+                const meta = document.createElement('div');
+                meta.className = 'pendiente-meta';
+
+                const badge = document.createElement('div');
+                badge.className = 'badge-date';
+                badge.textContent = clave.replace('registro_', '');
+
+                const textWrap = document.createElement('div');
+                textWrap.style.minWidth = '0';
+
+                const title = document.createElement('div');
+                title.className = 'pendiente-title';
+                if (t.url) {
+                    const a = document.createElement('a');
+                    a.href = t.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = t.identificador || '(sin nombre)';
+                    title.appendChild(document.createTextNode(`${t.proyecto} - `));
+                    title.appendChild(a);
+                } else {
+                    title.textContent = `${t.proyecto} - ${t.identificador || ''}`;
+                }
+
+                const desc = document.createElement('div');
+                desc.className = 'pendiente-desc';
+                desc.textContent = t.descripcion || '';
+
+                textWrap.appendChild(title);
+                textWrap.appendChild(desc);
+
+                meta.appendChild(badge);
+                meta.appendChild(textWrap);
+
+                const actions = document.createElement('div');
+                actions.className = 'pendiente-actions';
+
+                const btnMark = document.createElement('button');
+                btnMark.className = 'action-btn';
+                btnMark.dataset.action = 'marcar-pendiente';
+                btnMark.dataset.clave = clave;
+                btnMark.dataset.index = idx;
+                btnMark.title = 'Marcar como hecho';
+                btnMark.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.285 6.708l-11.39 11.39-5.18-5.18 1.414-1.414 3.766 3.766 9.976-9.976z"/></svg>';
+
+                const btnCopy = document.createElement('button');
+                btnCopy.className = 'action-btn';
+                btnCopy.dataset.action = 'copiar-pendiente';
+                btnCopy.dataset.clave = clave;
+                btnCopy.dataset.index = idx;
+                btnCopy.title = 'Copiar al parte';
+                btnCopy.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+
+                const parts = clave.replace('registro_', '').split('/');
+                const fechaISO = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                const btnGo = document.createElement('button');
+                btnGo.className = 'action-btn';
+                btnGo.dataset.action = 'ir-a-fecha';
+                btnGo.dataset.fecha = fechaISO;
+                btnGo.title = 'Ir a fecha';
+                btnGo.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 17l5-5-5-5v10z"/></svg>';
+
+                actions.appendChild(btnMark);
+                actions.appendChild(btnCopy);
+                actions.appendChild(btnGo);
+
+                div.appendChild(meta);
+                div.appendChild(actions);
+
+                contenedorPendientes.appendChild(div);
+            }
+        });
+    });
+}
+
+/* ================= COLA GLOBAL ODOO ================= */
+function verPendientesGlobal() {
+    if (!contenedorPendientes) return;
+    contenedorPendientes.innerHTML = '';
+    const filtro = document.getElementById('filtroEstadoOdoo')?.value || 'pending';
+    const partes = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const clave = localStorage.key(i);
+        if (!clave?.startsWith('registro_')) continue;
+        const fechaPartes = clave.replace('registro_', '').split('/');
+        const fecha = `${fechaPartes[2]}-${fechaPartes[1]}-${fechaPartes[0]}`;
+        const resumenes = {};
+        cargarTareas(fecha).forEach(tarea => {
+            if (!tarea.inicio || !tarea.fin || tarea.proyecto.toLowerCase() === 'descanso') return;
+            const key = agruparPorURL ? (tarea.url || '(sin URL)') : `${tarea.proyecto}||${tarea.identificador || ''}||${tarea.descripcion || ''}`;
+            const inicioMin = Number(tarea.inicio.split(':')[0]) * 60 + Number(tarea.inicio.split(':')[1]);
+            const finMin = Number(tarea.fin.split(':')[0]) * 60 + Number(tarea.fin.split(':')[1]);
+            if (!resumenes[key]) resumenes[key] = { key, proyecto: agruparPorURL ? '(agrupado)' : tarea.proyecto, descripcion: agruparPorURL ? '' : tarea.descripcion || '', identificador: agruparPorURL ? '' : tarea.identificador || '', url: tarea.url || '', minutos: 0, tareas: [], todosHechos: true };
+            resumenes[key].minutos += finMin - inicioMin;
+            resumenes[key].tareas.push(tarea);
+            resumenes[key].todosHechos = resumenes[key].todosHechos && !!tarea.hecho;
+        });
+        Object.values(resumenes).forEach(resumen => {
+            const parte = construirParteOdoo(fecha, resumen, redondearMinutosParte(resumen.minutos));
+            const item = colaOdoo.find(elemento => elemento.queueKey === parte.queueKey);
+            const estado = estadoParteOdoo(parte) || (resumen.todosHechos ? 'success' : 'pending');
+            if (filtro === 'pending' && estado === 'success') return;
+            if (filtro !== 'all' && filtro !== 'pending' && estado !== filtro) return;
+            partes.push({ parte, estado, item });
+        });
+    }
+    partes.sort((a, b) => b.parte.fecha.localeCompare(a.parte.fecha));
+    const resumenCola = document.createElement('div');
+    resumenCola.className = 'queue-summary';
+    resumenCola.textContent = `${partes.length} partes · ${partes.filter(item => item.estado === 'processing').length} procesando`;
+    contenedorPendientes.appendChild(resumenCola);
+    partes.forEach(({ parte, estado, item }) => {
+        const fila = document.createElement('div');
+        fila.className = `pendiente-item odoo-queue-item estado-${estado}`;
+        const check = document.createElement('input');
+        check.type = 'checkbox'; check.className = 'odoo-queue-check'; check.dataset.queueKey = parte.queueKey;
+        check.disabled = estado === 'success' || estado === 'processing';
+        fila.appendChild(check);
+        const meta = document.createElement('div'); meta.className = 'pendiente-meta';
+        const fecha = document.createElement('div'); fecha.className = 'badge-date'; fecha.textContent = parte.fecha;
+        const texto = document.createElement('div'); texto.className = 'pendiente-title'; texto.textContent = `${parte.descripcion || '(sin descripción)'} · ${parte.horasFormato}`;
+        const estadoTexto = document.createElement('div'); estadoTexto.className = 'pendiente-desc'; estadoTexto.textContent = estado === 'error' ? `Fallido: ${item?.error || 'error desconocido'}` : estado === 'success' ? 'Procesado' : estado === 'processing' ? 'Procesando…' : 'Pendiente';
+        meta.append(fecha, texto, estadoTexto); fila.appendChild(meta);
+        const acciones = document.createElement('div'); acciones.className = 'pendiente-actions';
+        const selectorEstado = document.createElement('select');
+        selectorEstado.className = 'odoo-state-select';
+        selectorEstado.title = 'Cambiar estado manualmente';
+        [['pending', 'Pendiente'], ['processing', 'Procesando'], ['success', 'Procesado'], ['error', 'Fallido']].forEach(([valor, texto]) => {
+            const opcion = document.createElement('option'); opcion.value = valor; opcion.textContent = texto; selectorEstado.appendChild(opcion);
+        });
+        selectorEstado.value = estado;
+        selectorEstado.addEventListener('change', () => {
+            guardarEstadoManualOdoo(parte.queueKey, selectorEstado.value);
+            verPendientesGlobal();
+        });
+        acciones.appendChild(selectorEstado);
+        const boton = document.createElement('button'); boton.className = 'action-btn'; boton.dataset.action = estado === 'error' ? 'reintentar-odoo' : 'procesar-odoo'; boton.dataset.queueKey = parte.queueKey; boton.textContent = estado === 'error' ? '↻' : '▶'; boton.title = estado === 'error' ? 'Reintentar' : 'Procesar'; boton.disabled = estado === 'success' || estado === 'processing';
+        acciones.appendChild(boton); fila.appendChild(acciones); contenedorPendientes.appendChild(fila);
+    });
+}
+
+/* ================= TOGGLE PENDIENTES ================= */
+togglePendientesBtn.addEventListener("click", () => {
+    contenedorPendientes.classList.toggle("oculto");
+});
+
+// Delegación para acciones dentro de pendientes
+if (contenedorPendientes) {
+    contenedorPendientes.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+
+        if (action === 'marcar-pendiente') {
+            const clave = btn.dataset.clave;
+            const idx = Number(btn.dataset.index);
+            const tareas = JSON.parse(localStorage.getItem(clave)) || [];
+            if (tareas[idx]) {
+                tareas[idx].hecho = !tareas[idx].hecho;
+                localStorage.setItem(clave, JSON.stringify(tareas));
+                verPendientesGlobal();
+                render();
+            }
+        }
+
+        if (action === 'copiar-pendiente') {
+            const clave = btn.dataset.clave;
+            const idx = Number(btn.dataset.index);
+            const tareas = JSON.parse(localStorage.getItem(clave)) || [];
+            const t = tareas[idx];
+            if (t) {
+                if (proyectoInput) proyectoInput.value = t.proyecto || '';
+                if (identificador) identificador.value = t.identificador || '';
+                if (url) url.value = t.url || '';
+                
+                const form = document.getElementById('time-form');
+                if (form) form.scrollIntoView({ behavior: 'smooth' });
+                setTimeout(() => {
+                    if (proyectoInput) proyectoInput.focus();
+                }, 300);
+            }
+        }
+
+        if (action === 'ir-a-fecha') {
+            const fechaISO = btn.dataset.fecha;
+            seleccionarFecha(fechaISO);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            contenedorPendientes.classList.add('oculto');
+        }
+    });
+}
+
+function partesSeleccionadosOdoo() {
+    const keys = [...document.querySelectorAll('.odoo-queue-check:checked')].map(input => input.dataset.queueKey);
+    return colaOdoo.filter(item => keys.includes(item.queueKey));
+}
+
+document.getElementById('seleccionarTodosOdoo')?.addEventListener('click', () => {
+    document.querySelectorAll('.odoo-queue-check:not(:disabled)').forEach(input => { input.checked = true; });
+});
+document.getElementById('deseleccionarTodosOdoo')?.addEventListener('click', () => {
+    document.querySelectorAll('.odoo-queue-check').forEach(input => { input.checked = false; });
+});
+document.getElementById('procesarSeleccionadosOdoo')?.addEventListener('click', () => {
+    const partes = partesSeleccionadosOdoo().map(item => item.parte);
+    if (partes.length) solicitarColaOdoo(partes);
+});
+document.getElementById('filtroEstadoOdoo')?.addEventListener('change', verPendientesGlobal);
+contenedorPendientes?.addEventListener('click', event => {
+    const boton = event.target.closest('[data-action="procesar-odoo"], [data-action="reintentar-odoo"]');
+    if (!boton) return;
+    const item = colaOdoo.find(elemento => elemento.queueKey === boton.dataset.queueKey);
+    if (!item) return;
+    if (boton.dataset.action === 'reintentar-odoo') {
+        reintentarParteOdoo(item);
+    } else {
+        solicitarColaOdoo([item.parte]);
+    }
+});
+
+/* ================= TOGGLE AGRUPAR POR URL ================= */
+toggleAgruparURLBtn.addEventListener("click", () => {
+    agruparPorURL = !agruparPorURL;
+    localStorage.setItem("agruparPorURL", agruparPorURL);
+    actualizarTextoBotónAgrupar();
+    calcularParteHoras();
+});
+
+function actualizarTextoBotónAgrupar() {
+    if (agruparPorURL) {
+        toggleAgruparURLBtn.textContent = "Agrupar por Proyecto";
+    } else {
+        toggleAgruparURLBtn.textContent = "Agrupar por URL";
+    }
+}
+
+/* ================= EVENTOS ================= */
+document.getElementById("agregar").onclick = agregar;
+document.getElementById("limpiar").onclick = limpiarInputs;
+document.getElementById("descanso").onclick = agregarDescanso;
+
+// Delegación de eventos para botones de acciones en la tabla (evita onclick inline)
+const tablaBody = document.querySelector("#tabla tbody");
+if (tablaBody) {
+    tablaBody.addEventListener('click', (e) => {
+        // Row checkbox toggles
+        const checkbox = e.target.closest('input.row-select');
+        if (checkbox) {
+            const idx = Number(checkbox.dataset.index);
+            if (checkbox.checked) selectedRows.add(idx);
+            else selectedRows.delete(idx);
+            // Visual
+            const row = checkbox.closest('tr');
+            if (row) row.classList.toggle('row-selected', checkbox.checked);
+            return;
+        }
+
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const idx = btn.dataset.index ? Number(btn.dataset.index) : null;
+        const fechaBtn = btn.dataset.fecha;
+
+        const targets = (selectedRows.size > 0) ? Array.from(selectedRows) : (idx !== null ? [idx] : []);
+
+        if (action === 'marcar') {
+            if (targets.length === 0) return;
+            return marcarMultiple(fechaBtn, targets);
+        }
+        if (action === 'copiar') {
+            if (targets.length === 0) return;
+            if (targets.length === 1) return copiarDatos(fechaBtn, targets[0]);
+            return copiarMultiple(fechaBtn, targets);
+        }
+        if (action === 'exportar') {
+            if (targets.length === 1) return exportarParte(fechaBtn, targets[0]);
+            return;
+        }
+        if (action === 'editar') {
+            if (targets.length > 1) return editarMultiple(fechaBtn, targets);
+            if (targets.length === 1) return editar(fechaBtn, targets[0]);
+            return;
+        }
+        if (action === 'borrar') {
+            if (targets.length === 0) return;
+            return borrarMultiple(fechaBtn, targets);
+        }
+    });
+}
+
+actualizarTextoBotónAgrupar();
+render();
+if (typeof initPendientes === 'function') initPendientes();
+
+// ================= BUSCADOR =================
+if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doSearch(searchInput.value || '');
+        }
+    });
+}
+
+function parseQuery(q) {
+    const filters = {};
+    let remainder = q || '';
+    // Allow values containing ':' (times, urls) by matching until next '<space><letter>:' or end
+    const re = /([piudcfm]):\s*([\s\S]*?)(?=(?:\s+[piudcfm]:)|$)/gi;
+    let m;
+    while ((m = re.exec(q))) {
+        filters[m[1].toLowerCase()] = m[2].trim();
+        remainder = remainder.replace(m[0], '');
+    }
+    remainder = remainder.trim();
+    return { filters, free: remainder };
+}
+
+function getAllTasks() {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith('registro_')) continue;
+        const tareas = JSON.parse(localStorage.getItem(key)) || [];
+        const fechaStr = key.replace('registro_', '');
+        const parts = fechaStr.split('/');
+        const fechaISO = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : '';
+        tareas.forEach((t, idx) => {
+            out.push({ ...t, _fechaISO: fechaISO, _clave: key, _index: idx });
+        });
+    }
+    return out;
+}
+
+function matchesTask(t, filters, free) {
+    const f = (s) => (s || '').toString().toLowerCase();
+
+    for (const k in filters) {
+        const val = filters[k].toString().toLowerCase();
+        if (k === 'p') {
+            if (!f(t.proyecto).includes(val)) return false;
+        } else if (k === 'i') {
+            if (!f(t.identificador).includes(val)) return false;
+        } else if (k === 'u') {
+            if (!f(t.url).includes(val)) return false;
+        } else if (k === 'd') {
+            if (!f(t.descripcion).includes(val)) return false;
+        } else if (k === 'c' || k === 'f') {
+            // Compare times: accept formats '08:00', '8:00' or '08'
+            const timeVal = val.trim();
+            const target = (k === 'c') ? t.inicio : t.fin;
+            if (!target) return false;
+
+            const parseToMinutes = (s) => {
+                if (!s) return null;
+                const parts = s.split(':').map(p => p.trim()).filter(p => p !== '');
+                const h = Number(parts[0]);
+                if (isNaN(h)) return null;
+                const m = parts.length > 1 ? Number(parts[1]) : 0;
+                if (parts.length > 1 && isNaN(m)) return null;
+                return h * 60 + (m || 0);
+            };
+
+            if (timeVal.includes(':')) {
+                const want = parseToMinutes(timeVal);
+                const actual = parseToMinutes(target);
+                if (want === null || actual === null) return false;
+                if (want !== actual) return false;
+            } else {
+                // single hour number e.g. '08' or '8' -> match hour
+                const hourNum = Number(timeVal);
+                if (!isNaN(hourNum)) {
+                    const actualHour = Number((target || '').split(':')[0]);
+                    if (isNaN(actualHour) || actualHour !== hourNum) return false;
+                } else {
+                    // fallback to partial string match
+                    if (!f(target).includes(timeVal)) return false;
+                }
+            }
+        } else if (k === 'm') {
+            const want = ['1', 'si', 'sí', 'true', 'yes', 'y'].includes(val) ? true : (['0', 'no', 'false', 'n'].includes(val) ? false : null);
+            if (want === null) continue;
+            if ((!!t.hecho) !== want) return false;
+        }
+    }
+
+    if (free) {
+        const s = free.toString().toLowerCase();
+        if (!(f(t.proyecto).includes(s) || f(t.identificador).includes(s) || f(t.descripcion).includes(s) || f(t.url).includes(s))) return false;
+    }
+
+    return true;
+}
+
+function doSearch(q) {
+    const { filters, free } = parseQuery(q || '');
+    const tasks = getAllTasks();
+    const results = tasks.filter(t => matchesTask(t, filters, free));
+    renderSearchResults(results);
+}
+
+function renderSearchResults(results) {
+    if (!searchResults) return;
+    searchResults.innerHTML = '';
+    if (!results || results.length === 0) {
+        searchResults.textContent = 'No hay resultados';
+        searchResults.style.display = 'block';
+        return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'search-results-list';
+    results.slice(0, 50).forEach(r => {
+        const li = document.createElement('li');
+        li.className = 'search-result-item';
+        li.innerHTML = `
+            <div class="sr-meta">${r._fechaISO} — ${r.proyecto} — ${r.identificador || '(sin id)'}</div>
+            <div class="sr-desc">${r.descripcion || ''} <span class="sr-time">${r.inicio || ''} → ${r.fin || ''}</span></div>
+        `;
+
+        li.addEventListener('click', () => {
+            if (r._fechaISO) seleccionarFecha(r._fechaISO);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            closeSearchResults();
+        });
+
+        ul.appendChild(li);
+    });
+
+    searchResults.appendChild(ul);
+    searchResults.style.display = 'block';
+}
+
+function closeSearchResults() {
+    if (!searchResults) return;
+    searchResults.innerHTML = '';
+    searchResults.style.display = 'none';
+}
+
+// Cerrar al hacer click fuera del contenedor del buscador
+document.addEventListener('click', (e) => {
+    if (!searchResults || !searchInput) return;
+    const inside = e.target.closest && e.target.closest('.search-container');
+    if (!inside) closeSearchResults();
+});
+
+// Mostrar resultados cuando el input recibe foco si ya hay resultados
+if (searchInput) {
+    searchInput.addEventListener('focus', () => {
+        if (searchResults && searchResults.innerHTML.trim() !== '') searchResults.style.display = 'block';
+    });
+
+    // Escape cierra el desplegable
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeSearchResults();
+    });
+}
+
+// Select all checkbox handling
+const selectAllCheckbox = document.getElementById('selectAll');
+if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const checks = document.querySelectorAll('#tabla tbody input.row-select');
+        selectedRows.clear();
+        checks.forEach(c => {
+            c.checked = e.target.checked;
+            const idx = Number(c.dataset.index);
+            if (e.target.checked) selectedRows.add(idx);
+            const row = c.closest('tr');
+            if (row) row.classList.toggle('row-selected', e.target.checked);
+        });
+    });
+}
+
+function exportarParte(fecha, indice) {
+    const tarea = cargarTareas(fecha)[indice];
+    if (!tarea) return;
+    const minutos = tarea.inicio && tarea.fin
+        ? timeToMinutes(tarea.fin) - timeToMinutes(tarea.inicio)
+        : 0;
+    const parte = {
+        fecha,
+        url: tarea.url || '',
+        descripcion: tarea.descripcion || '',
+        horas: Number((minutos / 60).toFixed(2)),
+        horasFormato: minutesToHM(minutos)
+    };
+    const partesPreparadas = prepararPartesOdoo([parte]);
+    if (!partesPreparadas) return;
+    const partePreparada = partesPreparadas[0];
+    localStorage.setItem('odoo_ultimo_parte', JSON.stringify(partePreparada));
+    window.postMessage({ source: 'partes-horas', type: 'odoo-parte', parte: partePreparada }, '*');
+    alert(`Parte preparado para Odoo: ${partePreparada.fecha} · ${partePreparada.horasFormato}`);
+}
+
+function exportarParteResumen(fecha, resumen, minutos) {
+    const parte = construirParteOdoo(fecha, resumen, minutos);
+    const partesPreparadas = prepararPartesOdoo([parte]);
+    if (!partesPreparadas) return;
+    const partePreparada = partesPreparadas[0];
+    localStorage.setItem('odoo_ultimo_parte', JSON.stringify(partePreparada));
+    window.postMessage({ source: 'partes-horas', type: 'odoo-parte', parte: partePreparada }, '*');
+    solicitarColaOdoo(partesPreparadas, true);
+}
