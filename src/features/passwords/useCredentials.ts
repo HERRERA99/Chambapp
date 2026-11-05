@@ -1,40 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { CredentialRow } from '../../domain/models';
-import { credentialAad, decryptJson, encryptJson } from '../../lib/crypto/vault';
 import { loadCredentials } from '../../lib/supabase/vault.repository';
 import { useAuth } from '../auth/useAuth';
 import { useVault } from '../vault/useVault';
-import { parseCredential } from './credentials.model';
-import type { CredentialSecret } from './credentials.model';
-
-export type OpenCredential = { row: CredentialRow; secret: CredentialSecret | null };
-
-export function encryptCredential(
-  key: CryptoKey,
-  userId: string,
-  id: string,
-  secret: CredentialSecret,
-) {
-  return encryptJson(key, credentialAad(userId, id), secret);
-}
-
-export async function openCredential(
-  key: CryptoKey,
-  userId: string,
-  generation: string | null,
-  row: CredentialRow,
-): Promise<OpenCredential> {
-  if (row.boveda_generacion !== generation) return { row, secret: null };
-  try {
-    return {
-      row,
-      secret: parseCredential(await decryptJson(key, credentialAad(userId, row.id), row.cifrado)),
-    };
-  } catch {
-    return { row, secret: null };
-  }
-}
+import { openCredential } from './credentials.model';
+import type { OpenCredential } from './credentials.model';
 
 /** Credentials of live projects, decrypted with the unlocked vault. */
 export function useCredentials() {

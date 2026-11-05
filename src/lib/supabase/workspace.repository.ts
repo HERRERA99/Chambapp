@@ -9,7 +9,7 @@ import {
   assertNote,
   withNoteDefaults,
 } from './rowValidation';
-import { isRetryableStatus, isValidCommandResponse } from './commandValidation';
+import { isRetryableStatus, isValidCommandResponse, rpcForAction } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
 
 type PageResult<T> = {
@@ -43,20 +43,7 @@ export async function executeCommand<T = unknown>(
 ): Promise<T> {
   const db = getSupabase();
   const request = db
-    .rpc(
-      ['guardar_nota', 'eliminar_nota'].includes(action)
-        ? 'chambapp_notas'
-        : ['crear_boveda', 'cambiar_clave', 'restablecer_boveda'].includes(action)
-          ? 'chambapp_boveda'
-          : ['guardar_credencial', 'eliminar_credencial'].includes(action)
-            ? 'chambapp_credenciales'
-            : ['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action)
-              ? 'chambapp_calendario'
-              : ['imputar_partes', 'deshacer_imputacion'].includes(action)
-                ? 'chambapp_imputaciones'
-                : 'chambapp_operar',
-      { p_accion: action, p_datos: payload },
-    )
+    .rpc(rpcForAction(action), { p_accion: action, p_datos: payload })
     .abortSignal(signal);
   if (expectedUserId) {
     const { data: auth, error: authError } = await db.auth.getSession();

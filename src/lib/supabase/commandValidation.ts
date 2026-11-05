@@ -15,6 +15,19 @@ export const isRetryableStatus = (status: number) =>
   status === 429 ||
   status >= 500;
 
+/** RPC that runs each command action. */
+export function rpcForAction(action: CommandAction) {
+  if (['guardar_nota', 'eliminar_nota'].includes(action)) return 'chambapp_notas';
+  if (['crear_boveda', 'cambiar_clave', 'restablecer_boveda'].includes(action))
+    return 'chambapp_boveda';
+  if (['guardar_credencial', 'eliminar_credencial'].includes(action))
+    return 'chambapp_credenciales';
+  if (['guardar_ausencia', 'eliminar_ausencia', 'sincronizar_festivos'].includes(action))
+    return 'chambapp_calendario';
+  if (['imputar_partes', 'deshacer_imputacion'].includes(action)) return 'chambapp_imputaciones';
+  return 'chambapp_operar';
+}
+
 /** An incomplete 2xx reply must not clear a durable intent or be shown as saved. */
 export function isValidCommandResponse(
   action: CommandAction,
