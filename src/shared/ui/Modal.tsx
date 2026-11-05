@@ -8,6 +8,7 @@ export function Modal({
   title,
   description,
   size = 'default',
+  className = '',
   children,
 }: {
   open: boolean;
@@ -15,6 +16,7 @@ export function Modal({
   title: string;
   description?: string;
   size?: 'default' | 'wide';
+  className?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -28,7 +30,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal ${size === 'wide' ? 'modal--wide' : ''}`}
+      className={`modal ${size === 'wide' ? 'modal--wide' : ''} ${className}`}
       aria-labelledby={id}
       aria-describedby={description ? `${id}-description` : undefined}
       onCancel={(event) => {

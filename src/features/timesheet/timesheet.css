@@ -518,3 +518,47 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Requests handed to the browser extension for Odoo. */
+.timesheet-group__queue {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #ffffff03;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.timesheet-group__queue--processing,
+.timesheet-group__queue--pending {
+  border-color: #ff2e5640;
+  color: var(--accent-soft);
+}
+.timesheet-group__queue--error {
+  border-color: #ef646455;
+  color: #ffbdc5;
+}
+.timesheet-group__queue--uncertain,
+.timesheet-group__queue--sent-unmarked {
+  border-color: #ecb67c40;
+  color: var(--warning);
+}
+.timesheet-group__queue-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.timesheet-group__queue p {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.timesheet-group__queue .button {
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 11px;
+  white-space: normal;
+}

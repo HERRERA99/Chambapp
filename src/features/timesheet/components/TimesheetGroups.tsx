@@ -6,6 +6,9 @@ import { Button } from '../../../shared/ui/Button';
 import { Icon } from '../../../shared/ui/Icon';
 import type { IconName } from '../../../shared/ui/Icon';
 import { OdooSendButton } from '../../time-entries/components/OdooSendButton';
+import { useExtension } from '../../extension/useExtension';
+import { formatHoursMinutes, odooMinutes, sameOrigin } from '../../extension/protocol';
+import type { QueueAction, QueueSummaryItem } from '../../extension/protocol';
 import {
   formatRange,
   groupRounding,
@@ -20,6 +23,18 @@ type Actions = {
   /** Marks the entries as imputed together; resolves true when saved. */
   onImpute: (group: TimesheetGroup, entries: TimeEntry[]) => Promise<boolean>;
   onUndo: (group: TimesheetGroup, imputationId: string) => Promise<void>;
+  /** Hands the entries to the browser extension, which creates one Odoo line. */
+  onSend: (group: TimesheetGroup, entries: TimeEntry[]) => Promise<boolean>;
+  onQueueAction: (group: TimesheetGroup, requestId: string, action: QueueAction) => Promise<void>;
+};
+
+const queueText: Record<QueueSummaryItem['status'], string> = {
+  pending: 'En cola para Odoo',
+  processing: 'Enviando a Odoo…',
+  success: 'Imputado en Odoo',
+  error: 'No se pudo enviar a Odoo',
+  uncertain: 'Revisa Odoo',
+  'sent-unmarked': 'Enviado a Odoo, sin marcar aquí',
 };
 
 const status: Record<TimesheetGroup['status'], { label: string; icon: IconName }> = {
@@ -81,8 +96,35 @@ export function TimesheetGroups({
   );
 }
 
-function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } & Actions) {
+function GroupCard({
+  group,
+  busy,
+  onImpute,
+  onUndo,
+  onSend,
+  onQueueAction,
+}: { group: TimesheetGroup } & Actions) {
   const detailId = useId();
+  const extension = useExtension();
+  const entryIds = new Set(group.entries.map((entry) => entry.id));
+  const queued = extension.queue.filter(
+    (item) => item.status !== 'success' && item.entryIds.some((id) => entryIds.has(id)),
+  );
+  const locked = extension.lockReason({ entryIds: [...entryIds] }) !== null;
+  const [acting, setActing] = useState<string | null>(null);
+  async function act(requestId: string, action: QueueAction) {
+    if (acting) return;
+    setActing(requestId);
+    try {
+      await onQueueAction(group, requestId, action);
+    } finally {
+      setActing(null);
+    }
+  }
+  // After "sent but not marked" the user marks by hand: only marking stays available.
+  const markLocked = queued.some((item) =>
+    ['pending', 'processing', 'uncertain'].includes(item.status),
+  );
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   // Entries that stop being pending (imputed elsewhere, deleted) leave the selection for
@@ -110,9 +152,32 @@ function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } 
   }
 
   async function impute(entries: TimeEntry[]) {
-    if (busy || !entries.length || tooMany(entries)) return;
+    if (busy || markLocked || !entries.length || tooMany(entries)) return;
     if (await onImpute(group, entries)) setSelected(new Set());
   }
+
+  async function send(entries: TimeEntry[]) {
+    if (busy || locked || !entries.length || tooMany(entries)) return;
+    if (await onSend(group, entries)) setSelected(new Set());
+  }
+
+  /** Why these entries cannot be sent now; null when they can. */
+  function sendProblem(entries: TimeEntry[]): string | null {
+    if (!extension.available) return 'Instala la extensión de Chambapp para enviar a Odoo.';
+    if (!extension.connected) return 'Conecta la extensión con esta cuenta para enviar a Odoo.';
+    if (!extension.odooOrigin) return 'Configura tu Odoo en los ajustes de la extensión.';
+    if (!group.odooUrl || !sameOrigin(group.odooUrl, extension.odooOrigin))
+      return `La tarea no es del Odoo configurado (${extension.odooOrigin}).`;
+    if (locked) return 'Estos partes ya se están enviando a Odoo.';
+    if (busy) return 'Espera a que terminen los cambios actuales.';
+    if (!entries.length) return 'Selecciona los partes que quieres enviar.';
+    if (tooMany(entries))
+      return `Demasiados partes para imputarlos juntos (máx. ${maxImputationEntries}).`;
+    if (odooMinutes(groupRounding(entries).loggedSeconds) < 1) return 'El tiempo a imputar es 0.';
+    return null;
+  }
+  const sendTitle = (entries: TimeEntry[]) =>
+    `Enviar ${formatHoursMinutes(odooMinutes(groupRounding(entries).loggedSeconds))} a Odoo`;
 
   const open = [...group.pending, ...group.running].sort((a, b) =>
     a.inicio_en.localeCompare(b.inicio_en),
@@ -191,7 +256,7 @@ function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } 
                       <input
                         type="checkbox"
                         checked={!running && selected.has(entry.id)}
-                        disabled={running || busy}
+                        disabled={running || busy || markLocked}
                         aria-label={`Seleccionar ${group.title}, ${range}`}
                         onChange={(event) => toggle(entry, event.target.checked)}
                       />
@@ -227,12 +292,69 @@ function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } 
                 <Button
                   variant="ghost"
                   className="timesheet-group__undo"
-                  disabled={busy}
+                  disabled={busy || locked}
                   onClick={() => void onUndo(group, imputation.id)}
                 >
                   Deshacer
                 </Button>
               </span>
+            </div>
+          ))}
+          {queued.map((item) => (
+            <div
+              key={item.requestId}
+              className={`timesheet-group__queue timesheet-group__queue--${item.status}`}
+              role="status"
+            >
+              <span className="timesheet-group__queue-title">
+                <Icon name={item.status === 'processing' ? 'refresh' : 'send'} size={12} />
+                {queueText[item.status]} · {plural(item.entryIds.length, 'parte', 'partes')}
+              </span>
+              {item.error ? <p>{item.error}</p> : null}
+              {item.status === 'error' ? (
+                <span className="timesheet-group__actions">
+                  <Button
+                    disabled={acting !== null}
+                    onClick={() => void act(item.requestId, 'retry')}
+                  >
+                    Reintentar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={acting !== null}
+                    onClick={() => void act(item.requestId, 'discard')}
+                  >
+                    Descartar
+                  </Button>
+                </span>
+              ) : null}
+              {item.status === 'uncertain' ? (
+                <span className="timesheet-group__actions">
+                  <Button
+                    disabled={acting !== null}
+                    onClick={() => void act(item.requestId, 'confirm-not-created')}
+                  >
+                    No se creó en Odoo: reintentar
+                  </Button>
+                  <Button
+                    disabled={acting !== null}
+                    onClick={() => void act(item.requestId, 'confirm-created')}
+                  >
+                    Sí se creó: marcar como imputado
+                  </Button>
+                </span>
+              ) : null}
+              {item.status === 'sent-unmarked' ? (
+                <span className="timesheet-group__actions">
+                  <Button
+                    variant="ghost"
+                    disabled={acting !== null}
+                    onClick={() => void act(item.requestId, 'discard')}
+                  >
+                    Descartar aviso
+                  </Button>
+                </span>
+              ) : null}
             </div>
           ))}
           {group.pending.length ? (
@@ -261,7 +383,7 @@ function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } 
               <div className="timesheet-group__actions">
                 <Button
                   variant="secondary"
-                  disabled={busy || !selection.length || tooMany(selection)}
+                  disabled={busy || markLocked || !selection.length || tooMany(selection)}
                   onClick={() => void impute(selection)}
                 >
                   Marcar seleccionados
@@ -269,17 +391,31 @@ function GroupCard({ group, busy, onImpute, onUndo }: { group: TimesheetGroup } 
                 <Button
                   variant="secondary"
                   icon="check"
-                  disabled={busy || tooMany(group.pending)}
+                  disabled={busy || markLocked || tooMany(group.pending)}
                   onClick={() => void impute(group.pending)}
                 >
                   Marcar todos
                 </Button>
-                <OdooSendButton label={`partes seleccionados de ${group.title}`}>
-                  Enviar seleccionados
-                </OdooSendButton>
-                <OdooSendButton label={`todos los partes pendientes de ${group.title}`}>
-                  Enviar todos ({formatDuration(group.pendingLoggedSeconds)})
-                </OdooSendButton>
+                {group.odooUrl ? (
+                  <>
+                    <OdooSendButton
+                      label={`partes seleccionados de ${group.title}`}
+                      disabledReason={sendProblem(selection)}
+                      title={sendTitle(selection)}
+                      onClick={() => void send(selection)}
+                    >
+                      Enviar seleccionados
+                    </OdooSendButton>
+                    <OdooSendButton
+                      label={`todos los partes pendientes de ${group.title}`}
+                      disabledReason={sendProblem(group.pending)}
+                      title={sendTitle(group.pending)}
+                      onClick={() => void send(group.pending)}
+                    >
+                      Enviar todos ({formatDuration(group.pendingLoggedSeconds)})
+                    </OdooSendButton>
+                  </>
+                ) : null}
               </div>
             </div>
           ) : null}

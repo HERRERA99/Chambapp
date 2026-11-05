@@ -3,6 +3,7 @@ import test from 'node:test';
 import type { Task, TimeEntry } from '../src/domain/models.ts';
 import {
   applyImputationResult,
+  buildOdooRequest,
   buildTimesheetWeek,
   formatRange,
   groupRounding,
@@ -303,4 +304,100 @@ test('a selection drops entries that stop being pending, even if they come back'
   assert.deepEqual([...afterImpute], ['b']);
   // Undoing that imputation makes a pending again, but it is not re-selected.
   assert.deepEqual([...reconcileSelection(afterImpute, [a, b])], ['b']);
+});
+
+test('buildOdooRequest rounds the sum once, then up to whole minutes for Odoo', () => {
+  const owner = '00000000-0000-4000-8000-000000000001';
+  const rid = '00000000-0000-4000-8000-000000000002';
+  const odooTask = task('a', {
+    version: 7,
+    odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/9',
+  });
+  const group = { date: monday, taskId: 'a', title: 'Tarea a', odooUrl: null };
+  const parts = [
+    entry('2', {
+      inicio_en: `${monday}T09:00:00Z`,
+      duracion_real_segundos: 20 * 60,
+      descripcion: 'Revisión',
+    }),
+    entry('1', {
+      inicio_en: `${monday}T08:00:00Z`,
+      duracion_real_segundos: 25 * 60,
+      descripcion: 'Análisis',
+    }),
+    entry('3', {
+      inicio_en: `${monday}T10:00:00Z`,
+      duracion_real_segundos: 10 * 60,
+      descripcion: 'Revisión',
+    }),
+  ];
+  const built = buildOdooRequest({
+    group,
+    entries: parts,
+    task: odooTask,
+    userId: owner,
+    requestId: rid,
+  });
+  assert.ok('request' in built);
+  // 25 + 20 + 10 = 55 min, rounded once to 15 → 60 min (not 75).
+  assert.equal(built.request.minutos, 60);
+  assert.equal(built.request.horasFormato, '01:00');
+  assert.equal(built.request.descripcion, 'Análisis · Revisión');
+  assert.equal(built.request.taskVersion, 7);
+  assert.equal(built.request.fecha, monday);
+  assert.equal(built.request.odooUrl, 'https://empresa.odoo.com/odoo/project/1/tasks/9');
+  assert.deepEqual(
+    built.request.partes.map((part) => part.id),
+    ['1', '2', '3'],
+  );
+
+  // Exact durations (interval 0) with seconds go up to the next minute: 61 s → 2 min.
+  const exact = buildOdooRequest({
+    group,
+    entries: [
+      entry('4', { intervalo_redondeo_minutos: 0, duracion_real_segundos: 61, descripcion: null }),
+    ],
+    task: odooTask,
+    userId: owner,
+    requestId: rid,
+  });
+  assert.ok('request' in exact);
+  assert.equal(exact.request.minutos, 2);
+  assert.equal(exact.request.horasFormato, '00:02');
+  assert.equal(exact.request.descripcion, 'Tarea a');
+
+  const zero = buildOdooRequest({
+    group,
+    entries: [entry('5', { intervalo_redondeo_minutos: 0, duracion_real_segundos: 0 })],
+    task: odooTask,
+    userId: owner,
+    requestId: rid,
+  });
+  assert.ok('problem' in zero);
+  const noUrl = buildOdooRequest({
+    group,
+    entries: parts,
+    task: task('a'),
+    userId: owner,
+    requestId: rid,
+  });
+  assert.ok('problem' in noUrl);
+  const running = buildOdooRequest({
+    group,
+    entries: [entry('6', { fin_en: null })],
+    task: odooTask,
+    userId: owner,
+    requestId: rid,
+  });
+  assert.ok('problem' in running);
+  const long = buildOdooRequest({
+    group,
+    entries: [entry('7', { duracion_real_segundos: 6 * 3600 })],
+    task: odooTask,
+    userId: owner,
+    requestId: rid,
+    confirmLong: true,
+  });
+  assert.ok('request' in long);
+  assert.equal(long.request.confirmLong, true);
 });

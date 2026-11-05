@@ -15,6 +15,7 @@ import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
 import { EntryModal } from './components/EntryModal';
 import { EntriesTable } from './components/EntriesTable';
+import { useExtension } from '../extension/useExtension';
 import { RoundingPreview } from './components/RoundingPreview';
 import { entryTotals } from './entryTotals';
 
@@ -33,6 +34,7 @@ function readFiltersHidden() {
 }
 
 export default function EntriesPage() {
+  const extension = useExtension();
   const { data, isLoading, error, reload } = useWorkspace();
   const { run, pending } = useCommand();
   const tracker = useTracker();
@@ -117,6 +119,8 @@ export default function EntriesPage() {
 
   async function remove() {
     if (!deleting) return;
+    const locked = extension.lockReason({ entryIds: [deleting.id] });
+    if (locked) throw new Error(locked);
     await run('eliminar_parte', { id: deleting.id, version: deleting.version });
     notify('Parte eliminado de los informes.');
     setDeleting(null);
@@ -125,6 +129,11 @@ export default function EntriesPage() {
   async function updateOdoo(entry: TimeEntry, checked: boolean) {
     if (busy) return;
     setActionError('');
+    const locked = extension.lockReason({ entryIds: [entry.id] });
+    if (locked) {
+      setActionError(locked);
+      return;
+    }
     try {
       await run('editar_parte', {
         id: entry.id,
@@ -347,6 +356,7 @@ export default function EntriesPage() {
             tasks={tasks}
             elapsedSeconds={tracker.elapsedSeconds}
             busy={busy}
+            lockReason={(entry) => extension.lockReason({ entryIds: [entry.id] })}
             onStop={() => void stop()}
             onEdit={setModal}
             onDelete={setDeleting}

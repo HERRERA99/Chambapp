@@ -2,6 +2,14 @@ import { DateTime } from 'luxon';
 import type { Task, TimeEntry } from '../../domain/models';
 import { roundDuration, weekDates } from '../../domain/time.ts';
 import { isOdooUrl } from '../../domain/odoo.ts';
+import {
+  formatHoursMinutes,
+  LONG_ODOO_MINUTES,
+  MAX_ODOO_DESCRIPTION,
+  MAX_ODOO_MINUTES,
+  odooMinutes,
+} from '../extension/protocol.ts';
+import type { OdooRequest } from '../extension/protocol.ts';
 
 export type TimesheetItem = {
   entry: TimeEntry;
@@ -220,4 +228,65 @@ export function applyImputationResult<T extends TimeEntry>(
         }
       : entry;
   });
+}
+
+/**
+ * Odoo line for some finished entries of one group: their summed real time is
+ * rounded once (like "Marcar") and then up to whole minutes, which is all
+ * Odoo's HH:MM field accepts. Returns the problem when it cannot be sent.
+ */
+export function buildOdooRequest({
+  group,
+  entries,
+  task,
+  userId,
+  requestId,
+  confirmLong = false,
+}: {
+  group: Pick<TimesheetGroup, 'date' | 'taskId' | 'title' | 'odooUrl'>;
+  entries: readonly TimeEntry[];
+  task: Pick<Task, 'id' | 'version' | 'titulo' | 'odoo_url'> | undefined;
+  userId: string;
+  requestId: string;
+  confirmLong?: boolean;
+}): { request: OdooRequest } | { problem: string } {
+  if (!task || task.id !== group.taskId) return { problem: 'La tarea ya no está disponible.' };
+  const odooUrl = [task.odoo_url, group.odooUrl].find(isOdooUrl);
+  if (!odooUrl) return { problem: 'La tarea no tiene un enlace de Odoo válido.' };
+  const parts = [...entries]
+    .filter((entry) => entry.fin_en && !entry.eliminado_en && !entry.imputacion_odoo_id)
+    .sort((a, b) => a.inicio_en.localeCompare(b.inicio_en) || a.id.localeCompare(b.id));
+  if (!parts.length) return { problem: 'No hay partes terminados pendientes.' };
+  if (parts.length !== entries.length)
+    return { problem: 'Solo se pueden enviar partes terminados y pendientes.' };
+  if (parts.length > maxImputationEntries)
+    return { problem: `Demasiados partes para imputarlos juntos (máx. ${maxImputationEntries}).` };
+  const minutos = odooMinutes(groupRounding(parts).loggedSeconds);
+  if (minutos < 1) return { problem: 'El tiempo a imputar es 0.' };
+  if (minutos > MAX_ODOO_MINUTES)
+    return { problem: 'Odoo no admite más de 24 horas en una línea.' };
+  const descriptions: string[] = [];
+  for (const entry of parts) {
+    const text = entry.descripcion?.trim();
+    if (text && !descriptions.includes(text)) descriptions.push(text);
+  }
+  const descripcion = Array.from(descriptions.join(' · ') || task.titulo.trim() || group.title)
+    .slice(0, MAX_ODOO_DESCRIPTION)
+    .join('')
+    .trim();
+  return {
+    request: {
+      requestId,
+      userId,
+      taskId: task.id,
+      taskVersion: task.version,
+      fecha: group.date,
+      odooUrl,
+      descripcion,
+      minutos,
+      horasFormato: formatHoursMinutes(minutos),
+      confirmLong: confirmLong && minutos > LONG_ODOO_MINUTES,
+      partes: parts.map((entry) => ({ id: entry.id, version: entry.version })),
+    },
+  };
 }

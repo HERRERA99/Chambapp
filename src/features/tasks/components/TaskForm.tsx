@@ -7,6 +7,7 @@ import { InputField, SelectField } from '../../../shared/ui/FormField';
 import { Modal } from '../../../shared/ui/Modal';
 import { useFeedback } from '../../../shared/feedback/FeedbackContext';
 import { useCommand } from '../../workspace/useCommand';
+import { useExtension } from '../../extension/useExtension';
 import { taskStatusLabels } from '../taskLabels';
 
 export function TaskForm({
@@ -22,6 +23,7 @@ export function TaskForm({
 }) {
   const { run, pending } = useCommand();
   const notify = useFeedback();
+  const extension = useExtension();
   const available = projects.filter(
     (project) =>
       !project.eliminado_en && (!project.archivado_en || project.id === task?.proyecto_id),
@@ -45,6 +47,11 @@ export function TaskForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
+    const locked = task ? extension.lockReason({ taskIds: [task.id] }) : null;
+    if (locked) {
+      setError(locked);
+      return;
+    }
     const minutes = estimate === '' ? null : Math.round(Number(estimate) * 60);
     if (!title.trim() || !project) {
       setError('Selecciona un proyecto y escribe el nombre de la tarea.');

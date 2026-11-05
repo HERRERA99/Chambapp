@@ -15,6 +15,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { LivingBackground } from './components/LivingBackground';
 import { ProductPreview } from './components/ProductPreview';
 import { FeatureCards } from './components/FeatureCards';
+import { ExtensionShowcase } from './components/ExtensionShowcase';
 import { RoundingLab } from './components/RoundingLab';
 import { WeekExplorer } from './components/WeekExplorer';
 import { Reveal } from './components/Reveal';
@@ -52,6 +53,9 @@ function LandingContent() {
             </a>
             <a href="#tu-semana" onClick={() => setMobileMenu(false)}>
               Tu semana
+            </a>
+            <a href="#extension" onClick={() => setMobileMenu(false)}>
+              Extensión <span className="landing-new">Nuevo</span>
             </a>
             <Link className="landing-nav__mobile-login" to="/login">
               Iniciar sesión
@@ -249,6 +253,23 @@ function LandingContent() {
           <Reveal>
             <WeekExplorer />
           </Reveal>
+        </section>
+        <section id="extension" className="landing-section landing-container">
+          <Reveal className="landing-section__heading">
+            <span className="landing-kicker">
+              <span className="landing-kicker__dot" /> Nuevo · Extensión de navegador
+            </span>
+            <h2>
+              Odoo y tus contraseñas,
+              <br />
+              <span className="landing-gradient-text">a un clic.</span>
+            </h2>
+            <p>
+              Chambapp sale de su pestaña: importa tareas de Odoo, envía tus partes sin teclearlos
+              dos veces y rellena tus accesos con la bóveda cifrada de tu cuenta.
+            </p>
+          </Reveal>
+          <ExtensionShowcase />
         </section>
         <section className="landing-workflow landing-container">
           <Reveal className="landing-workflow__intro">

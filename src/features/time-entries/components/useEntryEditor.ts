@@ -6,6 +6,7 @@ import { localDateTimeToIso, todayInZone } from '../../../domain/time';
 import { DataError } from '../../../lib/supabase/errors';
 import { useFeedback } from '../../../shared/feedback/FeedbackContext';
 import { useCommand } from '../../workspace/useCommand';
+import { useExtension } from '../../extension/useExtension';
 
 export function useEntryEditor({
   data,
@@ -22,6 +23,7 @@ export function useEntryEditor({
 }) {
   const { run, pending } = useCommand();
   const notify = useFeedback();
+  const extension = useExtension();
   const zone = entry?.zona_horaria ?? data.profile.zona_horaria;
   const projectById = new Map(data.projects.map((project) => [project.id, project]));
   const availableTasks = data.tasks.filter(
@@ -78,6 +80,8 @@ export function useEntryEditor({
     setError('');
     try {
       if (!selectedTask) throw new Error('Selecciona una tarea para este parte.');
+      const locked = entry ? extension.lockReason({ entryIds: [entry.id] }) : null;
+      if (locked) throw new Error(locked);
       const inicio = exactStart();
       const fin = exactEnd();
       // Server-confirmed microsecond intervals can collapse to the same browser

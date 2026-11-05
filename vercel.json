@@ -5,5 +5,25 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "headers": [
+    {
+      "source": "/downloads/(.*)\\.xpi",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/x-xpinstall"
+        }
+      ]
+    },
+    {
+      "source": "/downloads/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
   ]
 }
