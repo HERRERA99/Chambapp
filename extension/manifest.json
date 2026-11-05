@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Chambapp",
+  "version": "0.1.0",
+  "description": "Importa tareas de Odoo, envía partes de horas a Odoo y rellena contraseñas de tu bóveda de Chambapp.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlgYVnGOkKB8n2lDkglNq1Ecubgr4ga3iyZT6BQYv0cBuBxi9vIQjixVYYnwdWgAtB4H8qhpZ83ivmPyOiOBuboyRswJXh4uP2GnjIbeuIKErZTLkCA9is827psYrmF+JkgALIvcMlwA1APm89sdHKvuCTQHBRzgeNPOJguBKrOc+xrWewULm2kvQxGj95oJxFYqrChmC6p412KiFE1yHGmkiVdjiE9JNLr/bhEGvcsSQAQ0O/o23cNQu6YF/d8q+EjE0UorywI+LsiU8WS1CYFuMOvNVwaPLE3X+SNnaZUtcIMjmOiMnNseG/3XgS+4zOIy6RdZCajJ6l/P03toyfwIDAQAB",
+  "minimum_chrome_version": "120",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Chambapp",
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/index.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting",
+    "activeTab",
+    "identity",
+    "tabs",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://chambapp-tracker.vercel.app/*",
+    "http://127.0.0.1:5173/*",
+    "__SUPABASE_ORIGIN__/*"
+  ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://chambapp-tracker.vercel.app/*", "http://127.0.0.1:5173/*"],
+      "js": ["content/app-bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

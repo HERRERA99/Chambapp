@@ -12,7 +12,11 @@ import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
-import { applyImputationResult, buildTimesheetWeek } from './timesheet.model';
+import { applyImputationResult, buildOdooRequest, buildTimesheetWeek } from './timesheet.model';
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useExtension } from '../extension/useExtension';
+import { LONG_ODOO_MINUTES } from '../extension/protocol';
+import type { OdooRequest, QueueAction } from '../extension/protocol';
 import type { ImputationResultEntry, TimesheetGroup, TimesheetItem } from './timesheet.model';
 import { TimesheetGroups } from './components/TimesheetGroups';
 import { TimesheetDayHeader } from './components/TimesheetDayHeader';
@@ -33,6 +37,10 @@ export default function TimesheetPage() {
   const { user } = useAuth();
   const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [longSend, setLongSend] = useState<{ group: TimesheetGroup; request: OdooRequest } | null>(
+    null,
+  );
+  const extension = useExtension();
   const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
   const today = todayInZone(zone);
   const currentMonday = mondayForDate(today);
@@ -96,8 +104,67 @@ export default function TimesheetPage() {
     }
   }
 
+  async function dispatch(group: TimesheetGroup, request: OdooRequest) {
+    const result = await extension.send(request);
+    if (!result.ok) {
+      setActionError(result.error);
+      return false;
+    }
+    notify(
+      result.error ||
+        `Enviando ${request.horasFormato} de ${group.title} a Odoo. Puedes seguir trabajando.`,
+    );
+    return true;
+  }
+
+  /** Builds the Odoo line (rounded on the sum, then to whole minutes) and hands it over. */
+  async function send(group: TimesheetGroup, entries: TimeEntry[]) {
+    if (busy || !user) return false;
+    setActionError('');
+    const built = buildOdooRequest({
+      group,
+      entries,
+      task: data?.tasks.find((task) => task.id === group.taskId),
+      userId: user.id,
+      requestId: crypto.randomUUID(),
+    });
+    if ('problem' in built) {
+      setActionError(built.problem);
+      return false;
+    }
+    if (built.request.minutos > LONG_ODOO_MINUTES) {
+      setLongSend({ group, request: built.request });
+      return false;
+    }
+    return dispatch(group, built.request);
+  }
+
+  async function queueAction(group: TimesheetGroup, requestId: string, action: QueueAction) {
+    setActionError('');
+    const result = await extension.act(requestId, action);
+    if (!result.ok) setActionError(result.error);
+    else if (action === 'confirm-created')
+      notify(`Marcando como imputados los partes de ${group.title}…`);
+  }
+
   return (
     <div className="timesheet">
+      <ConfirmDialog
+        open={!!longSend}
+        title="Imputar más de 5 horas"
+        description={
+          longSend
+            ? `Vas a imputar ${longSend.request.horasFormato} en Odoo para ${longSend.group.title} (${longSend.request.fecha}). ¿Continuar?`
+            : ''
+        }
+        confirmLabel="Enviar a Odoo"
+        onClose={() => setLongSend(null)}
+        onConfirm={async () => {
+          if (!longSend) return;
+          const ok = await dispatch(longSend.group, { ...longSend.request, confirmLong: true });
+          if (!ok) throw new Error('No se pudo enviar a Odoo.');
+        }}
+      />
       <header className="timesheet__toolbar">
         <div>
           <p className="eyebrow">Parte semanal</p>
@@ -139,6 +206,8 @@ export default function TimesheetPage() {
             busy={busy}
             onImpute={impute}
             onUndo={undo}
+            onSend={send}
+            onQueueAction={queueAction}
           />
           <section className="timesheet__section" aria-labelledby="timesheet-timeline-title">
             <header className="timesheet__section-header">

@@ -15,6 +15,7 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
+import { useExtension } from '../extension/useExtension';
 import { entryTotals, entryTotalsBy } from '../time-entries/entryTotals';
 import { ProjectCard } from './components/ProjectCard';
 import { ProjectForm } from './components/ProjectForm';
@@ -26,6 +27,7 @@ type ProjectAction = { kind: 'archive' | 'delete'; project: Project };
 export default function ProjectsPage() {
   const { data, isLoading, error, reload } = useWorkspace();
   const { run, pending } = useCommand();
+  const extension = useExtension();
   const notify = useFeedback();
   const [status, setStatus] = useState<StatusFilter>('all');
   const [query, setQuery] = useState('');
@@ -55,6 +57,12 @@ export default function ProjectsPage() {
 
   async function confirmAction() {
     if (!action) return;
+    const locked = extension.lockReason({
+      taskIds: tasks
+        .filter((task) => task.proyecto_id === action.project.id)
+        .map((task) => task.id),
+    });
+    if (locked) throw new Error(locked);
     await run(action.kind === 'delete' ? 'eliminar_proyecto' : 'editar_proyecto', {
       id: action.project.id,
       version: action.project.version,

@@ -17,6 +17,9 @@ import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { VaultProvider } from '../../features/vault/VaultProvider';
+import { ExtensionProvider } from '../../features/extension/ExtensionProvider';
+import { ExtensionDownloadButton } from '../../features/extension/ExtensionDownloadButton';
+import { ExtensionStatusChip } from '../../features/extension/ExtensionStatusChip';
 
 type NavItem = { to: string; label: string; icon: IconName };
 type NavSection = { id: string; label: string; items: readonly NavItem[] };
@@ -153,172 +156,172 @@ export function WorkspaceLayout() {
     }
   }
   return (
-    <div className={`workspace ${collapsed ? 'workspace--collapsed' : ''}`}>
-      <a href="#workspace-content" className="skip-link">
-        Saltar al contenido
-      </a>
-      {menuOpen ? (
-        <button
-          className="sidebar-backdrop"
-          aria-label="Cerrar navegación"
-          onClick={() => setMenuOpen(false)}
-        />
-      ) : null}
-      <aside
-        id="workspace-navigation"
-        className={`sidebar ${menuOpen ? 'sidebar--open' : ''}`}
-        aria-label="Panel de navegación"
-      >
-        <div className="sidebar__brand">
-          <Brand compact to={paths.dashboard} label="Chambapp · Resumen" />
-          <Link to={paths.dashboard} className="sidebar__mark" aria-label="Chambapp · Resumen">
-            <img src="/brand/favicon.svg" alt="" width="34" height="34" />
-          </Link>
-          <IconButton
-            className="sidebar__close"
-            icon="close"
-            label="Cerrar menú"
+    // Keyed by account: the extension status and its queue belong to one user.
+    <ExtensionProvider key={user?.id}>
+      <div className={`workspace ${collapsed ? 'workspace--collapsed' : ''}`}>
+        <a href="#workspace-content" className="skip-link">
+          Saltar al contenido
+        </a>
+        {menuOpen ? (
+          <button
+            className="sidebar-backdrop"
+            aria-label="Cerrar navegación"
             onClick={() => setMenuOpen(false)}
           />
-          <IconButton
-            className="sidebar__collapse"
-            icon={collapsed ? 'sidebarOpen' : 'sidebarClose'}
-            label={collapsed ? 'Mostrar menú' : 'Ocultar menú'}
-            aria-expanded={!collapsed}
-            onClick={toggleCollapsed}
-          />
-          <div className="sidebar__metadata">
-            <Badge tone="accent">
-              <span className="status-dot" /> Mi espacio
-            </Badge>
-            <span className="mono dim">0.1</span>
+        ) : null}
+        <aside
+          id="workspace-navigation"
+          className={`sidebar ${menuOpen ? 'sidebar--open' : ''}`}
+          aria-label="Panel de navegación"
+        >
+          <div className="sidebar__brand">
+            <Brand compact to={paths.dashboard} label="Chambapp · Resumen" />
+            <Link to={paths.dashboard} className="sidebar__mark" aria-label="Chambapp · Resumen">
+              <img src="/brand/favicon.svg" alt="" width="34" height="34" />
+            </Link>
+            <IconButton
+              className="sidebar__close"
+              icon="close"
+              label="Cerrar menú"
+              onClick={() => setMenuOpen(false)}
+            />
+            <IconButton
+              className="sidebar__collapse"
+              icon={collapsed ? 'sidebarOpen' : 'sidebarClose'}
+              label={collapsed ? 'Mostrar menú' : 'Ocultar menú'}
+              aria-expanded={!collapsed}
+              onClick={toggleCollapsed}
+            />
+            <div className="sidebar__metadata">
+              <Badge tone="accent">
+                <span className="status-dot" /> Mi espacio
+              </Badge>
+              <span className="mono dim">0.1</span>
+            </div>
           </div>
-        </div>
-        <nav aria-label="Navegación principal">
-          {renderItem(overview)}
-          {sections.map((section) => {
-            const open = !closedSections.includes(section.id);
-            const hasActive = section.items.some((item) => item.to === pathname);
-            return (
-              <div key={section.id} className={`nav-section ${open ? 'nav-section--open' : ''}`}>
-                <button
-                  type="button"
-                  className="nav-section__toggle"
-                  aria-expanded={open}
-                  aria-controls={`nav-section-${section.id}`}
-                  onClick={() => toggleSection(section.id)}
-                >
-                  <span>{section.label}</span>
-                  {!open && hasActive ? (
-                    <i className="nav-section__dot" title="Contiene la página actual" />
-                  ) : null}
-                  <Icon name="chevron" size={14} />
-                </button>
-                <div className="nav-section__items" id={`nav-section-${section.id}`}>
-                  <div>{section.items.map(renderItem)}</div>
+          <nav aria-label="Navegación principal">
+            {renderItem(overview)}
+            {sections.map((section) => {
+              const open = !closedSections.includes(section.id);
+              const hasActive = section.items.some((item) => item.to === pathname);
+              return (
+                <div key={section.id} className={`nav-section ${open ? 'nav-section--open' : ''}`}>
+                  <button
+                    type="button"
+                    className="nav-section__toggle"
+                    aria-expanded={open}
+                    aria-controls={`nav-section-${section.id}`}
+                    onClick={() => toggleSection(section.id)}
+                  >
+                    <span>{section.label}</span>
+                    {!open && hasActive ? (
+                      <i className="nav-section__dot" title="Contiene la página actual" />
+                    ) : null}
+                    <Icon name="chevron" size={14} />
+                  </button>
+                  <div className="nav-section__items" id={`nav-section-${section.id}`}>
+                    <div>{section.items.map(renderItem)}</div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </nav>
-        <div className="sidebar__bottom">
-          <div className="sidebar__settings">{renderItem(settingsItem)}</div>
-          <div className="preview-note">
-            <Icon name="globe" size={15} />
-            <span>
-              Zona horaria
-              <br />
-              <span className="dim">{profile?.zona_horaria}</span>
-            </span>
-          </div>
-          <div className="sidebar__profile">
-            <span className="avatar">{initials}</span>
-            <div>
-              <strong>{profile?.nombre}</strong>
-              <span className="dim" title={user?.email}>
-                {user?.email}
+              );
+            })}
+          </nav>
+          <div className="sidebar__bottom">
+            <div className="sidebar__settings">{renderItem(settingsItem)}</div>
+            <div className="preview-note">
+              <Icon name="globe" size={15} />
+              <span>
+                Zona horaria
+                <br />
+                <span className="dim">{profile?.zona_horaria}</span>
               </span>
             </div>
-            <IconButton
-              icon="logout"
-              label="Cerrar sesión"
-              disabled={signingOut}
-              onClick={() => void signOut()}
-            />
-          </div>
-        </div>
-      </aside>
-      <div className="workspace__body">
-        <header className="workspace-header">
-          <div className="workspace-header__breadcrumb">
-            <IconButton
-              className="mobile-menu"
-              icon="menu"
-              label="Abrir navegación"
-              aria-expanded={menuOpen}
-              aria-controls="workspace-navigation"
-              onClick={() => setMenuOpen(true)}
-            />
-            <span className="eyebrow">Mi espacio</span>
-            <span className="dim">/</span>
-            <strong>{title}</strong>
-          </div>
-          <div className="workspace-header__actions">
-            <AttendanceControls compact />
-            <div className="header-tracker">
-              <TimerDisplay compact />
+            <ExtensionDownloadButton onClick={() => setMenuOpen(false)} />
+            <div className="sidebar__profile">
+              <span className="avatar">{initials}</span>
+              <div>
+                <strong>{profile?.nombre}</strong>
+                <span className="dim" title={user?.email}>
+                  {user?.email}
+                </span>
+              </div>
+              <IconButton
+                icon="logout"
+                label="Cerrar sesión"
+                disabled={signingOut}
+                onClick={() => void signOut()}
+              />
             </div>
-            <Badge>
-              {profile?.intervalo_redondeo_minutos
-                ? `R${profile.intervalo_redondeo_minutos}`
-                : 'Exacto'}
-            </Badge>
-            <NavLink to={paths.settings} className="avatar avatar--accent" aria-label="Mi perfil">
-              {initials}
-            </NavLink>
           </div>
-        </header>
-        <main id="workspace-content" tabIndex={-1} className="workspace-content">
-          {error ? (
-            <div className="page-stack">
-              <Notice title="No se pudieron actualizar los datos">
-                {readableError(error)} Se muestran los últimos datos cargados.
+        </aside>
+        <div className="workspace__body">
+          <header className="workspace-header">
+            <div className="workspace-header__breadcrumb">
+              <IconButton
+                className="mobile-menu"
+                icon="menu"
+                label="Abrir navegación"
+                aria-expanded={menuOpen}
+                aria-controls="workspace-navigation"
+                onClick={() => setMenuOpen(true)}
+              />
+              <span className="eyebrow">Mi espacio</span>
+              <span className="dim">/</span>
+              <strong>{title}</strong>
+            </div>
+            <div className="workspace-header__actions">
+              <AttendanceControls compact />
+              <div className="header-tracker">
+                <TimerDisplay compact />
+              </div>
+              <ExtensionStatusChip />
+              <NavLink to={paths.settings} className="avatar avatar--accent" aria-label="Mi perfil">
+                {initials}
+              </NavLink>
+            </div>
+          </header>
+          <main id="workspace-content" tabIndex={-1} className="workspace-content">
+            {error ? (
+              <div className="page-stack">
+                <Notice title="No se pudieron actualizar los datos">
+                  {readableError(error)} Se muestran los últimos datos cargados.
+                </Notice>
+                <Button onClick={() => void reload()}>Actualizar</Button>
+              </div>
+            ) : null}
+            {tracker.error ? (
+              <div role="alert" className="form-error">
+                {tracker.error}
+                {tracker.pending
+                  ? ' Usa Reintentar en el cronómetro para confirmar la operación.'
+                  : ''}
+              </div>
+            ) : null}
+            {attendance.error ? (
+              <div role="alert" className="form-error">
+                {attendance.error}
+                {attendance.pending
+                  ? ' Reintenta el fichaje pendiente para confirmar el resultado.'
+                  : ''}
+              </div>
+            ) : null}
+            {attendance.pending && !attendance.error ? (
+              <Notice title="Fichaje pendiente de confirmar">
+                Usa Reintentar fichaje para comprobar el resultado. Se conservan los instantes del
+                intento original.
               </Notice>
-              <Button onClick={() => void reload()}>Actualizar</Button>
-            </div>
-          ) : null}
-          {tracker.error ? (
-            <div role="alert" className="form-error">
-              {tracker.error}
-              {tracker.pending
-                ? ' Usa Reintentar en el cronómetro para confirmar la operación.'
-                : ''}
-            </div>
-          ) : null}
-          {attendance.error ? (
-            <div role="alert" className="form-error">
-              {attendance.error}
-              {attendance.pending
-                ? ' Reintenta el fichaje pendiente para confirmar el resultado.'
-                : ''}
-            </div>
-          ) : null}
-          {attendance.pending && !attendance.error ? (
-            <Notice title="Fichaje pendiente de confirmar">
-              Usa Reintentar fichaje para comprobar el resultado. Se conservan los instantes del
-              intento original.
-            </Notice>
-          ) : null}
-          {/* Keyed by account: switching users drops any key held in memory. */}
-          <VaultProvider key={user?.id}>
-            <Outlet />
-          </VaultProvider>
-        </main>
-        <footer className="workspace-footer">
-          <span>Chambapp</span>
-          <span>Tiempos exactos · Duración imputada configurable</span>
-        </footer>
+            ) : null}
+            {/* Keyed by account: switching users drops any key held in memory. */}
+            <VaultProvider key={user?.id}>
+              <Outlet />
+            </VaultProvider>
+          </main>
+          <footer className="workspace-footer">
+            <span>Chambapp</span>
+            <span>Tiempos exactos · Duración imputada configurable</span>
+          </footer>
+        </div>
       </div>
-    </div>
+    </ExtensionProvider>
   );
 }

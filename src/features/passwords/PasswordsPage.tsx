@@ -19,7 +19,7 @@ import { CredentialEditor } from './CredentialEditor';
 import { credentialMatches, defaultCredential, safeUrl } from './credentials.model';
 import type { CredentialField, CredentialSecret } from './credentials.model';
 import { useCredentials } from './useCredentials';
-import type { OpenCredential } from './useCredentials';
+import type { OpenCredential } from './credentials.model';
 import './passwords.css';
 
 const CLIPBOARD_CLEAR_MS = 30_000;

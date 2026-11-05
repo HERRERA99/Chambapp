@@ -18,7 +18,7 @@ import {
   normalizeCredential,
 } from './credentials.model';
 import type { CredentialField, CredentialSecret } from './credentials.model';
-import { encryptCredential, openCredential } from './useCredentials';
+import { encryptCredential, openCredential } from './credentials.model';
 
 type Pending = {
   id: string;

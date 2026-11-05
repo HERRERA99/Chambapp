@@ -81,6 +81,10 @@ El provider de fichajes conserva las operaciones pendientes por usuario en el na
 
 Las lecturas se paginan en bloques de 500 para recuperar todos los registros sin truncarlos con el límite de respuesta de Supabase. La caché se actualiza después de escribir, al recuperar el foco y periódicamente. Si crece el volumen de datos, la siguiente optimización consiste en consultas filtradas y agregaciones en el servidor por pantalla y periodo.
 
+## Extensión de navegador
+
+La carpeta `extension/` contiene la extensión de Chrome, Edge y Firefox: importa tareas de Odoo, envía los partes de Parte semanal a Odoo sin usar su API y rellena contraseñas de la bóveda. Se compila con `npm run ext:build` (`extension/dist` y `extension/dist-firefox`), se empaqueta para la web con `npm run ext:pack` y la versión de Firefox se firma con `npm run ext:sign:firefox`. Instalación, configuración y pruebas en [docs/extension.md](docs/extension.md).
+
 ## Reglas de tiempo y persistencia
 
 El inicio y fin se conservan exactos, incluidos segundos y fracciones. El redondeo superior se aplica a la duración total de cada parte: **4 h 8 min** imputa **4 h 15 min**, **4 h 30 min** o **5 h** según el intervalo. Se admiten 0, 5, 10, 15, 30 y 60 minutos; 0 conserva la duración exacta. Las horas de inicio y fin visibles no se ajustan.

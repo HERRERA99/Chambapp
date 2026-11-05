@@ -159,6 +159,28 @@ export function unlockVault(password: string, userId: string, vault: WrappedVaul
   return unwrap(password, userId, vault, false);
 }
 
+/**
+ * Data key that can be exported once, for the browser extension: it keeps the
+ * raw key only in its in-memory session storage. The app never uses this.
+ */
+export function unlockVaultExtractable(password: string, userId: string, vault: WrappedVault) {
+  return unwrap(password, userId, vault, true);
+}
+
+export async function exportRawKey(key: CryptoKey): Promise<string> {
+  return toBase64Url(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
+}
+
+/** Non-extractable data key from its raw bytes. */
+export async function importRawKey(raw: string): Promise<CryptoKey> {
+  const bytes = fromBase64Url(raw);
+  if (bytes.length !== 32) throw new UnreadableEnvelopeError();
+  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+}
+
 /** Same data key wrapped with a new master password (records are not re-encrypted). */
 export async function rewrapVault(
   oldPassword: string,

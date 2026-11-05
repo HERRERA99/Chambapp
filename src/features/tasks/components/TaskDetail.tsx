@@ -8,6 +8,7 @@ import { Button } from '../../../shared/ui/Button';
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../../shared/feedback/FeedbackContext';
 import { useCommand } from '../../workspace/useCommand';
+import { useExtension } from '../../extension/useExtension';
 import { useTracker } from '../../tracker/useTracker';
 import { entryTotals } from '../../time-entries/entryTotals';
 import { EntryModal } from '../../time-entries/components/EntryModal';
@@ -26,6 +27,8 @@ export function TaskDetail({
   entries: TimeEntry[];
 }) {
   const { run, pending } = useCommand();
+  const extension = useExtension();
+  const sending = extension.lockReason({ taskIds: [task.id] });
   const tracker = useTracker();
   const notify = useFeedback();
   const [editing, setEditing] = useState<Task | null>(null);
@@ -45,6 +48,11 @@ export function TaskDetail({
 
   async function updateStatus() {
     setError('');
+    const locked = extension.lockReason({ taskIds: [task.id] });
+    if (locked) {
+      setError(locked);
+      return;
+    }
     try {
       await run('editar_tarea', {
         id: task.id,
@@ -69,6 +77,8 @@ export function TaskDetail({
 
   async function confirm() {
     if (!confirmation) return;
+    const locked = extension.lockReason({ taskIds: [confirmation.task.id] });
+    if (locked) throw new Error(locked);
     await run(confirmation.kind === 'delete' ? 'eliminar_tarea' : 'editar_tarea', {
       id: confirmation.task.id,
       version: confirmation.task.version,
@@ -117,17 +127,25 @@ export function TaskDetail({
           />
           <Button
             icon="check"
-            disabled={busy || !!active || blocked}
+            disabled={busy || !!active || blocked || !!sending}
+            title={sending ?? undefined}
             onClick={() => void updateStatus()}
           >
             {task.estado === 'completada' ? 'Reabrir' : 'Completar'}
           </Button>
-          <Button icon="edit" disabled={busy || !!active} onClick={() => setEditing(task)}>
+          <Button
+            icon="edit"
+            disabled={busy || !!active || !!sending}
+            title={sending ?? undefined}
+            onClick={() => setEditing(task)}
+          >
             Editar / Mover
           </Button>
           <Button
             icon="folder"
-            disabled={busy || !!active || (!task.archivado_en && !!project?.archivado_en)}
+            disabled={
+              busy || !!active || !!sending || (!task.archivado_en && !!project?.archivado_en)
+            }
             onClick={() => setConfirmation({ kind: 'archive', task })}
           >
             {task.archivado_en ? 'Desarchivar' : 'Archivar'}
@@ -135,7 +153,8 @@ export function TaskDetail({
           <Button
             icon="trash"
             variant="danger"
-            disabled={busy || !!active}
+            disabled={busy || !!active || !!sending}
+            title={sending ?? undefined}
             onClick={() => setConfirmation({ kind: 'delete', task })}
           >
             Eliminar

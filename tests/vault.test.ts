@@ -16,6 +16,9 @@ import {
   noteAad,
   rewrapVault,
   unlockVault,
+  unlockVaultExtractable,
+  exportRawKey,
+  importRawKey,
 } from '../src/lib/crypto/vault.ts';
 
 // Low iteration count keeps tests fast; production uses VAULT_ITERATIONS (600 000).
@@ -120,4 +123,23 @@ test('the largest valid note fits the database envelope limit', async () => {
   }
   const raw = await encryptBytes(key, 'x', new Uint8Array(0));
   assert.equal((await decryptBytes(key, 'x', raw)).length, 0);
+});
+
+test('the extension key: exported once, re-imported non-extractable, same data key as the app', async () => {
+  const vault = await createVault('correct horse battery', user, ITERATIONS);
+  const sealed = await encryptJson(vault.key, 'ctx', { secreto: 'valor' });
+  await assert.rejects(
+    unlockVaultExtractable('wrong password!!', user, vault),
+    WrongMasterPasswordError,
+  );
+  const raw = await exportRawKey(
+    await unlockVaultExtractable('correct horse battery', user, vault),
+  );
+  assert.match(raw, /^[A-Za-z0-9_-]{43}$/);
+  const key = await importRawKey(raw);
+  await assert.rejects(crypto.subtle.exportKey('raw', key));
+  assert.deepEqual(await decryptJson(key, 'ctx', sealed), { secreto: 'valor' });
+  const back = await encryptJson(key, 'ctx', { otro: 1 });
+  assert.deepEqual(await decryptJson(vault.key, 'ctx', back), { otro: 1 });
+  await assert.rejects(importRawKey('AAAA'), UnreadableEnvelopeError);
 });

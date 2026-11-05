@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && npm run ext:pack && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "lint": "eslint src",
-    "typecheck": "tsc --noEmit",
+    "lint": "eslint src extension/src",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.extension.json",
     "db:cli": "supabase",
     "db:login": "supabase login",
     "db:link": "node tools/supabase.mjs link",
@@ -23,8 +23,13 @@
     "db:test": "npm --prefix tools/db-tests test",
     "db:test:install": "npm --prefix tools/db-tests ci --ignore-scripts",
     "test": "node --experimental-strip-types --test tests/*.test.ts && node tools/week-tests.mjs",
-    "format": "prettier --write src tests tools/*.mjs package.json README.md docs/base-de-datos.md",
-    "format:check": "prettier --check src tests tools/*.mjs package.json README.md docs/base-de-datos.md"
+    "format": "prettier --write src tests extension/src extension/*.mjs extension/scripts tools/*.mjs package.json README.md docs/base-de-datos.md docs/extension.md",
+    "format:check": "prettier --check src tests extension/src extension/*.mjs extension/scripts tools/*.mjs package.json README.md docs/base-de-datos.md docs/extension.md",
+    "ext:build": "node extension/build.mjs",
+    "ext:watch": "node extension/build.mjs --watch",
+    "ext:pack": "node extension/build.mjs && node extension/scripts/pack.mjs",
+    "ext:sign:firefox": "node extension/scripts/sign-firefox.mjs",
+    "ext:icons": "node extension/scripts/make-icons.mjs"
   },
   "dependencies": {
     "@fontsource/geist": "5.3.0",
@@ -43,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/chrome": "0.3.7",
     "@types/luxon": "3.7.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

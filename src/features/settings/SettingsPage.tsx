@@ -16,12 +16,21 @@ import { RoundingSettings } from './components/RoundingSettings';
 import { RegionalSettings } from './components/RegionalSettings';
 import { SecuritySettings } from './components/SecuritySettings';
 import { VaultSettings } from './components/VaultSettings';
+import { ExtensionSettings } from './components/ExtensionSettings';
+import { useExtension } from '../extension/useExtension';
 import '../vault/vault.css';
 import { initialSchedule, minimumScheduleMonday, profileDraft } from './settingsDraft';
 import type { Profile, WorkspaceData } from '../../domain/models';
 
-type SectionId = 'perfil' | 'jornada' | 'redondeo' | 'odoo' | 'seguridad';
-const SECTION_IDS: readonly SectionId[] = ['perfil', 'jornada', 'redondeo', 'odoo', 'seguridad'];
+type SectionId = 'perfil' | 'jornada' | 'redondeo' | 'odoo' | 'extension' | 'seguridad';
+const SECTION_IDS: readonly SectionId[] = [
+  'perfil',
+  'jornada',
+  'redondeo',
+  'odoo',
+  'extension',
+  'seguridad',
+];
 
 /** `#regional` (old link) is an alias of Perfil; unknown or empty hashes open Perfil. */
 function sectionFromHash(hash: string): SectionId {
@@ -45,6 +54,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
   const changedElsewhere = data.profile.version !== version;
   const minimumDate = minimumScheduleMonday(data);
   const { hash } = useLocation();
+  const extension = useExtension();
   const navigate = useNavigate();
   const active = sectionFromHash(hash);
   const roundingDirty = profile.intervaloRedondeo !== baseline.intervaloRedondeo;
@@ -86,6 +96,13 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
       dirty: roundingDirty,
     },
     { id: 'odoo', label: 'Odoo', icon: 'globe', summary: 'Integración y API key', dirty: false },
+    {
+      id: 'extension',
+      label: 'Extensión',
+      icon: 'zap',
+      summary: extension.available ? `Instalada · v${extension.version}` : 'No instalada',
+      dirty: false,
+    },
     {
       id: 'seguridad',
       label: 'Seguridad',
@@ -313,6 +330,9 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           </div>
           <div hidden={active !== 'odoo'}>
             <OdooSettings disabled={saving} />
+          </div>
+          <div hidden={active !== 'extension'}>
+            <ExtensionSettings />
           </div>
           <div hidden={active !== 'seguridad'}>
             <SecuritySettings disabled={saving} />

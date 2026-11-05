@@ -1,3 +1,6 @@
+import { credentialAad, decryptJson, encryptJson } from '../../lib/crypto/vault.ts';
+import type { CredentialRow } from '../../domain/models';
+
 /** Password-manager entry as stored inside its encrypted envelope. */
 export type CredentialField = {
   id: string;
@@ -161,4 +164,33 @@ export function generatePassword(
     }
   }
   return result;
+}
+
+export type OpenCredential = { row: CredentialRow; secret: CredentialSecret | null };
+
+export function encryptCredential(
+  key: CryptoKey,
+  userId: string,
+  id: string,
+  secret: CredentialSecret,
+) {
+  return encryptJson(key, credentialAad(userId, id), secret);
+}
+
+/** Decrypted entry, or `secret: null` when it belongs to another vault or cannot be read. */
+export async function openCredential(
+  key: CryptoKey,
+  userId: string,
+  generation: string | null,
+  row: CredentialRow,
+): Promise<OpenCredential> {
+  if (row.boveda_generacion !== generation) return { row, secret: null };
+  try {
+    return {
+      row,
+      secret: parseCredential(await decryptJson(key, credentialAad(userId, row.id), row.cifrado)),
+    };
+  } catch {
+    return { row, secret: null };
+  }
 }

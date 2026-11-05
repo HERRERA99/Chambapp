@@ -1,0 +1,238 @@
+<!doctype html>
+<!--
+  Minimal stand-in for an Odoo task form, with the ids and classes the extension
+  (and Extension_App) rely on. Serve it under /odoo/project/1/tasks/9.
+  Query: ?run=<id>&mode=normal|slow|rejected|invalid|paginated
+  Saved lines persist in localStorage per run, so a reload shows them.
+-->
+<html lang="es-ES">
+  <head>
+    <meta charset="utf-8" />
+    <title>T9 · Migrar datos - Odoo (prueba)</title>
+    <style>
+      body {
+        font:
+          14px system-ui,
+          sans-serif;
+        margin: 0;
+      }
+      .o_control_panel {
+        display: flex;
+        gap: 8px;
+        padding: 8px;
+        border-bottom: 1px solid #ccc;
+      }
+      .o_form_view {
+        padding: 12px;
+      }
+      .o_notebook_headers a {
+        margin-right: 12px;
+      }
+      .o_notebook_headers a.active {
+        font-weight: bold;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td {
+        border: 1px solid #ddd;
+        padding: 2px 6px;
+      }
+      .modal {
+        position: fixed;
+        inset: 60px;
+        background: #fff;
+        border: 2px solid #333;
+        padding: 12px;
+      }
+      .o_notification {
+        position: fixed;
+        right: 10px;
+        bottom: 10px;
+        padding: 8px;
+        border: 2px solid;
+      }
+      .loading {
+        opacity: 0.6;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="o_action_manager">
+      <div class="o_control_panel">
+        <span class="o_form_status_indicator"><span class="indicator"></span></span>
+        <button
+          class="o_form_button_save hidden"
+          data-hotkey="s"
+          aria-label="Save manually"
+          title="Guardar manualmente"
+          type="button"
+        >
+          <i class="fa fa-cloud-upload"></i> Guardar
+        </button>
+      </div>
+      <div class="o_form_view">
+        <div class="o_field_widget" name="name"><textarea id="name_0">Migrar datos</textarea></div>
+        <div class="o_field_widget" name="project_id">
+          <input id="project_id_0" value="[F] Formación" />
+        </div>
+        <div class="o_field_widget" name="code"><span>T9</span></div>
+        <div class="o_notebook">
+          <div class="o_notebook_headers">
+            <a role="tab" href="#desc">Descripción</a>
+            <a role="tab" href="#ts">Partes de horas</a>
+          </div>
+          <div class="tab-pane" id="pane-ts" hidden>
+            <div class="o_field_widget o_field_x2many_list" name="timesheet_ids">
+              <div class="o_x2m_control_panel">
+                <span class="o_pager hidden">
+                  <span class="o_pager_value"></span> / <span class="o_pager_limit"></span>
+                  <button class="o_pager_next" type="button">›</button>
+                </span>
+              </div>
+              <table>
+                <tbody class="ui-sortable"></tbody>
+              </table>
+              <div class="o_field_x2many_list_row_add">
+                <a role="button" href="#">Añadir una línea</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const mode = params.get('mode') || 'normal';
+      const key = `fake-odoo:${params.get('run') || 'default'}`;
+      const PAGE = 40;
+      let page = 0;
+      const log = (window.__fakeOdooLog = []);
+      const saved = () => JSON.parse(localStorage.getItem(key) || 'null') ?? seed();
+      function seed() {
+        const lines = [];
+        if (mode === 'paginated')
+          for (let i = 1; i <= 45; i += 1)
+            lines.push({
+              date: `${String((i % 28) + 1).padStart(2, '0')}/10/2026`,
+              name: `Antigua ${i}`,
+              time: '01:00',
+            });
+        localStorage.setItem(key, JSON.stringify(lines));
+        return lines;
+      }
+      let rows = saved();
+      const sortKey = (line) => line.date.split('/').reverse().join('-');
+      const tbody = document.querySelector('tbody');
+      const pager = document.querySelector('.o_pager');
+      const mainSave = document.querySelector('.o_form_button_save');
+      const indicator = document.querySelector('.o_form_status_indicator .indicator');
+
+      function render() {
+        const sorted = [...rows].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+        const pages = Math.max(1, Math.ceil(sorted.length / PAGE));
+        page = page % pages;
+        const shown = sorted.slice(page * PAGE, page * PAGE + PAGE);
+        tbody.innerHTML = '';
+        for (const line of shown) {
+          const tr = document.createElement('tr');
+          tr.className = 'o_data_row';
+          for (const [name, value] of [
+            ['date', line.date],
+            ['name', line.name],
+            ['unit_amount', line.time],
+          ]) {
+            const td = document.createElement('td');
+            td.setAttribute('name', name);
+            td.textContent = value;
+            tr.append(td);
+          }
+          tbody.append(tr);
+        }
+        pager.classList.toggle('hidden', sorted.length <= PAGE);
+        pager.querySelector('.o_pager_value').textContent =
+          `${page * PAGE + 1}-${page * PAGE + shown.length}`;
+        pager.querySelector('.o_pager_limit').textContent = String(sorted.length);
+      }
+      function dirty(value) {
+        mainSave.classList.toggle('hidden', !value);
+        indicator.className = value ? 'indicator o_form_dirty' : 'indicator';
+      }
+      pager.querySelector('.o_pager_next').addEventListener('click', () => {
+        log.push('pager-next');
+        page += 1;
+        setTimeout(render, 120);
+      });
+      document.querySelectorAll('.o_notebook_headers a').forEach((tab) =>
+        tab.addEventListener('click', (event) => {
+          event.preventDefault();
+          log.push(`tab:${tab.textContent}`);
+          document
+            .querySelectorAll('.o_notebook_headers a')
+            .forEach((item) => item.classList.toggle('active', item === tab));
+          const pane = document.getElementById('pane-ts');
+          pane.hidden = tab.textContent !== 'Partes de horas';
+          pane.classList.toggle('active', !pane.hidden);
+        }),
+      );
+      let unsaved = [];
+      document
+        .querySelector('.o_field_x2many_list_row_add a')
+        .addEventListener('click', (event) => {
+          event.preventDefault();
+          log.push('add-line');
+          const modal = document.createElement('div');
+          modal.className = 'modal';
+          modal.innerHTML = `
+          <div class="o_form_view">
+            <div name="date"><input id="date" /></div>
+            <div name="name"><input id="name" /></div>
+            <div name="unit_amount"><input id="unit_amount" /></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="o_form_button_save" data-hotkey="c">Guardar y cerrar</button>
+          </div>`;
+          document.body.append(modal);
+          modal.querySelector('.o_form_button_save').addEventListener('click', () => {
+            log.push('line-save');
+            const value = (id) => modal.querySelector(`#${id}`).value;
+            if (mode === 'invalid') {
+              modal.querySelector('[name="unit_amount"]').classList.add('o_field_invalid');
+              return;
+            }
+            unsaved.push({ date: value('date'), name: value('name'), time: value('unit_amount') });
+            modal.remove();
+            dirty(true);
+          });
+        });
+      mainSave.addEventListener('click', () => {
+        log.push('form-save');
+        if (mode === 'rejected') {
+          setTimeout(() => {
+            const note = document.createElement('div');
+            note.className = 'o_notification border-danger';
+            note.textContent = 'No se ha guardado: error de validación en los partes.';
+            document.body.append(note);
+          }, 300);
+          return;
+        }
+        const delay = mode === 'slow' ? 3000 : 300;
+        document.body.classList.add('loading');
+        mainSave.disabled = false; // stays enabled and visible while "saving"
+        setTimeout(() => {
+          rows = [...rows, ...unsaved];
+          unsaved = [];
+          localStorage.setItem(key, JSON.stringify(rows));
+          document.body.classList.remove('loading');
+          dirty(false);
+          render();
+        }, delay);
+      });
+      render();
+    </script>
+  </body>
+</html>
