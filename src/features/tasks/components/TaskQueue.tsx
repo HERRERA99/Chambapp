@@ -5,6 +5,7 @@ import { SelectField } from '../../../shared/ui/FormField';
 import { SearchSuggest } from '../../../shared/ui/SearchSuggest';
 import { taskStatusLabels } from '../taskLabels';
 import { isArchivedTask } from '../taskQueue';
+import { OriginBadge } from '../../local/OriginBadge';
 import '../task-queue.css';
 
 /** Hidden matches shown in the queue while searching with the archive switch off. */
@@ -96,6 +97,7 @@ export function TaskQueue({
             </span>
           </span>
           <span className="task-queue__side">
+            {task.origen === 'local' ? <OriginBadge origin="local" /> : null}
             {task.odoo_id ? (
               <span className="task-queue__odoo mono" title={task.odoo_id}>
                 {task.odoo_id}
@@ -137,6 +139,7 @@ export function TaskQueue({
             <option key={project.id} value={project.id}>
               {project.nombre}
               {project.archivado_en ? ' (archivado)' : ''}
+              {project.origen === 'local' ? ' · Local' : ''}
             </option>
           ))}
         </SelectField>

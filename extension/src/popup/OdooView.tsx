@@ -125,6 +125,7 @@ function TaskImport({ context, onDone }: { context: TabContext; onDone: () => vo
           {context.projects.map((item) => (
             <option key={item.id} value={item.id}>
               {item.nombre}
+              {item.origen === 'local' ? ' · Local' : ''}
             </option>
           ))}
           <option value={NEW_PROJECT}>+ Crear proyecto nuevo…</option>

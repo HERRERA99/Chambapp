@@ -50,6 +50,23 @@ const messages: Record<string, string> = {
   tareas_odoo_id_formato: 'El ID de Odoo debe ser T seguido de números, por ejemplo T443212.',
   tareas_odoo_url_formato:
     'El enlace de Odoo debe ser una dirección válida con http:// o https://.',
+  PARTES_SOLAPADOS:
+    'Este intervalo se solapa con otro parte. Revisa la hora exacta de inicio y fin.',
+  DATOS_LOCALES_BLOQUEADOS:
+    'Tus datos locales están bloqueados: desbloquea la bóveda con tu clave maestra para usarlos.',
+  DATOS_LOCALES_OCUPADOS:
+    'Otra pestaña está guardando tus datos locales a la vez. Vuelve a intentarlo.',
+  DATOS_LOCALES_NO_DISPONIBLES:
+    'Este navegador no permite guardar datos locales (por ejemplo, en una ventana privada).',
+  DATOS_LOCALES_ILEGIBLES:
+    'Los datos locales se cifraron con una clave maestra anterior. Importa una copia de seguridad.',
+  MOVER_ENTRE_ALMACENES:
+    'No se puede mover entre un proyecto local y uno de la nube. Usa «Mover proyecto» en su ficha.',
+  COPIA_INVALIDA: 'El archivo no es una copia de seguridad válida de Chambapp.',
+  COPIA_OTRA_CUENTA: 'Esta copia pertenece a otra cuenta de Chambapp.',
+  COPIA_CONTRASENA: 'La contraseña de la copia no es correcta.',
+  TRASPASO_ID_EXISTENTE: 'Algún registro de este proyecto ya existe en la nube.',
+  CONFIRMACION_CASCADA_REQUERIDA: 'Confirma que quieres eliminar también sus elementos.',
   CONFIRMAR_CAMBIO_ZONA:
     'El registro cambia a una jornada con otra zona horaria. Revisa la zona antes de guardarlo.',
 };

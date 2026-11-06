@@ -116,6 +116,10 @@ MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 node tools/ext-smoke/run-firefox.mjs
    - Más de 5 horas pide confirmación.
 4. **Contraseñas.** Pestaña Contraseñas → clave maestra de Chambapp → **Desbloquear**. En una web de login con entrada guardada aparece en «Esta web»: pulsa la flecha para rellenar. Prueba también copiar, mostrar, crear una entrada nueva (se ve después en Chambapp → Contraseñas) y el bloqueo automático (Ajustes). Al cerrar el navegador se vuelve a pedir la clave.
 
+### Datos guardados en el navegador
+
+Con proyectos locales (ver [datos-locales.md](datos-locales.md)) la extensión pide los datos a una pestaña abierta de Chambapp de la misma cuenta, con la clave maestra desbloqueada: para listar proyectos al importar una tarea de Odoo, crearla en un proyecto local y revalidar y marcar los partes locales que envía. Sin esa pestaña lo avisa y no toca Odoo.
+
 ## Seguridad
 
 - Permisos de host: solo Chambapp (`chambapp-tracker.vercel.app`, `127.0.0.1:5173`), Supabase y el Odoo configurado. Rellenar contraseñas usa `activeTab` (solo tras pulsar en el popup) y solo en el marco principal.

@@ -4,17 +4,20 @@ import { formatDuration } from '../../../domain/time';
 import { Badge, Progress } from '../../../shared/ui/Panel';
 import { IconButton } from '../../../shared/ui/Button';
 import { Icon } from '../../../shared/ui/Icon';
+import { OriginBadge } from '../../local/OriginBadge';
 
 export function ProjectCard({
   project,
   totalSeconds,
   taskCount,
   onDetails,
+  showOrigin = false,
 }: {
   project: Project;
   totalSeconds: number;
   taskCount: number;
   onDetails: (project: Project) => void;
+  showOrigin?: boolean;
 }) {
   const budgetSeconds = (project.presupuesto_minutos ?? 0) * 60;
   const progress = budgetSeconds > 0 ? (totalSeconds / budgetSeconds) * 100 : 0;
@@ -31,6 +34,7 @@ export function ProjectCard({
         <Badge tone={project.archivado_en ? 'neutral' : 'accent'}>
           {project.archivado_en ? 'Archivado' : 'Activo'}
         </Badge>
+        {showOrigin ? <OriginBadge origin={project.origen} /> : null}
         <IconButton
           icon="more"
           label={`Detalles de ${project.nombre}`}

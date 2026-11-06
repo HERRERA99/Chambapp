@@ -1,3 +1,4 @@
+import type { LocalSummary } from '../lib/local/runtime';
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Profile = {
@@ -21,7 +22,11 @@ type OwnedRecord = {
   version: number;
 };
 
+/** Where a project, task or entry is stored; absent means the cloud. */
+export type DataOrigin = 'nube' | 'local';
+
 export type Project = OwnedRecord & {
+  origen?: DataOrigin;
   nombre: string;
   descripcion: string | null;
   cliente: string | null;
@@ -31,6 +36,7 @@ export type Project = OwnedRecord & {
 };
 
 export type Task = OwnedRecord & {
+  origen?: DataOrigin;
   proyecto_id: string;
   titulo: string;
   descripcion: string | null;
@@ -91,6 +97,7 @@ export type TimeRecord = OwnedRecord & {
 };
 
 export type TimeEntry = TimeRecord & {
+  origen?: DataOrigin;
   proyecto_id: string;
   odoo_id: string | null;
   odoo_url: string | null;
@@ -147,6 +154,8 @@ export type WorkspaceData = {
   absences: CalendarAbsence[];
   serverTime: string;
   receivedAt: number;
+  /** State of the projects, tasks and entries kept in this browser. */
+  local?: LocalSummary;
 };
 
 export type CalendarAbsence = OwnedRecord & {

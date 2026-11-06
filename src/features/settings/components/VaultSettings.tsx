@@ -8,11 +8,18 @@ import { readableError } from '../../../lib/supabase/errors';
 import { MIN_MASTER_PASSWORD_LENGTH } from '../../../lib/crypto/vault';
 import { useFeedback } from '../../../shared/feedback/FeedbackContext';
 import { useVault } from '../../vault/useVault';
+import { useWorkspace } from '../../workspace/useWorkspace';
+import { downloadBackup } from '../../local/localData';
 
 /** Master password: change it (the data key is re-wrapped) or reset all encrypted data. */
 export function VaultSettings({ disabled = false }: { disabled?: boolean }) {
   const vault = useVault();
   const notify = useFeedback();
+  const { data } = useWorkspace();
+  // Local projects, tasks and entries are encrypted with this vault's key.
+  const localState = data?.local?.estado;
+  const hasLocalData =
+    localState === 'bloqueado' || (localState === 'abierto' && (data?.local?.proyectos ?? 0) > 0);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -170,6 +177,29 @@ export function VaultSettings({ disabled = false }: { disabled?: boolean }) {
         description="Se eliminarán de forma permanente todas tus notas cifradas y todas tus contraseñas. Esta acción no se puede deshacer."
       >
         <div className="vault-settings__form" onKeyDown={onEnter(() => void reset())}>
+          {hasLocalData ? (
+            <Notice title="También dejarás de poder leer tus datos locales">
+              Los proyectos, tareas y partes guardados en este navegador están cifrados con esta
+              clave. Después solo podrás recuperarlos importando una copia de seguridad.{' '}
+              {localState === 'abierto' ? (
+                <Button
+                  variant="ghost"
+                  icon="download"
+                  disabled={busy}
+                  onClick={() =>
+                    void downloadBackup().then(
+                      () => notify('Copia de seguridad descargada.'),
+                      (cause) => setResetError(readableError(cause)),
+                    )
+                  }
+                >
+                  Descargar copia antes
+                </Button>
+              ) : (
+                'Desbloquea antes la bóveda si quieres descargar una copia.'
+              )}
+            </Notice>
+          ) : null}
           <InputField
             label="Escribe BORRAR para confirmar"
             value={resetText}

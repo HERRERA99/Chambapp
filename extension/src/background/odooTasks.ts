@@ -4,8 +4,33 @@ import { findExistingTask, parseOdooTaskUrl, suggestProject } from '../shared/od
 import type { DetectedTask } from '../shared/odooTask';
 import type { TabContext } from '../shared/messages';
 import { getSettings } from './settings';
-import { createProject, createTask, loadProjects, loadTasks } from './workspace';
+import type { Project, Task } from '../../../src/domain/models';
+import { createProject, createTask, loadProjects, loadStorageMode, loadTasks } from './workspace';
 import { requireUser } from './supabase';
+import { askApp } from './appTabs';
+
+type LocalList = { proyectos: Project[]; tareas: Task[] };
+
+/** Projects and tasks kept in the browser, from an open Chambapp tab (null: none answered). */
+async function localData(userId: string): Promise<LocalList | null> {
+  try {
+    const data = await askApp<LocalList>(userId, { kind: 'listar' }, 4_000);
+    if (!data || !Array.isArray(data.proyectos) || !Array.isArray(data.tareas)) return null;
+    return {
+      proyectos: data.proyectos.map((row) => ({ ...row, origen: 'local' as const })),
+      tareas: data.tareas.map((row) => ({ ...row, origen: 'local' as const })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function allProjects(userId: string, local: LocalList | null) {
+  return [...(await loadProjects(userId)), ...(local?.proyectos ?? [])];
+}
+async function allTasks(userId: string, local: LocalList | null) {
+  return [...(await loadTasks(userId)), ...(local?.tareas ?? [])];
+}
 
 /** One key per tab: concurrent reports from several Odoo tabs never overwrite each other. */
 const detectedKey = (tabId: number) => `chambapp_detected_v1:${tabId}`;
@@ -79,7 +104,12 @@ export async function tabContext(tabId: number): Promise<TabContext> {
   const current = tab?.url ? parseOdooTaskUrl(tab.url, { assumeTask: true }) : null;
   if (!detected || current?.recordId !== detected.recordId || current.origin !== detected.origin)
     return base;
-  const [tasks, projects] = await Promise.all([loadTasks(), loadProjects()]);
+  const user = await requireUser();
+  const local = await localData(user.id);
+  const [tasks, projects] = await Promise.all([
+    allTasks(user.id, local),
+    allProjects(user.id, local),
+  ]);
   const names = new Map(projects.map((project) => [project.id, project.nombre]));
   const existing = findExistingTask(tasks, detected);
   const active = projects.filter((project) => !project.archivado_en);
@@ -94,15 +124,34 @@ export async function tabContext(tabId: number): Promise<TabContext> {
         }
       : null,
     suggestedProjectId: suggestProject(projects, detected.projectName)?.id ?? null,
-    projects: active.map((project) => ({ id: project.id, nombre: project.nombre })),
+    projects: active.map((project) => ({
+      id: project.id,
+      nombre: project.nombre,
+      origen: project.origen === 'local' ? ('local' as const) : ('nube' as const),
+    })),
   };
 }
 
-const importTask = createImporter({
-  loadProjects: (userId) => loadProjects(userId),
-  loadTasks: (userId) => loadTasks(userId),
-  createProject: (name, userId) => createProject(name, userId),
-  createTask: (task, userId) => createTask(task, userId),
+// Reads include the data kept in the browser when a Chambapp tab can give it; a task
+// goes where its project lives and a new project where the user's preference says.
+let lastLocal: LocalList | null = null;
+const importTask = createImporter<Project, Task>({
+  loadProjects: async (userId) => {
+    lastLocal = await localData(userId);
+    return allProjects(userId, lastLocal);
+  },
+  loadTasks: async (userId) => allTasks(userId, lastLocal ?? (await localData(userId))),
+  createProject: async (name, userId) => {
+    if ((await loadStorageMode(userId)) === 'nube') return createProject(name, userId);
+    const created = await askApp<Project>(userId, { kind: 'crear-proyecto', nombre: name });
+    return { ...created, origen: 'local' };
+  },
+  createTask: async (task, userId) => {
+    const local = lastLocal?.proyectos.some((project) => project.id === task.proyecto_id);
+    if (!local) return createTask(task, userId);
+    const created = await askApp<Task>(userId, { kind: 'crear-tarea', tarea: task });
+    return { ...created, origen: 'local' };
+  },
 });
 
 export async function importDetected(input: {

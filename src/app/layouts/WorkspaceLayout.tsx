@@ -17,6 +17,7 @@ import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { VaultProvider } from '../../features/vault/VaultProvider';
+import { LocalBanners } from '../../features/local/LocalBanners';
 import { ExtensionProvider } from '../../features/extension/ExtensionProvider';
 import { ExtensionDownloadButton } from '../../features/extension/ExtensionDownloadButton';
 import { ExtensionStatusChip } from '../../features/extension/ExtensionStatusChip';
@@ -313,6 +314,7 @@ export function WorkspaceLayout() {
             ) : null}
             {/* Keyed by account: switching users drops any key held in memory. */}
             <VaultProvider key={user?.id}>
+              <LocalBanners />
               <Outlet />
             </VaultProvider>
           </main>

@@ -75,7 +75,7 @@ export async function verifyNotes({
   for (const [field, value, error] of [
     ['proyecto_ids', [otherProject.id], /PROYECTO_NO_DISPONIBLE/],
     ['tarea_ids', [otherTask.id], /TAREA_NO_DISPONIBLE/],
-    ['tarea_ids', [randomUUID()], /TAREA_NO_DISPONIBLE/],
+    // An unknown id is accepted since Plan 11 (a task kept in the browser): see local-storage.mjs.
   ]) {
     await expectError(
       () =>
@@ -100,7 +100,7 @@ export async function verifyNotes({
         'insert into public.nota_proyectos(nota_id,usuario_id,proyecto_id) values($1,$2,$3)',
         [note.id, note.usuario_id, otherProject.id],
       ),
-    /foreign key/,
+    /ENLACE_AJENO/,
   );
   await expectError(
     () =>
@@ -109,7 +109,7 @@ export async function verifyNotes({
         note.usuario_id,
         otherTask.id,
       ]),
-    /foreign key/,
+    /ENLACE_AJENO/,
   );
   // Writes only go through chambapp_notas: direct DML is denied for every account.
   for (const connection of [ca, cb])
@@ -122,9 +122,7 @@ export async function verifyNotes({
       ['delete from public.nota_proyectos where nota_id=$1', [note.id]],
     ])
       await expectError(() => connection.query(sql, values), /permission denied/);
-  ok(
-    'note relation validation is atomic and composite foreign keys prevent links across account boundaries',
-  );
+  ok('note relation validation is atomic and links can never cross account boundaries');
 
   for (const invalid of [
     { titulo: '' },

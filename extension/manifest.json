@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chambapp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Importa tareas de Odoo, envía partes de horas a Odoo y rellena contraseñas de tu bóveda de Chambapp.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlgYVnGOkKB8n2lDkglNq1Ecubgr4ga3iyZT6BQYv0cBuBxi9vIQjixVYYnwdWgAtB4H8qhpZ83ivmPyOiOBuboyRswJXh4uP2GnjIbeuIKErZTLkCA9is827psYrmF+JkgALIvcMlwA1APm89sdHKvuCTQHBRzgeNPOJguBKrOc+xrWewULm2kvQxGj95oJxFYqrChmC6p412KiFE1yHGmkiVdjiE9JNLr/bhEGvcsSQAQ0O/o23cNQu6YF/d8q+EjE0UorywI+LsiU8WS1CYFuMOvNVwaPLE3X+SNnaZUtcIMjmOiMnNseG/3XgS+4zOIy6RdZCajJ6l/P03toyfwIDAQAB",
   "minimum_chrome_version": "120",

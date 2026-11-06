@@ -795,6 +795,7 @@ export type Database = {
       chambapp_credenciales: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_calendario: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_imputaciones: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
+      chambapp_traspasos: { Args: { p_accion: string; p_datos?: Json }; Returns: Json };
       chambapp_configurar_odoo: {
         Args: { p_api_key?: string; p_guardar?: boolean };
         Returns: boolean;

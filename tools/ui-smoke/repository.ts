@@ -514,3 +514,9 @@ export async function executeCommand(action: string, payload: Record<string, Jso
   window.dispatchEvent(new Event('chambapp-smoke-workspace'));
   return entry;
 }
+/** Plan 11: the preview has no Supabase; moving a project is recorded and refused. */
+export const executeCloudCommand = executeCommand;
+export async function executeTransfer(action: string, payload: Record<string, Json | undefined>) {
+  operations.push({ action, payload });
+  throw new Error('Mover proyectos no está disponible en la vista de prueba.');
+}

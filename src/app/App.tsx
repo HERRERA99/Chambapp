@@ -1,3 +1,4 @@
+import { VaultProvider } from '../features/vault/VaultProvider';
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { WorkspaceLayout } from './layouts/WorkspaceLayout';
@@ -88,7 +89,14 @@ export function App() {
                     <Route path={paths.register} element={<AuthPage />} />
                     <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
                     <Route element={<RequireAuth onboarding />}>
-                      <Route path={paths.onboarding} element={<OnboardingPage />} />
+                      <Route
+                        path={paths.onboarding}
+                        element={
+                          <VaultProvider>
+                            <OnboardingPage />
+                          </VaultProvider>
+                        }
+                      />
                     </Route>
                     <Route element={<RequireAuth />}>
                       <Route element={<WorkspaceLayout />}>

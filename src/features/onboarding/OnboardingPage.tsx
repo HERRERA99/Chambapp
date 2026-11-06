@@ -12,6 +12,9 @@ import { RoundingPreview } from '../time-entries/components/RoundingPreview';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { getSupabase } from '../../lib/supabase/client';
+import { storageMode } from '../../lib/local/preferences';
+import { VaultKeyDialog } from '../local/VaultKeyDialog';
+import { useVault } from '../vault/useVault';
 import { paths } from '../../app/paths';
 import { mondayForDate, todayInZone } from '../../domain/time';
 import type { Profile, WorkspaceData } from '../../domain/models';
@@ -22,6 +25,7 @@ const steps = [
   'Perfil & Workspace',
   'Jornada semanal',
   'Motor de Redondeo',
+  'Dónde guardar',
   'Zona Horaria & Proyecto',
   'Odoo',
 ] as const;
@@ -29,6 +33,7 @@ const titles = [
   'Dale un lugar a tu trabajo',
   'Define tu jornada semanal',
   'Cada minuto, con total transparencia',
+  '¿Dónde guardamos tus proyectos?',
   'Tu consola, a tu medida',
   'Configura tu acceso a Odoo',
 ] as const;
@@ -87,6 +92,11 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
   const [project, setProject] = useState('');
   const [client, setClient] = useState('');
   const [odooKey, setOdooKey] = useState('');
+  const [storage, setStorage] = useState(storageMode(data.profile));
+  const [keyDialog, setKeyDialog] = useState(false);
+  const vault = useVault();
+  const localOpen = data.local?.estado === 'abierto' || data.local?.estado === 'sin-datos';
+  const lastStep = steps.length - 1;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const monday = mondayForDate(todayInZone(zone));
@@ -97,8 +107,13 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
   async function finish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
-    if (step !== 4) {
+    if (step !== lastStep) {
       continueStep();
+      return;
+    }
+    if (storage === 'local' && !localOpen) {
+      setStep(3);
+      setError('Crea o desbloquea tu clave maestra para guardar los datos en este navegador.');
       return;
     }
     setError(null);
@@ -137,6 +152,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
           especialidad: specialty.trim(),
           organizacion: organization,
           moneda: currency,
+          almacenamiento: storage,
         },
       });
 
@@ -161,7 +177,11 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
           (item) => item.nombre === projectName && (item.cliente ?? '') === clientName,
         )
       ) {
-        await run('crear_proyecto', { nombre: projectName, cliente: clientName || null });
+        await run('crear_proyecto', {
+          nombre: projectName,
+          cliente: clientName || null,
+          destino: storage,
+        });
       }
       // Completing onboarding is the final persisted step.
       await run('editar_perfil', { version: profile.version, onboarding_completado: true });
@@ -206,6 +226,10 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
         Number(customHours) > 120)
     ) {
       setError('Introduce una jornada entre 1 y 120 horas semanales.');
+      return;
+    }
+    if (step === 3 && storage === 'local' && !localOpen) {
+      setKeyDialog(true);
       return;
     }
     setStep((current) => Math.min(steps.length - 1, current + 1));
@@ -394,8 +418,80 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
               </Panel>
             ) : null}
             {step === 3 ? (
+              <Panel eyebrow="Bloque 04" title="Proyectos, tareas y partes de horas">
+                <p className="muted">
+                  Puedes guardarlos en la nube o solo en este navegador, si tu empresa no quiere que
+                  estén en un servidor externo. El resto (perfil, jornada, fichajes, festivos, notas
+                  y contraseñas) se guarda en la nube. Puedes cambiarlo cuando quieras en Ajustes →
+                  Datos, y los dos tipos de datos se ven siempre juntos.
+                </p>
+                <fieldset className="choice-fieldset" disabled={saving}>
+                  <legend>Guardar los proyectos nuevos</legend>
+                  <div className="choice-grid">
+                    <label
+                      className={`choice-card ${storage === 'nube' ? 'choice-card--selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="storage"
+                        checked={storage === 'nube'}
+                        onChange={() => setStorage('nube')}
+                      />
+                      <strong>En la nube</strong>
+                      <span className="muted">
+                        Disponibles en cualquier dispositivo con tu cuenta.
+                      </span>
+                    </label>
+                    <label
+                      className={`choice-card ${storage === 'local' ? 'choice-card--selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="storage"
+                        checked={storage === 'local'}
+                        disabled={data.local?.estado === 'no-disponible'}
+                        onChange={() => {
+                          setStorage('local');
+                          if (!localOpen) setKeyDialog(true);
+                        }}
+                      />
+                      <strong>En este navegador</strong>
+                      <span className="muted">
+                        Cifrados con tu clave maestra y guardados solo aquí. Descarga copias de
+                        seguridad desde Ajustes → Datos.
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+                {storage === 'local' ? (
+                  localOpen ? (
+                    <Notice title="Clave maestra lista" icon="verified">
+                      Tus proyectos se cifrarán con tu clave maestra en este navegador.
+                    </Notice>
+                  ) : (
+                    <Notice title="Necesitas una clave maestra" icon="shield">
+                      Los datos de este navegador se cifran con ella.{' '}
+                      <Button variant="ghost" icon="shield" onClick={() => setKeyDialog(true)}>
+                        {vault.status === 'missing' ? 'Crear clave maestra' : 'Desbloquear'}
+                      </Button>
+                    </Notice>
+                  )
+                ) : null}
+                {data.local?.estado === 'no-disponible' ? (
+                  <Notice title="Este navegador no permite guardar datos locales">
+                    Puede ocurrir en ventanas privadas.
+                  </Notice>
+                ) : null}
+                <VaultKeyDialog
+                  open={keyDialog}
+                  onClose={() => setKeyDialog(false)}
+                  onUnlocked={() => setStorage('local')}
+                />
+              </Panel>
+            ) : null}
+            {step === 4 ? (
               <>
-                <Panel eyebrow="Bloque 04" title="Zona Horaria & Primer Proyecto">
+                <Panel eyebrow="Bloque 05" title="Zona Horaria & Primer Proyecto">
                   <div className="form-grid">
                     <SelectField
                       label="Zona horaria"
@@ -454,8 +550,8 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
                 </Notice>
               </>
             ) : null}
-            {step === 4 ? (
-              <Panel eyebrow="Bloque 05" title="API key de Odoo (opcional)">
+            {step === 5 ? (
+              <Panel eyebrow="Bloque 06" title="API key de Odoo (opcional)">
                 <p className="muted">
                   Añade la clave de tu usuario de Odoo. También puedes hacerlo más adelante desde
                   Ajustes.
@@ -476,7 +572,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
             <span className="mono dim">
               {saving ? 'Guardando configuración…' : 'Se guarda al finalizar'}
             </span>
-            {step === 4 ? (
+            {step === lastStep ? (
               <Button key="finish" type="submit" variant="primary" icon="arrow" disabled={saving}>
                 {saving ? 'Guardando…' : 'Guardar y abrir Workspace'}
               </Button>

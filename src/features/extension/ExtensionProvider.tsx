@@ -1,3 +1,5 @@
+import { answerLocal } from '../local/extensionBridge';
+import { readableError } from '../../lib/supabase/errors';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -53,7 +55,23 @@ export function ExtensionProvider({ children }: { children: ReactNode }) {
           odooOrigin: message.odooOrigin,
         });
       } else if (message.type === 'queue') setQueue(message.items);
-      else if (message.type === 'workspace-changed') {
+      else if (message.type === 'local-request') {
+        // Only for the signed-in account; another account's request gets no answer.
+        if (!user || message.userId !== user.id) return;
+        const reply = (ok: boolean, error: string, data?: unknown) =>
+          post({
+            source: APP_SOURCE,
+            type: 'local-reply',
+            requestId: message.requestId,
+            ok,
+            error,
+            data,
+          });
+        answerLocal(message.op, user.id).then(
+          (data) => reply(true, '', data),
+          (cause) => reply(false, readableError(cause)),
+        );
+      } else if (message.type === 'workspace-changed') {
         if (user)
           void queryClient
             .invalidateQueries({ queryKey: ['workspace', user.id] })

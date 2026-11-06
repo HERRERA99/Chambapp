@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import type { WorkspaceData } from '../../domain/models';
 import { mondayForDate, todayInZone } from '../../domain/time.ts';
+import { backupReminderDays, storageMode } from '../../lib/local/preferences.ts';
 
 export type ProfileDraft = {
   nombre: string;
@@ -8,6 +9,10 @@ export type ProfileDraft = {
   especialidad: string;
   zonaHoraria: string;
   intervaloRedondeo: number;
+  /** Where new projects are created (preferencias.almacenamiento). */
+  almacenamiento: 'nube' | 'local';
+  /** Days without a backup before the reminder (preferencias.aviso_copia_dias). */
+  avisoCopiaDias: number;
 };
 
 export type ScheduleDraft = {
@@ -39,6 +44,8 @@ export function profileDraft(data: WorkspaceData): ProfileDraft {
         : '',
     zonaHoraria: data.profile.zona_horaria,
     intervaloRedondeo: data.profile.intervalo_redondeo_minutos,
+    almacenamiento: storageMode(data.profile),
+    avisoCopiaDias: backupReminderDays(data.profile),
   };
 }
 

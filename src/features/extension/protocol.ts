@@ -32,7 +32,28 @@ export type OdooRequest = {
   horasFormato: string;
   confirmLong: boolean;
   partes: OdooEntryRef[];
+  /** Where the task and its entries are stored; absent means the cloud (older apps). */
+  origen?: 'nube' | 'local';
 };
+
+/**
+ * What the extension may ask a Chambapp tab about the data kept in that browser
+ * (Plan 11). Only a tab of the same account with its local data open answers.
+ */
+export type LocalOperation =
+  | { kind: 'listar' }
+  | {
+      kind: 'crear-tarea';
+      tarea: {
+        proyecto_id: string;
+        titulo: string;
+        odoo_id: string | null;
+        odoo_url: string | null;
+      };
+    }
+  | { kind: 'crear-proyecto'; nombre: string }
+  | { kind: 'cargar'; taskId: string; partIds: string[] }
+  | { kind: 'imputar'; partes: OdooEntryRef[] };
 
 export type QueueStatus =
   'pending' | 'processing' | 'success' | 'error' | 'uncertain' | 'sent-unmarked';
@@ -50,6 +71,14 @@ export type QueueAction = 'retry' | 'discard' | 'confirm-created' | 'confirm-not
 
 export type AppMessage =
   | { source: typeof APP_SOURCE; type: 'ping' }
+  | {
+      source: typeof APP_SOURCE;
+      type: 'local-reply';
+      requestId: string;
+      ok: boolean;
+      error: string;
+      data?: unknown;
+    }
   | { source: typeof APP_SOURCE; type: 'send-odoo'; request: OdooRequest }
   | { source: typeof APP_SOURCE; type: 'queue-action'; requestId: string; action: QueueAction };
 
@@ -63,6 +92,13 @@ export type ExtensionMessage =
   | ({ source: typeof EXTENSION_SOURCE; type: 'hello' } & ExtensionHello)
   | { source: typeof EXTENSION_SOURCE; type: 'queue'; items: QueueSummaryItem[] }
   | { source: typeof EXTENSION_SOURCE; type: 'workspace-changed' }
+  | {
+      source: typeof EXTENSION_SOURCE;
+      type: 'local-request';
+      requestId: string;
+      userId: string;
+      op: LocalOperation;
+    }
   | {
       source: typeof EXTENSION_SOURCE;
       type: 'send-result';
@@ -151,6 +187,8 @@ export function odooRequestProblem(value: unknown): string | null {
   if (request.horasFormato !== formatHoursMinutes(request.minutos))
     return 'El tiempo en HH:MM no coincide con los minutos.';
   if (typeof request.confirmLong !== 'boolean') return 'Falta la confirmación de horas.';
+  if (request.origen !== undefined && request.origen !== 'nube' && request.origen !== 'local')
+    return 'La solicitud no indica dónde están los partes.';
   if (request.minutos > LONG_ODOO_MINUTES && !request.confirmLong)
     return 'El parte supera las 5 horas y requiere confirmación.';
   if (!Array.isArray(request.partes) || !request.partes.length)
@@ -185,12 +223,63 @@ export function cleanOdooRequest(request: OdooRequest): OdooRequest {
     horasFormato: request.horasFormato,
     confirmLong: request.confirmLong,
     partes: request.partes.map((part) => ({ id: part.id, version: part.version })),
+    origen: request.origen === 'local' ? 'local' : 'nube',
   };
+}
+
+const isEntryRefs = (value: unknown) =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.length <= MAX_ODOO_ENTRIES &&
+  value.every((part) => isRecord(part) && isUuid(part.id) && isVersion(part.version));
+
+const isNullableText = (value: unknown, max: number) =>
+  value === null || (typeof value === 'string' && value.length <= max);
+
+export function isLocalOperation(value: unknown): value is LocalOperation {
+  if (!isRecord(value)) return false;
+  switch (value.kind) {
+    case 'listar':
+      return true;
+    case 'crear-tarea': {
+      const task = value.tarea;
+      return (
+        isRecord(task) &&
+        isUuid(task.proyecto_id) &&
+        typeof task.titulo === 'string' &&
+        task.titulo.trim().length > 0 &&
+        [...task.titulo].length <= 300 &&
+        isNullableText(task.odoo_id, 64) &&
+        isNullableText(task.odoo_url, 2048)
+      );
+    }
+    case 'crear-proyecto':
+      return (
+        typeof value.nombre === 'string' &&
+        value.nombre.trim().length > 0 &&
+        [...value.nombre].length <= 200
+      );
+    case 'cargar':
+      return (
+        isUuid(value.taskId) &&
+        Array.isArray(value.partIds) &&
+        value.partIds.length <= MAX_ODOO_ENTRIES &&
+        value.partIds.every(isUuid)
+      );
+    case 'imputar':
+      return isEntryRefs(value.partes);
+    default:
+      return false;
+  }
 }
 
 export function isAppMessage(value: unknown): value is AppMessage {
   if (!isRecord(value) || value.source !== APP_SOURCE) return false;
   if (value.type === 'ping') return true;
+  if (value.type === 'local-reply')
+    return (
+      isUuid(value.requestId) && typeof value.ok === 'boolean' && typeof value.error === 'string'
+    );
   if (value.type === 'send-odoo') return isOdooRequest(value.request);
   if (value.type === 'queue-action')
     return (
@@ -227,6 +316,8 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
       return Array.isArray(value.items) && value.items.every(isQueueSummaryItem);
     case 'workspace-changed':
       return true;
+    case 'local-request':
+      return isUuid(value.requestId) && isUuid(value.userId) && isLocalOperation(value.op);
     case 'send-result':
       return (
         isUuid(value.requestId) && typeof value.ok === 'boolean' && typeof value.error === 'string'

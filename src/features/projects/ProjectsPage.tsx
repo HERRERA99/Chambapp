@@ -17,11 +17,18 @@ import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useExtension } from '../extension/useExtension';
 import { entryTotals, entryTotalsBy } from '../time-entries/entryTotals';
+import { useAuth } from '../auth/useAuth';
+import { loadCredentials } from '../../lib/supabase/vault.repository';
+import { deleteLocalProjectCredentials } from '../local/localData';
+import { MoveProjectDialog } from '../local/MoveProjectDialog';
+import { OriginBadge } from '../local/OriginBadge';
+import { usesLocalData } from '../local/origin';
 import { ProjectCard } from './components/ProjectCard';
 import { ProjectForm } from './components/ProjectForm';
 import { ProjectDetails } from './components/ProjectDetails';
 
 type StatusFilter = 'all' | 'active' | 'archived';
+type OriginFilter = 'todos' | 'nube' | 'local';
 type ProjectAction = { kind: 'archive' | 'delete'; project: Project };
 
 export default function ProjectsPage() {
@@ -35,12 +42,18 @@ export default function ProjectsPage() {
   const [form, setForm] = useState<Project | 'new' | null>(null);
   const [selected, setSelected] = useState<Project | null>(null);
   const [action, setAction] = useState<ProjectAction | null>(null);
+  const [origin, setOrigin] = useState<OriginFilter>('todos');
+  const [moving, setMoving] = useState<Project | null>(null);
+  const { user } = useAuth();
+  const showOrigin = usesLocalData(data);
+  const localOpen = data?.local?.estado === 'abierto' || data?.local?.estado === 'sin-datos';
   const projects = data?.projects.filter((project) => !project.eliminado_en) ?? [];
   const tasks = data?.tasks.filter((task) => !task.eliminado_en) ?? [];
   const entries = data?.entries.filter((entry) => !entry.eliminado_en) ?? [];
   const visible = projects.filter(
     (project) =>
       (status === 'all' || (status === 'archived') === !!project.archivado_en) &&
+      (origin === 'todos' || (project.origen ?? 'nube') === origin) &&
       normalizeNoteSearch(`${project.nombre} ${project.cliente ?? ''}`).includes(
         normalizeNoteSearch(query),
       ),
@@ -70,6 +83,14 @@ export default function ProjectsPage() {
         ? { confirmar_cascada: true }
         : { archivado: !action.project.archivado_en }),
     });
+    // The cloud deletes the credentials of its own projects; a local project's are
+    // removed here.
+    if (action.kind === 'delete' && action.project.origen === 'local' && user)
+      await deleteLocalProjectCredentials(
+        user.id,
+        action.project.id,
+        await loadCredentials(user.id).catch(() => []),
+      );
     notify(
       action.kind === 'delete'
         ? 'Proyecto y registros asociados eliminados.'
@@ -193,6 +214,18 @@ export default function ProjectsPage() {
             { value: 'archived', label: `Archivados (${projects.length - activeCount})` },
           ]}
         />
+        {showOrigin ? (
+          <SegmentedControl<OriginFilter>
+            label="Dónde se guardan"
+            value={origin}
+            onChange={setOrigin}
+            options={[
+              { value: 'todos', label: 'Todos' },
+              { value: 'nube', label: 'Nube' },
+              { value: 'local', label: 'Este navegador' },
+            ]}
+          />
+        ) : null}
         <div className="view-switch" role="group" aria-label="Vista de proyectos">
           <IconButton
             icon="grid"
@@ -220,6 +253,7 @@ export default function ProjectsPage() {
                 totalSeconds={projectTotal(project.id)}
                 taskCount={taskCounts.get(project.id) ?? 0}
                 onDetails={setSelected}
+                showOrigin={showOrigin}
               />
             ))}
           </div>
@@ -245,7 +279,8 @@ export default function ProjectsPage() {
                 <td>
                   <Badge tone={project.archivado_en ? 'neutral' : 'accent'}>
                     {project.archivado_en ? 'Archivado' : 'Activo'}
-                  </Badge>
+                  </Badge>{' '}
+                  {showOrigin ? <OriginBadge origin={project.origen} /> : null}
                 </td>
                 <td className="mono">
                   {formatDuration(projectTotal(project.id))} /{' '}
@@ -280,6 +315,7 @@ export default function ProjectsPage() {
               onClick={() => {
                 setQuery('');
                 setStatus('all');
+                setOrigin('todos');
               }}
             >
               Limpiar filtros
@@ -321,6 +357,29 @@ export default function ProjectsPage() {
             setAction({ kind: 'delete', project: selected });
             setSelected(null);
           }}
+          onMove={
+            localOpen
+              ? () => {
+                  setMoving(selected);
+                  setSelected(null);
+                }
+              : undefined
+          }
+          canMove={
+            !extension.lockReason({
+              taskIds: tasks
+                .filter((task) => task.proyecto_id === selected.id)
+                .map((task) => task.id),
+            })
+          }
+        />
+      ) : null}
+      {moving ? (
+        <MoveProjectDialog
+          project={moving}
+          taskCount={tasks.filter((task) => task.proyecto_id === moving.id).length}
+          entryCount={entries.filter((entry) => entry.proyecto_id === moving.id).length}
+          onClose={() => setMoving(null)}
         />
       ) : null}
       <ConfirmDialog
