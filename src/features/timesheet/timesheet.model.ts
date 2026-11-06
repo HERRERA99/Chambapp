@@ -230,6 +230,23 @@ export function applyImputationResult<T extends TimeEntry>(
   });
 }
 
+/** Entries that would go to Odoo, in send order (finished, pending, not deleted). */
+function sendableParts(entries: readonly TimeEntry[]) {
+  return [...entries]
+    .filter((entry) => entry.fin_en && !entry.eliminado_en && !entry.imputacion_odoo_id)
+    .sort((a, b) => a.inicio_en.localeCompare(b.inicio_en) || a.id.localeCompare(b.id));
+}
+
+/** Distinct, non-empty descriptions of the entries to send, in send order. */
+export function odooDescriptionChoices(entries: readonly TimeEntry[]): string[] {
+  const descriptions: string[] = [];
+  for (const entry of sendableParts(entries)) {
+    const text = entry.descripcion?.trim();
+    if (text && !descriptions.includes(text)) descriptions.push(text);
+  }
+  return descriptions;
+}
+
 /**
  * Odoo line for some finished entries of one group: their summed real time is
  * rounded once (like "Marcar") and then up to whole minutes, which is all
@@ -242,6 +259,7 @@ export function buildOdooRequest({
   userId,
   requestId,
   confirmLong = false,
+  descripcion: chosen,
 }: {
   group: Pick<TimesheetGroup, 'date' | 'taskId' | 'title' | 'odooUrl'>;
   entries: readonly TimeEntry[];
@@ -249,13 +267,13 @@ export function buildOdooRequest({
   userId: string;
   requestId: string;
   confirmLong?: boolean;
+  /** Description picked by the user; without it the entries' descriptions are joined. */
+  descripcion?: string;
 }): { request: OdooRequest } | { problem: string } {
   if (!task || task.id !== group.taskId) return { problem: 'La tarea ya no está disponible.' };
   const odooUrl = [task.odoo_url, group.odooUrl].find(isOdooUrl);
   if (!odooUrl) return { problem: 'La tarea no tiene un enlace de Odoo válido.' };
-  const parts = [...entries]
-    .filter((entry) => entry.fin_en && !entry.eliminado_en && !entry.imputacion_odoo_id)
-    .sort((a, b) => a.inicio_en.localeCompare(b.inicio_en) || a.id.localeCompare(b.id));
+  const parts = sendableParts(entries);
   if (!parts.length) return { problem: 'No hay partes terminados pendientes.' };
   if (parts.length !== entries.length)
     return { problem: 'Solo se pueden enviar partes terminados y pendientes.' };
@@ -265,15 +283,12 @@ export function buildOdooRequest({
   if (minutos < 1) return { problem: 'El tiempo a imputar es 0.' };
   if (minutos > MAX_ODOO_MINUTES)
     return { problem: 'Odoo no admite más de 24 horas en una línea.' };
-  const descriptions: string[] = [];
-  for (const entry of parts) {
-    const text = entry.descripcion?.trim();
-    if (text && !descriptions.includes(text)) descriptions.push(text);
-  }
-  const descripcion = Array.from(descriptions.join(' · ') || task.titulo.trim() || group.title)
-    .slice(0, MAX_ODOO_DESCRIPTION)
-    .join('')
-    .trim();
+  const source =
+    chosen === undefined
+      ? odooDescriptionChoices(parts).join(' · ') || task.titulo.trim() || group.title
+      : chosen.trim();
+  const descripcion = Array.from(source).slice(0, MAX_ODOO_DESCRIPTION).join('').trim();
+  if (!descripcion) return { problem: 'Escribe una descripción para el parte.' };
   return {
     request: {
       requestId,

@@ -12,7 +12,12 @@ import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
-import { applyImputationResult, buildOdooRequest, buildTimesheetWeek } from './timesheet.model';
+import {
+  applyImputationResult,
+  buildOdooRequest,
+  buildTimesheetWeek,
+  odooDescriptionChoices,
+} from './timesheet.model';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useExtension } from '../extension/useExtension';
 import { LONG_ODOO_MINUTES } from '../extension/protocol';
@@ -20,6 +25,7 @@ import type { OdooRequest, QueueAction } from '../extension/protocol';
 import type { ImputationResultEntry, TimesheetGroup, TimesheetItem } from './timesheet.model';
 import { TimesheetGroups } from './components/TimesheetGroups';
 import { TimesheetDayHeader } from './components/TimesheetDayHeader';
+import { OdooDescriptionDialog } from './components/OdooDescriptionDialog';
 import './timesheet.css';
 
 function weekLabel(monday: string, lastDay: string) {
@@ -40,6 +46,13 @@ export default function TimesheetPage() {
   const [longSend, setLongSend] = useState<{ group: TimesheetGroup; request: OdooRequest } | null>(
     null,
   );
+  const [describe, setDescribe] = useState<{
+    key: string;
+    group: TimesheetGroup;
+    entries: TimeEntry[];
+    request: OdooRequest;
+    choices: string[];
+  } | null>(null);
   const extension = useExtension();
   const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
   const today = todayInZone(zone);
@@ -117,26 +130,50 @@ export default function TimesheetPage() {
     return true;
   }
 
-  /** Builds the Odoo line (rounded on the sum, then to whole minutes) and hands it over. */
-  async function send(group: TimesheetGroup, entries: TimeEntry[]) {
-    if (busy || !user) return false;
-    setActionError('');
-    const built = buildOdooRequest({
+  function build(group: TimesheetGroup, entries: TimeEntry[], descripcion?: string) {
+    return buildOdooRequest({
       group,
       entries,
       task: data?.tasks.find((task) => task.id === group.taskId),
-      userId: user.id,
+      userId: user!.id,
       requestId: crypto.randomUUID(),
+      descripcion,
     });
+  }
+
+  /** Sends a built line, asking first when it is longer than 5 hours. */
+  function sendBuilt(group: TimesheetGroup, request: OdooRequest) {
+    if (request.minutos > LONG_ODOO_MINUTES) {
+      setLongSend({ group, request });
+      return Promise.resolve(false);
+    }
+    return dispatch(group, request);
+  }
+
+  /**
+   * Builds the Odoo line (rounded on the sum, then to whole minutes) and hands it over.
+   * When the entries have several descriptions, or none, the user picks or writes one.
+   */
+  async function send(group: TimesheetGroup, entries: TimeEntry[]) {
+    if (busy || !user) return false;
+    setActionError('');
+    const built = build(group, entries);
     if ('problem' in built) {
       setActionError(built.problem);
       return false;
     }
-    if (built.request.minutos > LONG_ODOO_MINUTES) {
-      setLongSend({ group, request: built.request });
+    const choices = odooDescriptionChoices(entries);
+    if (choices.length !== 1) {
+      setDescribe({
+        key: built.request.requestId,
+        group,
+        entries,
+        request: built.request,
+        choices,
+      });
       return false;
     }
-    return dispatch(group, built.request);
+    return sendBuilt(group, built.request);
   }
 
   async function queueAction(group: TimesheetGroup, requestId: string, action: QueueAction) {
@@ -149,6 +186,34 @@ export default function TimesheetPage() {
 
   return (
     <div className="timesheet">
+      {describe ? (
+        <OdooDescriptionDialog
+          key={describe.key}
+          open
+          title="Descripción del parte en Odoo"
+          detail={`${describe.group.title} · ${describe.request.fecha} · ${describe.request.horasFormato}`}
+          choices={describe.choices}
+          fallback={describe.request.descripcion}
+          onClose={() => setDescribe(null)}
+          onConfirm={async (descripcion) => {
+            if (!user) return 'Inicia sesión para enviar a Odoo.';
+            const built = build(describe.group, describe.entries, descripcion);
+            if ('problem' in built) return built.problem;
+            if (built.request.minutos > LONG_ODOO_MINUTES) {
+              setLongSend({ group: describe.group, request: built.request });
+              return null;
+            }
+            setActionError('');
+            const result = await extension.send(built.request);
+            if (!result.ok) return result.error;
+            notify(
+              result.error ||
+                `Enviando ${built.request.horasFormato} de ${describe.group.title} a Odoo. Puedes seguir trabajando.`,
+            );
+            return null;
+          }}
+        />
+      ) : null}
       <ConfirmDialog
         open={!!longSend}
         title="Imputar más de 5 horas"

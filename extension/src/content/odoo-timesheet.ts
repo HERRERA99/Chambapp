@@ -14,7 +14,18 @@ import type {
 
 class Stop extends Error {}
 
-let active: { config: AttemptConfig; port: chrome.runtime.Port; cancelled: boolean } | null = null;
+type Session = {
+  config: AttemptConfig;
+  port: chrome.runtime.Port;
+  cancelled: boolean;
+  /** The task form has rendered once; from then on it must stay. */
+  formSeen: boolean;
+};
+
+let active: Session | null = null;
+
+/** Odoo can take a while to render the task in a freshly opened window. */
+const FORM_TIMEOUT_MS = 60_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const normalize = (value: string | null | undefined) =>
@@ -46,18 +57,24 @@ function check() {
   if (active.cancelled) throw new Stop('Envío cancelado.');
   if (Date.now() > active.config.deadline) throw new Stop('Se agotó el tiempo del envío.');
   if (location.origin !== active.config.origin) throw new Stop('La pestaña salió de Odoo.');
-  if (!onRecord(active.config.recordId))
+  if (!onTaskUrl(active.config.recordId) || (active.formSeen && !taskFormReady()))
     throw new Stop('La pestaña ya no muestra la tarea de Odoo.');
 }
 
+/**
+ * Polls `find` until it returns something. During an attempt every step also runs
+ * `check()`; outside one, `deadline` (epoch ms) bounds the whole operation.
+ */
 async function waitFor<T>(
   label: string,
   find: () => T | null | undefined | false,
   timeout = 30_000,
+  deadline = Infinity,
 ) {
   const started = Date.now();
   for (;;) {
     if (active) check();
+    if (Date.now() > deadline) throw new Stop('Se agotó el tiempo de la comprobación.');
     const found = find();
     if (found) return found;
     if (Date.now() - started > timeout) throw new Error(`No aparece en Odoo: ${label}.`);
@@ -65,12 +82,23 @@ async function waitFor<T>(
   }
 }
 
+/** The address is that project.task (the form may still be loading). */
+function onTaskUrl(recordId: number) {
+  return parseOdooTaskUrl(location.href, { assumeTask: true })?.recordId === recordId;
+}
+
+/** The main task form has rendered (some Odoo versions name the field display_project_id). */
+function taskFormReady() {
+  return [
+    ...document.querySelectorAll(
+      '.o_form_view [name="project_id"], .o_form_view [name="display_project_id"], .o_form_view #display_project_id',
+    ),
+  ].some((element) => !element.closest('.modal'));
+}
+
 /** The tab shows that project.task (address and the main form). */
 function onRecord(recordId: number) {
-  const parsed = parseOdooTaskUrl(location.href, { assumeTask: true });
-  return (
-    parsed?.recordId === recordId && !!document.querySelector('.o_form_view [name="project_id"]')
-  );
+  return onTaskUrl(recordId) && taskFormReady();
 }
 
 function click(element: HTMLElement) {
@@ -126,10 +154,10 @@ function timesheetList(): HTMLElement | null {
   return visible(pane) ? pane : null;
 }
 
-async function openTimesheets() {
+async function openTimesheets(deadline = Infinity) {
   const tab = timesheetTab();
   if (tab && !tab.classList.contains('active')) click(tab);
-  return waitFor('la lista «Partes de horas» de la tarea', timesheetList, 20_000);
+  return waitFor('la lista «Partes de horas» de la tarea', timesheetList, 20_000, deadline);
 }
 
 function errors(): string | null {
@@ -227,7 +255,13 @@ function pagerState(list: HTMLElement) {
  * the number of pages comes from its total, not from a disabled button.
  * Returns null when the pages cannot all be read.
  */
-async function countAll(list: HTMLElement, date: string, descripcion: string, horas: string) {
+async function countAll(
+  list: HTMLElement,
+  date: string,
+  descripcion: string,
+  horas: string,
+  deadline = Infinity,
+) {
   let state = pagerState(list);
   if (state === undefined) return null;
   if (state === null) {
@@ -253,6 +287,7 @@ async function countAll(list: HTMLElement, date: string, descripcion: string, ho
         return next && next.value !== before ? next : null;
       },
       15_000,
+      deadline,
     );
     await sleep(150);
     state = pagerState(list);
@@ -263,6 +298,7 @@ async function countAll(list: HTMLElement, date: string, descripcion: string, ho
     if (state.start !== 1) return null;
     let total = 0;
     for (let page = 0; page < pages; page += 1) {
+      if (Date.now() > deadline) return null;
       total += countPage(list, date, descripcion, horas);
       await turn();
     }
@@ -297,13 +333,24 @@ async function writeBoundary() {
   check();
 }
 
-async function run() {
-  const config = active!.config;
+async function run(session: Session) {
+  const config = session.config;
   const heartbeat = setInterval(
     () => post({ type: 'heartbeat', attemptId: config.attemptId }),
     10_000,
   );
   try {
+    // The window may still be loading Odoo: wait for the task form before anything else.
+    try {
+      await waitFor('el formulario de la tarea', taskFormReady, FORM_TIMEOUT_MS);
+    } catch (cause) {
+      if (cause instanceof Stop) throw cause;
+      throw new Error(
+        'Odoo no mostró la tarea en 60 s. Comprueba que has iniciado sesión en Odoo y vuelve a intentarlo.',
+        { cause },
+      );
+    }
+    session.formSeen = true;
     post({ type: 'phase', attemptId: config.attemptId, phase: 'counting' });
     const list = await openTimesheets();
     const date = formatOdooDate(config.fecha, config.dateFormat);
@@ -387,38 +434,53 @@ async function run() {
     });
   } finally {
     clearInterval(heartbeat);
+    // Free the page for the next attempt. The worker closes the port once it has settled.
+    if (active === session) active = null;
   }
 }
 
 const api: OdooPageApi = {
   start(config) {
     if (active) return false;
-    if (location.origin !== config.origin || !onRecord(config.recordId)) return false;
+    // Only the address: the form may still be rendering, run() waits for it.
+    if (location.origin !== config.origin || !onTaskUrl(config.recordId)) return false;
     const port = chrome.runtime.connect({ name: `${ATTEMPT_PORT_PREFIX}${config.attemptId}` });
-    active = { config, port, cancelled: false };
+    const session: Session = { config, port, cancelled: false, formSeen: false };
+    active = session;
+    // Bound to this attempt: an older port can never touch a newer attempt.
     port.onMessage.addListener((message: WorkerMessage) => {
       if (message?.attemptId !== config.attemptId) return;
-      if (message.type === 'write-ack') ackResolver?.();
-      if (message.type === 'cancel' && active) active.cancelled = true;
+      if (message.type === 'write-ack' && active === session) ackResolver?.();
+      if (message.type === 'cancel') session.cancelled = true;
     });
     port.onDisconnect.addListener(() => {
-      if (active) active.cancelled = true;
+      session.cancelled = true;
     });
-    void run();
+    void run(session);
     return true;
   },
   cancel() {
     if (active) active.cancelled = true;
   },
-  async count(recordId, fecha, format: DateFormat, descripcion, horas) {
+  async ready(recordId, timeoutMs) {
+    try {
+      const timeout = Math.min(Math.max(0, timeoutMs), FORM_TIMEOUT_MS);
+      await waitFor('la ficha de la tarea', () => onRecord(recordId), timeout);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  async count(recordId, fecha, format: DateFormat, descripcion, horas, deadline) {
     try {
       // Counting another task's lines would prove nothing about this one.
-      await waitFor('la ficha de la tarea', () => onRecord(recordId), 20_000);
-      const list = await openTimesheets();
+      await waitFor('la ficha de la tarea', () => onRecord(recordId), FORM_TIMEOUT_MS, deadline);
+      const list = await openTimesheets(deadline);
       if (!onRecord(recordId)) return null;
       // Let the reloaded list settle before reading it.
       await sleep(500);
-      return await countAll(list, formatOdooDate(fecha, format), descripcion, horas);
+      if (Date.now() > deadline) return null;
+      return await countAll(list, formatOdooDate(fecha, format), descripcion, horas, deadline);
     } catch {
       return null;
     }

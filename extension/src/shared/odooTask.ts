@@ -72,6 +72,18 @@ export function parseOdooTaskUrl(
   return null;
 }
 
+/**
+ * Some Odoo setups put the task code in the title: "[T457973] Revisar". Returns
+ * that code and the title without it (the original title if nothing else is left).
+ */
+export function splitTaskTitle(value: string): { code: string | null; title: string } {
+  const title = value.replace(/\s+/g, ' ').trim();
+  const match = /^\[(T\d+)\]\s*/i.exec(title);
+  const code = match ? normalizeOdooCode(match[1]) : null;
+  if (!match || !code) return { code: null, title };
+  return { code, title: title.slice(match[0].length).trim() || title };
+}
+
 /** Odoo shows projects as "[CODE] Name" in some versions. */
 export function cleanProjectName(value: string): string {
   return value

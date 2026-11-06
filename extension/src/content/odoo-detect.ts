@@ -1,5 +1,10 @@
 // Registered only for the configured Odoo origin. Tells the worker when the tab shows a task form.
-import { cleanProjectName, normalizeOdooCode, parseOdooTaskUrl } from '../shared/odooTask';
+import {
+  cleanProjectName,
+  normalizeOdooCode,
+  parseOdooTaskUrl,
+  splitTaskTitle,
+} from '../shared/odooTask';
 import type { DetectedTask } from '../shared/odooTask';
 
 function readField(selectors: string[]): string {
@@ -20,24 +25,30 @@ function readField(selectors: string[]): string {
 function detect(): DetectedTask | null {
   const form = document.querySelector('.o_action_manager .o_form_view, .o_form_view');
   if (!form) return null;
+  // Some Odoo versions name the task's project field display_project_id.
   const hasTaskFields =
-    form.querySelector('[name="project_id"]') && form.querySelector('[name="name"]');
+    form.querySelector('[name="project_id"], [name="display_project_id"]') &&
+    form.querySelector('[name="name"]');
   if (!hasTaskFields) return null;
   const parsed = parseOdooTaskUrl(location.href, { assumeTask: true });
   if (!parsed) return null;
-  const title = readField([
+  const rawTitle = readField([
     '.o_form_view [name="name"] textarea',
     '.o_form_view [name="name"] input',
     '.o_form_view #name',
     '.o_form_view [name="name"]',
   ]);
-  if (!title) return null;
+  if (!rawTitle) return null;
+  const fromTitle = splitTaskTitle(rawTitle);
   const project = readField([
     '.o_form_view [name="project_id"] input',
+    '.o_form_view [name="display_project_id"] input',
     '.o_form_view #display_project_id',
     '.o_form_view #project_id',
     '.o_form_view [name="project_id"] a',
+    '.o_form_view [name="display_project_id"] a',
     '.o_form_view [name="project_id"]',
+    '.o_form_view [name="display_project_id"]',
   ]);
   const code = readField([
     '.o_form_view [name="code"] input',
@@ -48,9 +59,9 @@ function detect(): DetectedTask | null {
     origin: parsed.origin,
     recordId: parsed.recordId,
     url: location.href,
-    title,
+    title: fromTitle.title,
     projectName: cleanProjectName(project),
-    code: normalizeOdooCode(code),
+    code: normalizeOdooCode(code) ?? fromTitle.code,
   };
 }
 

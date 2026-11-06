@@ -110,8 +110,9 @@ MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 node tools/ext-smoke/run-firefox.mjs
 
 1. **Acceso.** Abre el popup e inicia sesión con tu cuenta de Chambapp. La sesión de la web no se cierra.
 2. **Importar tarea.** Configura tu Odoo, abre una tarea: el icono muestra `+`. Abre el popup → pestaña Odoo → revisa nombre y proyecto → **Añadir a Chambapp**. La tarea aparece en Chambapp (recarga si no la ves). Volver a abrir el popup en esa tarea muestra «Ya está en Chambapp».
-3. **Enviar a Odoo.** Con `npm run dev` (http://127.0.0.1:5173) o en producción, ve a **Parte semanal**, despliega una tarea con enlace de Odoo y pulsa **Enviar seleccionados** o **Enviar todos**. Se abre una ventana de Odoo en segundo plano; al terminar se cierra y los partes quedan como imputados. En la tarea de Odoo verás una sola línea nueva con la fecha, la descripción de los partes y el tiempo redondeado. Mientras se envía, esos partes no se pueden editar ni marcar.
+3. **Enviar a Odoo.** Con `npm run dev` (http://127.0.0.1:5173) o en producción, ve a **Parte semanal**, despliega una tarea con enlace de Odoo y pulsa **Enviar seleccionados** o **Enviar todos**. Se abre una ventana de Odoo en primer plano: Odoo no termina de cargar en una ventana de fondo, así que la extensión la mantiene delante (como mucho 75 s) hasta que se ve la tarea; después puedes volver a lo que estabas haciendo. Al terminar se cierra y los partes quedan como imputados. En la tarea de Odoo verás una sola línea nueva con la fecha, la descripción y el tiempo redondeado. Mientras se envía, esos partes no se pueden editar ni marcar.
    - Si Odoo muestra un error o el resultado no se puede comprobar, el grupo muestra **Revisa Odoo** con «No se creó: reintentar» / «Sí se creó: marcar». Nunca se reenvía solo.
+   - Si los partes tienen descripciones distintas, o ninguno tiene descripción, se abre un diálogo para elegir una o escribirla (también se puede modificar la elegida). Odoo recibe una sola descripción.
    - Más de 5 horas pide confirmación.
 4. **Contraseñas.** Pestaña Contraseñas → clave maestra de Chambapp → **Desbloquear**. En una web de login con entrada guardada aparece en «Esta web»: pulsa la flecha para rellenar. Prueba también copiar, mostrar, crear una entrada nueva (se ve después en Chambapp → Contraseñas) y el bloqueo automático (Ajustes). Al cerrar el navegador se vuelve a pedir la clave.
 
@@ -126,7 +127,7 @@ MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 node tools/ext-smoke/run-firefox.mjs
 
 ## Límites conocidos
 
-- La automatización depende del HTML de Odoo (textos en español/inglés, ids de campos). Otras versiones pueden necesitar ajustar `extension/src/content/odoo-timesheet.ts`.
+- La automatización depende del HTML de Odoo (textos en español/inglés, ids de campos). Se reconoce el campo de proyecto como `project_id` o `display_project_id`, y el código `T…` de la tarea en el campo `code` o al principio del título (`[T457973] …`). El envío espera hasta 60 s a que Odoo muestre la tarea. Otras versiones pueden necesitar ajustar `extension/src/content/odoo-timesheet.ts`.
 - El bloqueo de edición durante un envío solo afecta a las pestañas de Chambapp de este navegador. Importar la misma tarea a la vez desde dos navegadores podría duplicarla.
 - Los tiempos con segundos (redondeo 0) se envían a Odoo redondeados al minuto superior.
 - No hay captura automática de contraseñas al iniciar sesión en webs ni menú dentro de los campos.
