@@ -2325,3 +2325,34 @@
     padding: 18px;
   }
 }
+
+/* Vídeo promocional */
+.landing-video {
+  position: relative;
+  max-width: 1080px;
+  margin-inline: auto;
+}
+.landing-video__glow {
+  position: absolute;
+  inset: 8% 6% -6%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 46 86 / 26%), transparent 68%);
+  filter: blur(40px);
+}
+.landing-video__frame {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: #131316;
+  box-shadow:
+    0 26px 100px rgb(0 0 0 / 42%),
+    inset 0 1px rgb(255 255 255 / 4%);
+  overflow: hidden;
+}
+.landing-video__frame video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #131316;
+}
