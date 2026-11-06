@@ -31,9 +31,47 @@ const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage
 const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
 const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const noop = async () => {};
+/**
+ * `?local=abierto|bloqueado|sin-datos|error`: data kept in this browser (Plan 11). With
+ * "abierto" the first project and its tasks and entries are shown as local.
+ */
+function withLocal(base: typeof current): typeof current {
+  const state = new URLSearchParams(window.location.search).get('local');
+  if (!state) return base;
+  const localProject = state === 'abierto' ? base.projects[0]?.id : undefined;
+  const localTasks = new Set(
+    base.tasks.filter((task) => task.proyecto_id === localProject).map((task) => task.id),
+  );
+  return {
+    ...base,
+    profile: {
+      ...base.profile,
+      preferencias: { ...base.profile.preferencias, almacenamiento: 'local' },
+    },
+    projects: base.projects.map((row) => ({
+      ...row,
+      origen: row.id === localProject ? ('local' as const) : ('nube' as const),
+    })),
+    tasks: base.tasks.map((row) => ({
+      ...row,
+      origen: localTasks.has(row.id) ? ('local' as const) : ('nube' as const),
+    })),
+    local: {
+      estado: state as 'abierto',
+      proyectos: localProject ? 1 : 0,
+      tareas: localTasks.size,
+      partes: 12,
+      actualizadoEn: now,
+      ultimaCopiaEn: null,
+      cambiosDesdeCopia: true,
+      persistente: false,
+      traspasosPendientes: 0,
+    },
+  };
+}
 const client = new QueryClient();
 function Smoke() {
-  const [data, setData] = useState(current);
+  const [data, setData] = useState(() => withLocal(current));
   // Stateful, recording mocks so header popups can be verified (`?fail=attendance` rejects).
   const [activeAttendance, setActiveAttendance] = useState(
     () => current.fichajes.find((attendance) => !attendance.fin_en) ?? null,
@@ -89,7 +127,7 @@ function Smoke() {
     ? (Date.parse(now) - Date.parse(activeAttendance.inicio_en)) / 1000
     : 0;
   useEffect(() => {
-    const refresh = () => setData(current);
+    const refresh = () => setData(withLocal(current));
     window.addEventListener('chambapp-smoke-workspace', refresh);
     // `?bump=perfil`: another session changes the profile shortly after loading.
     if (new URLSearchParams(window.location.search).get('bump') === 'perfil') {

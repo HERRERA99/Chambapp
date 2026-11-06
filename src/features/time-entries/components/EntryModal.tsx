@@ -68,6 +68,7 @@ function EntryEditor({
               <option key={project.id} value={project.id}>
                 {project.nombre}
                 {project.archivado_en ? ' (archivado)' : ''}
+                {project.origen === 'local' ? ' · Local' : ''}
               </option>
             ))}
           </SelectField>
@@ -88,6 +89,7 @@ function EntryEditor({
                   {task.titulo}
                   {task.odoo_id ? ` · ${task.odoo_id}` : ''}
                   {task.archivado_en ? ' (archivada)' : ''}
+                  {task.origen === 'local' ? ' · Local' : ''}
                 </option>
               ))}
           </SelectField>

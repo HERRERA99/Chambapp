@@ -337,3 +337,24 @@ Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitat
 - npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.2.0.xpi (AMO unlisted, META-INF signature present, manifest 0.2.0). 0.1.0 kept.
 - npm run ext:pack → public/downloads zip 0.2.0 + xpi firmado; extension.json {version 0.2.0, firefoxSigned true}.
 - Not committed (no commit authorization).
+
+---
+
+# Plan 11 — Almacenamiento local coexistiendo con la nube (2026-11-06)
+
+- Roles: host/planner/builder = Claude (Claude Code, Opus 5.5); plan reviewer + final inspector = Codex CLI (default config, observed gpt-6-astra earlier).
+- Plan: PLAN-11.md. Max review rounds 5; fix rounds 2; inspection rounds 2.
+- Authorization: user asked to implement the refactor with Claudex Loop, asking before adding extra features. Decisions gathered via 3 question batches (recorded in plan table).
+- Round 1 review FAILED operationally: Codex usage limit reached (resets 23:32). Not a verdict. Before failing it read the notes SQL; host found nota_proyectos/nota_tareas FKs and amended PLAN-11 §5.
+- USER OVERRIDE (2026-11-06 19:3x): "Seguir sin Codex" — build proceeds on the UNREVIEWED plan with host self-review and tests only; no independent plan review or code inspection. Never label this approved.
+
+## Build (Claude only, UNREVIEWED by Codex — user override) — base 9fcd521
+- Proof: typecheck (app + extension), lint, prettier on touched files; npm test 230/230 (new: localEngine, localBackup, localStore, localRouter, extensionAppTabs, vault large-envelope, protocol/settings updates); db-tests 55/55 on embedded Postgres 17 (new local-storage.mjs: 4 groups); vite production build; extension build + tools/ext-smoke 18/18 in Edge; real-browser runtime smoke (scratchpad local.mjs, Edge, real IndexedDB) 13/13; ui-smoke screenshots of Ajustes → Datos (open/locked), Proyectos and banners, no console errors.
+- Bug found by the browser smoke and fixed: envelope regex overflowed V8's stack above ~20 MB, leaving stored data unreadable; now parsed without regex, and the store verifies decryptability before writing.
+- Perf: 20 000 entries (16 MB encrypted) ≈ 0.5 s/write after native base64 + revision cache (plan target 300 ms not met; documented).
+- Not tested: onboarding step visually; full flows against real Supabase (migration not applied to the hosted project); extension local path end-to-end with a real app tab (unit-tested with fake chrome); project move against a real Supabase (RPC covered by db-tests, client flow not).
+- Not done (needs user decision): apply migration to hosted Supabase; sign Firefox 0.3.0; commit; Codex review when quota resets.
+
+## Release 0.3.0
+- npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.3.0.xpi (AMO unlisted, signature in META-INF, manifest 0.3.0). 0.1.0 and 0.2.0 kept.
+- npm run ext:pack → public/downloads zip 0.3.0 + signed xpi; extension.json {0.3.0, firefoxSigned: true}. Not committed.

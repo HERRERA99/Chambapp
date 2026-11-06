@@ -143,3 +143,17 @@ test('the extension key: exported once, re-imported non-extractable, same data k
   assert.deepEqual(await decryptJson(vault.key, 'ctx', back), { otro: 1 });
   await assert.rejects(importRawKey('AAAA'), UnreadableEnvelopeError);
 });
+
+test('large envelopes (local data of tens of MB) are parsed without a regular expression', async () => {
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+  const big = new Uint8Array(24 * 1024 * 1024).fill(97);
+  const envelope = await encryptBytes(key, 'aad', big);
+  assert.ok(envelope.length > 30_000_000);
+  assert.equal(isEnvelope(envelope), true);
+  assert.equal((await decryptBytes(key, 'aad', envelope)).length, big.length);
+  assert.equal(isEnvelope(`${envelope}.x`), false);
+  assert.equal(isEnvelope(`v2${envelope.slice(2)}`), false);
+});

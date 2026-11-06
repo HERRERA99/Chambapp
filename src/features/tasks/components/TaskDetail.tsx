@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Project, Task, TimeEntry } from '../../../domain/models';
 import { formatDuration, formatTime, formatClock } from '../../../domain/time';
 import { Panel, Badge, Progress } from '../../../shared/ui/Panel';
+import { OriginBadge } from '../../local/OriginBadge';
 import { Button } from '../../../shared/ui/Button';
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../../shared/feedback/FeedbackContext';
@@ -104,6 +105,7 @@ export function TaskDetail({
             {taskStatusLabels[task.estado]}
           </Badge>
           {task.archivado_en ? <Badge>Archivada</Badge> : null}
+          {task.origen === 'local' ? <OriginBadge origin="local" /> : null}
           {project?.archivado_en ? <Badge>Proyecto archivado</Badge> : null}
         </div>
         <h2 className="task-detail__title">{task.titulo}</h2>

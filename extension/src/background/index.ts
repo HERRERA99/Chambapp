@@ -29,13 +29,13 @@ import { forgetTab, importDetected, setDetected, tabContext } from './odooTasks'
 import {
   getSettings,
   hasOdooPermission,
-  originPattern,
   setAutoLock,
   setDateFormat,
   setOdooOrigin,
   syncDetector,
 } from './settings';
 import { currentSession, message } from './supabase';
+import { APP_ORIGINS, appTabs, onLocalReply, toApp } from './appTabs';
 import { applyAutoLock, lock, lockIfExpired, onLock, unlock, vaultStatus } from './vault';
 
 // Every lock drops decrypted entries and closes secret views in open extension pages.
@@ -44,7 +44,6 @@ onLock(() => {
   void chrome.runtime.sendMessage({ channel: 'vault-locked' }).catch(() => undefined);
 });
 
-const APP_ORIGINS = ['https://chambapp-tracker.vercel.app', 'http://127.0.0.1:5173'];
 const TICK = 'chambapp-tick';
 
 /** Origin of the page that sent a message (Firefox has no `sender.origin`: use its URL). */
@@ -84,24 +83,6 @@ async function state(): Promise<ExtensionState> {
 
 // ---------------------------------------------------------------- app tabs
 
-async function appTabs() {
-  // Patterns without ports (Firefox ignores ported ones); the exact origin is checked here.
-  const tabs = await chrome.tabs.query({ url: APP_ORIGINS.map(originPattern) });
-  return tabs.filter((tab) => {
-    try {
-      return tab.id !== undefined && !!tab.url && APP_ORIGINS.includes(new URL(tab.url).origin);
-    } catch {
-      return false;
-    }
-  });
-}
-
-async function toApp(message: ExtensionMessage, tabId?: number) {
-  const targets = tabId !== undefined ? [{ id: tabId }] : await appTabs();
-  for (const tab of targets)
-    await chrome.tabs.sendMessage(tab.id!, { channel: 'to-app', message }).catch(() => undefined);
-}
-
 async function hello(): Promise<ExtensionMessage> {
   const session = await currentSession();
   const { odooOrigin } = await getSettings();
@@ -123,6 +104,10 @@ onQueueChange(() => void broadcastQueue());
 onWorkspaceChanged(() => void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' }));
 
 async function handleApp(message: AppMessage, tabId: number): Promise<ExtensionMessage | null> {
+  if (message.type === 'local-reply') {
+    onLocalReply(message, tabId);
+    return null;
+  }
   if (message.type === 'ping') {
     await toApp({ source: EXTENSION_SOURCE, type: 'queue', items: await queueSummary() }, tabId);
     return hello();

@@ -263,7 +263,7 @@ export function buildOdooRequest({
 }: {
   group: Pick<TimesheetGroup, 'date' | 'taskId' | 'title' | 'odooUrl'>;
   entries: readonly TimeEntry[];
-  task: Pick<Task, 'id' | 'version' | 'titulo' | 'odoo_url'> | undefined;
+  task: Pick<Task, 'id' | 'version' | 'titulo' | 'odoo_url' | 'origen'> | undefined;
   userId: string;
   requestId: string;
   confirmLong?: boolean;
@@ -302,6 +302,7 @@ export function buildOdooRequest({
       horasFormato: formatHoursMinutes(minutos),
       confirmLong: confirmLong && minutos > LONG_ODOO_MINUTES,
       partes: parts.map((entry) => ({ id: entry.id, version: entry.version })),
+      origen: task.origen === 'local' ? 'local' : 'nube',
     },
   };
 }

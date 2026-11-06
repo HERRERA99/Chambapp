@@ -41,7 +41,11 @@ export function NoteAssociations({
         title: project.nombre,
         detail: projectsFull
           ? `Límite de ${LIMIT} proyectos alcanzado`
-          : [project.cliente, project.archivado_en ? 'Archivado' : null]
+          : [
+              project.cliente,
+              project.archivado_en ? 'Archivado' : null,
+              project.origen === 'local' ? 'Local' : null,
+            ]
               .filter(Boolean)
               .join(' · ') || undefined,
         disabled: projectsFull,
@@ -61,7 +65,7 @@ export function NoteAssociations({
         detail: tasksFull
           ? `Límite de ${LIMIT} tareas alcanzado`
           : [
-              projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible',
+              projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible aquí',
               task.odoo_id,
               task.archivado_en ? 'Archivada' : null,
             ]
@@ -93,7 +97,7 @@ export function NoteAssociations({
             const project = projectById.get(id);
             return {
               id,
-              title: project?.nombre ?? 'Proyecto no disponible',
+              title: project?.nombre ?? 'Proyecto no disponible aquí',
               detail: project ? (project.archivado_en ? 'Archivado' : undefined) : 'Quítalo',
               missing: !project,
             };
@@ -114,9 +118,9 @@ export function NoteAssociations({
             const task = taskById.get(id);
             return {
               id,
-              title: task?.titulo ?? 'Tarea no disponible',
+              title: task?.titulo ?? 'Tarea no disponible aquí',
               detail: task
-                ? (projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible')
+                ? (projectById.get(task.proyecto_id)?.nombre ?? 'Proyecto no disponible aquí')
                 : 'Quítala',
               missing: !task,
             };

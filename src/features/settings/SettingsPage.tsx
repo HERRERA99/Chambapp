@@ -17,16 +17,18 @@ import { RegionalSettings } from './components/RegionalSettings';
 import { SecuritySettings } from './components/SecuritySettings';
 import { VaultSettings } from './components/VaultSettings';
 import { ExtensionSettings } from './components/ExtensionSettings';
+import { StorageSettings } from './components/StorageSettings';
 import { useExtension } from '../extension/useExtension';
 import '../vault/vault.css';
 import { initialSchedule, minimumScheduleMonday, profileDraft } from './settingsDraft';
 import type { Profile, WorkspaceData } from '../../domain/models';
 
-type SectionId = 'perfil' | 'jornada' | 'redondeo' | 'odoo' | 'extension' | 'seguridad';
+type SectionId = 'perfil' | 'jornada' | 'redondeo' | 'datos' | 'odoo' | 'extension' | 'seguridad';
 const SECTION_IDS: readonly SectionId[] = [
   'perfil',
   'jornada',
   'redondeo',
+  'datos',
   'odoo',
   'extension',
   'seguridad',
@@ -63,6 +65,9 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     profile.workspace !== baseline.workspace ||
     profile.especialidad !== baseline.especialidad ||
     profile.zonaHoraria !== baseline.zonaHoraria;
+  const storageDirty =
+    profile.almacenamiento !== baseline.almacenamiento ||
+    profile.avisoCopiaDias !== baseline.avisoCopiaDias;
   const weeklyMinutesDraft = schedule.minutes.reduce((sum, value) => sum + value, 0);
   const sections: {
     id: SectionId;
@@ -94,6 +99,16 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           ? 'Tiempo exacto'
           : `Bloques de ${profile.intervaloRedondeo} min`,
       dirty: roundingDirty,
+    },
+    {
+      id: 'datos',
+      label: 'Datos',
+      icon: 'hardDrive',
+      summary:
+        profile.almacenamiento === 'local'
+          ? 'Proyectos nuevos en este navegador'
+          : 'Proyectos nuevos en la nube',
+      dirty: storageDirty,
     },
     { id: 'odoo', label: 'Odoo', icon: 'globe', summary: 'Integración y API key', dirty: false },
     {
@@ -189,6 +204,8 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
             ...data.profile.preferencias,
             workspace: profile.workspace.trim(),
             especialidad: profile.especialidad.trim(),
+            almacenamiento: profile.almacenamiento,
+            aviso_copia_dias: profile.avisoCopiaDias,
           },
         });
         const saved = {
@@ -325,6 +342,20 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
                 setProfile(next);
                 setMessage(null);
               }}
+              disabled={saving}
+            />
+          </div>
+          <div hidden={active !== 'datos'}>
+            <StorageSettings
+              value={{
+                almacenamiento: profile.almacenamiento,
+                avisoCopiaDias: profile.avisoCopiaDias,
+              }}
+              onChange={(next) => {
+                setProfile((current) => ({ ...current, ...next }));
+                setMessage(null);
+              }}
+              data={data}
               disabled={saving}
             />
           </div>

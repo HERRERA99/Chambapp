@@ -81,7 +81,9 @@ test('cleanOdooRequest drops unknown fields', () => {
     extra: 'x',
     partes: [{ id: id(4), version: 2, x: 1 }],
   } as never);
-  assert.deepEqual(cleaned, valid);
+  assert.deepEqual(cleaned, { ...valid, origen: 'nube' });
+  assert.equal(cleanOdooRequest({ ...valid, origen: 'local' }).origen, 'local');
+  assert.equal(odooRequestProblem({ ...valid, origen: 'disco' }) !== null, true);
 });
 
 test('app and extension messages are validated by source and type', () => {

@@ -29,7 +29,7 @@ export type ExtensionState = {
   odooPermission: boolean;
 };
 
-export type ProjectOption = { id: string; nombre: string };
+export type ProjectOption = { id: string; nombre: string; origen?: 'nube' | 'local' };
 
 /** Credential as the popup sees it: secret values stay in the worker until asked for. */
 export type CredentialView = {

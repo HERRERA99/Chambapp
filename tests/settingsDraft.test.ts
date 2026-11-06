@@ -142,8 +142,17 @@ test('profile drafts retain valid saved preferences and safely default incompati
     especialidad: 'Engineering',
     zonaHoraria: 'Europe/Madrid',
     intervaloRedondeo: 15,
+    almacenamiento: 'nube',
+    avisoCopiaDias: 7,
   });
   data.profile.preferencias = { workspace: { nested: true }, especialidad: 42 };
   assert.equal(profileDraft(data).workspace, 'Mi Workspace');
   assert.equal(profileDraft(data).especialidad, '');
+  // Storage mode and backup reminder (Plan 11).
+  data.profile.preferencias = { almacenamiento: 'local', aviso_copia_dias: 0 };
+  assert.equal(profileDraft(data).almacenamiento, 'local');
+  assert.equal(profileDraft(data).avisoCopiaDias, 0);
+  data.profile.preferencias = { almacenamiento: 'disco', aviso_copia_dias: -3 };
+  assert.equal(profileDraft(data).almacenamiento, 'nube');
+  assert.equal(profileDraft(data).avisoCopiaDias, 7);
 });

@@ -186,6 +186,7 @@ export function CredentialEditor({
               <option key={project.id} value={project.id}>
                 {project.nombre}
                 {project.archivado_en ? ' (archivado)' : ''}
+                {project.origen === 'local' ? ' · Local' : ''}
               </option>
             ))}
           </SelectField>

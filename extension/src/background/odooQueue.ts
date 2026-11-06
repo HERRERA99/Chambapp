@@ -17,7 +17,7 @@ import {
   verificationStatus,
 } from '../shared/queue';
 import { parseOdooTaskUrl } from '../shared/odooTask';
-import type { QueueItem, QueuePhase } from '../shared/queue';
+import type { EntryRow, ProjectRow, QueueItem, QueuePhase, TaskRow } from '../shared/queue';
 import { ATTEMPT_PORT_PREFIX } from '../shared/automation';
 import type { AttemptConfig, DateFormat, ScriptMessage } from '../shared/automation';
 import { onAttemptDisconnect, onScriptMessage } from './attemptMessages';
@@ -26,6 +26,36 @@ import type { QueueView } from '../shared/messages';
 import { getSettings, hasOdooPermission } from './settings';
 import { command, currentSession, message } from './supabase';
 import { loadEntryRows, loadTaskAndProject } from './workspace';
+import { askApp } from './appTabs';
+
+type RequestData = { rows: EntryRow[]; task: TaskRow | null; project: ProjectRow | null };
+
+/**
+ * Entries, task and project of a request, read again from where they live: Supabase,
+ * or the Chambapp tab that holds the data kept in that browser.
+ */
+async function loadRequestData(item: QueueItem, withEntries = true): Promise<RequestData> {
+  const { request } = item;
+  if (request.origen === 'local') {
+    const data = await askApp<RequestData>(request.userId, {
+      kind: 'cargar',
+      taskId: request.taskId,
+      partIds: withEntries ? request.partes.map((part) => part.id) : [],
+    });
+    if (!data || !Array.isArray(data.rows)) throw new Error('Chambapp no devolvió los partes.');
+    return { rows: data.rows, task: data.task ?? null, project: data.project ?? null };
+  }
+  const [rows, { task, project }] = await Promise.all([
+    withEntries
+      ? loadEntryRows(
+          request.partes.map((part) => part.id),
+          request.userId,
+        )
+      : Promise.resolve([]),
+    loadTaskAndProject(request.taskId, request.userId),
+  ]);
+  return { rows, task, project };
+}
 
 const QUEUE_KEY = 'chambapp_odoo_queue_v1';
 // The attempt includes up to 60 s for Odoo to render the task in the new window.
@@ -291,13 +321,15 @@ function finishMarking(id: string, token: string | null, patch: Partial<QueueIte
 
 async function markEntries(item: QueueItem, token: string | null = null) {
   try {
-    const { task, project } = await loadTaskAndProject(item.request.taskId, item.request.userId);
+    const { task, project } = await loadRequestData(item, false);
     const changed = taskChangedProblem(item.request, task, project);
     if (changed) {
       await finishMarking(item.id, token, { status: 'sent-unmarked', error: changed });
       return;
     }
-    await command('imputar_partes', { partes: item.request.partes }, item.request.userId);
+    if (item.request.origen === 'local')
+      await askApp(item.request.userId, { kind: 'imputar', partes: item.request.partes });
+    else await command('imputar_partes', { partes: item.request.partes }, item.request.userId);
     await finishMarking(item.id, token, { status: 'success', phase: 'done', error: '' });
   } catch (cause) {
     await finishMarking(item.id, token, {
@@ -326,13 +358,7 @@ async function runAttempt(item: QueueItem): Promise<void> {
 
   // 1. Nothing is written to Odoo unless the entries are exactly as when "Enviar" was pressed.
   try {
-    const [rows, { task, project }] = await Promise.all([
-      loadEntryRows(
-        item.request.partes.map((part) => part.id),
-        item.request.userId,
-      ),
-      loadTaskAndProject(item.request.taskId, item.request.userId),
-    ]);
+    const { rows, task, project } = await loadRequestData(item);
     const stale = revalidationProblem(item.request, rows, task, project);
     if (stale) return void (await fail(stale));
   } catch (cause) {

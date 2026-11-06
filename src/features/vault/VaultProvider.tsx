@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NoteRow, VaultRow } from '../../domain/models';
 import { createVault, encryptNote, rewrapVault, unlockVault } from '../../lib/crypto/vault';
+import { onVaultGeneration, provideLocalKey } from '../../lib/local/runtime';
 import { loadVault } from '../../lib/supabase/vault.repository';
 import { executeCommand } from '../../lib/supabase/workspace.repository';
 import { useAuth } from '../auth/useAuth';
@@ -59,6 +60,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!current) migratedWith.current = null;
   }, [current]);
+  // The local data (projects, tasks, entries in this browser) keeps the key for the
+  // rest of the tab's life: the vault's idle lock does not close it.
+  useEffect(() => {
+    if (current && userId) void provideLocalKey(userId, current.key, current.row.generacion);
+  }, [current, userId]);
+  const storedGeneration = query.isSuccess ? (row?.generacion ?? null) : undefined;
+  useEffect(() => {
+    if (storedGeneration !== undefined) onVaultGeneration(storedGeneration);
+  }, [storedGeneration]);
 
   const registerFlush = useCallback((flush: () => void) => {
     flushers.current.add(flush);

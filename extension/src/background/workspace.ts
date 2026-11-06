@@ -22,6 +22,20 @@ async function readAll<T>(
   }
 }
 
+/** Where the user keeps new projects (perfiles.preferencias.almacenamiento). */
+export async function loadStorageMode(expectedUserId?: string): Promise<'nube' | 'local'> {
+  const user = await requireUser(expectedUserId);
+  const { data, error, status } = await supabase
+    .from('perfiles')
+    .select('preferencias')
+    .eq('id', user.id)
+    .abortSignal(AbortSignal.timeout(20_000))
+    .maybeSingle();
+  if (error) fail(error, status);
+  const preferences = data?.preferencias as { almacenamiento?: unknown } | null | undefined;
+  return preferences?.almacenamiento === 'local' ? 'local' : 'nube';
+}
+
 /** Live projects of the signed-in user (archived ones included; callers filter). */
 export async function loadProjects(expectedUserId?: string): Promise<Project[]> {
   const user = await requireUser(expectedUserId);

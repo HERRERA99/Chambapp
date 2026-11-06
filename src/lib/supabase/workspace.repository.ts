@@ -11,6 +11,8 @@ import {
 } from './rowValidation';
 import { isRetryableStatus, isValidCommandResponse, rpcForAction } from './commandValidation';
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
+import { isLocalAction } from '../local/engine';
+import { mergeLocal, registerCloudCommand, routeCommand } from '../local/runtime';
 
 type PageResult<T> = {
   data: T[] | null;
@@ -35,7 +37,47 @@ async function readAll<T>(fetchPage: (from: number, to: number) => PromiseLike<P
   }
 }
 
+/**
+ * Runs a command. Commands on projects, tasks and entries go to the store that holds
+ * them (this browser or Supabase, see lib/local/router.ts); the rest to Supabase.
+ */
 export async function executeCommand<T = unknown>(
+  action: CommandAction,
+  payload: Record<string, Json | undefined> = {},
+  signal = AbortSignal.timeout(20_000),
+  expectedUserId?: string,
+): Promise<T> {
+  if (isLocalAction(action))
+    return (await routeCommand(action, payload, signal, expectedUserId)) as T;
+  return executeCloudCommand<T>(action, payload, signal, expectedUserId);
+}
+
+/** Moves a project between the browser and Supabase (chambapp_traspasos). */
+export async function executeTransfer<T = unknown>(
+  action: 'importar_proyecto' | 'purgar_proyecto',
+  payload: Record<string, Json | undefined>,
+  expectedUserId: string,
+): Promise<T> {
+  const db = getSupabase();
+  const { data: auth, error: authError } = await db.auth.getSession();
+  if (authError || auth.session?.user.id !== expectedUserId)
+    throw new DataError(
+      'La sesión ha cambiado. Vuelve a acceder a tu cuenta para confirmar los cambios pendientes.',
+      true,
+      'SESION_CAMBIADA',
+    );
+  const request = db
+    .rpc('chambapp_traspasos', { p_accion: action, p_datos: payload as Json })
+    .abortSignal(AbortSignal.timeout(60_000));
+  request.setHeader('Authorization', `Bearer ${auth.session.access_token}`);
+  const { data, error, status } = await request;
+  if (error)
+    throw new DataError(readableError(error), isRetryableStatus(status), error.code, error.message);
+  return data as T;
+}
+
+/** Runs a command on Supabase only. */
+export async function executeCloudCommand<T = unknown>(
   action: CommandAction,
   payload: Record<string, Json | undefined> = {},
   signal = AbortSignal.timeout(20_000),
@@ -149,7 +191,7 @@ export async function loadWorkspace(
         .range(from, to)
         .abortSignal(signal),
     ),
-    executeCommand<{ hora_servidor: string }>('consultar_cronometro', {}, signal, userId).then(
+    executeCloudCommand<{ hora_servidor: string }>('consultar_cronometro', {}, signal, userId).then(
       (clock) => ({
         ...clock,
         receivedAt: Date.now(),
@@ -208,7 +250,7 @@ export async function loadWorkspace(
       true,
       'SESION_CAMBIADA',
     );
-  return {
+  const cloud: WorkspaceData = {
     profile: profile.data,
     projects,
     tasks: tasks.map((row) => {
@@ -238,4 +280,7 @@ export async function loadWorkspace(
     serverTime: clock.hora_servidor,
     receivedAt: clock.receivedAt,
   };
+  return mergeLocal(cloud, userId);
 }
+
+registerCloudCommand(executeCloudCommand);

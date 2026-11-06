@@ -10,7 +10,6 @@
 
 export const VAULT_ITERATIONS = 600_000;
 export const MIN_MASTER_PASSWORD_LENGTH = 12;
-const ENVELOPE = /^v1\.([A-Za-z0-9_-]{16})\.([A-Za-z0-9_-]{22,})$/;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
@@ -30,15 +29,68 @@ export class UnreadableEnvelopeError extends Error {
 
 export type WrappedVault = { sal: string; iteraciones: number; clave_envuelta: string };
 
+/** Native base64 (Chrome 140+, Firefox 133+, Safari 18.2+): much faster on large data. */
+type NativeBase64 = {
+  toBase64?: (this: Uint8Array, options: { alphabet: 'base64url'; omitPadding: boolean }) => string;
+};
+type NativeFromBase64 = {
+  fromBase64?: (text: string, options: { alphabet: 'base64url' }) => Uint8Array<ArrayBuffer>;
+};
+
 export function toBase64Url(bytes: Uint8Array): string {
+  const native = (Uint8Array.prototype as NativeBase64).toBase64;
+  if (native) return native.call(bytes, { alphabet: 'base64url', omitPadding: true });
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000)
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** Only base64url characters (a loop: a regular expression overflows on large inputs). */
+function isBase64Url(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (!(
+      (code >= 48 && code <= 57) || // 0-9
+      (code >= 65 && code <= 90) || // A-Z
+      (code >= 97 && code <= 122) || // a-z
+      code === 45 || // -
+      code === 95 // _
+    ))
+      return false;
+  }
+  return true;
+}
+
+/**
+ * `v1.<iv: 16 base64url>.<data: 22+ base64url>`, parsed without a regular expression:
+ * V8 runs out of stack matching one on envelopes of several MB (large local data).
+ */
+function splitEnvelope(value: string): [string, string] | null {
+  const first = value.indexOf('.');
+  const second = value.indexOf('.', first + 1);
+  if (
+    first !== 2 ||
+    !value.startsWith('v1.') ||
+    second !== 19 ||
+    value.indexOf('.', second + 1) !== -1
+  )
+    return null;
+  const iv = value.slice(3, 19);
+  const data = value.slice(20);
+  return data.length >= 22 && isBase64Url(iv) && isBase64Url(data) ? [iv, data] : null;
+}
+
 export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
-  if (!/^[A-Za-z0-9_-]*$/.test(text) || text.length % 4 === 1) throw new UnreadableEnvelopeError();
+  if (!isBase64Url(text) || text.length % 4 === 1) throw new UnreadableEnvelopeError();
+  const native = (Uint8Array as NativeFromBase64).fromBase64;
+  if (native) {
+    try {
+      return native(text, { alphabet: 'base64url' });
+    } catch {
+      throw new UnreadableEnvelopeError();
+    }
+  }
   const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
@@ -54,19 +106,23 @@ export const noteAad = (userId: string, noteId: string) => `chambapp:nota:v1:${u
 export const credentialAad = (userId: string, credentialId: string) =>
   `chambapp:credencial:v1:${userId}:${credentialId}`;
 export const noteDraftAad = (userId: string) => `chambapp:borrador-nota:v1:${userId}`;
+/** Projects, tasks and entries kept in this browser (IndexedDB), under the vault data key. */
+export const localDataAad = (userId: string) => `chambapp:local:v1:${userId}`;
+/** Backup file of the local data, under a key derived from a password chosen for it. */
+export const localBackupAad = (userId: string) => `chambapp:copia-local:v1:${userId}`;
 
 export function isEnvelope(value: unknown): value is string {
-  return typeof value === 'string' && ENVELOPE.test(value);
+  return typeof value === 'string' && splitEnvelope(value) !== null;
 }
 
 function parseEnvelope(envelope: string): {
   iv: Uint8Array<ArrayBuffer>;
   data: Uint8Array<ArrayBuffer>;
 } {
-  const match = ENVELOPE.exec(envelope);
-  if (!match) throw new UnreadableEnvelopeError();
-  const iv = fromBase64Url(match[1]!);
-  const data = fromBase64Url(match[2]!);
+  const parts = splitEnvelope(envelope);
+  if (!parts) throw new UnreadableEnvelopeError();
+  const iv = fromBase64Url(parts[0]);
+  const data = fromBase64Url(parts[1]);
   if (iv.length !== 12 || data.length < 16) throw new UnreadableEnvelopeError();
   return { iv, data };
 }
@@ -136,6 +192,40 @@ async function unwrap(
   } catch {
     throw new WrongMasterPasswordError();
   }
+}
+
+/** Random salt for `derivePasswordKey`, base64url. */
+export function newSalt(): string {
+  return toBase64Url(random(16));
+}
+
+/**
+ * AES-GCM key derived from a password (PBKDF2-SHA-256), for data that must not
+ * depend on the vault, such as a backup file.
+ */
+export async function derivePasswordKey(password: string, salt: string, iterations: number) {
+  let saltBytes: Uint8Array<ArrayBuffer>;
+  try {
+    saltBytes = fromBase64Url(salt);
+  } catch {
+    throw new UnreadableEnvelopeError();
+  }
+  if (saltBytes.length < 16 || !Number.isSafeInteger(iterations) || iterations < 100_000)
+    throw new UnreadableEnvelopeError();
+  const material = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password.normalize('NFC')),
+    'PBKDF2',
+    false,
+    ['deriveKey'],
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
 }
 
 /** New vault: a fresh data key wrapped with the master password. */

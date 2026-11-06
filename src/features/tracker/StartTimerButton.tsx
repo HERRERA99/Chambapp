@@ -124,6 +124,7 @@ function StartTimerForm({
             <option key={task.id} value={task.id}>
               {data!.projects.find((project) => project.id === task.proyecto_id)?.nombre} ·{' '}
               {task.titulo}
+              {task.origen === 'local' ? ' · Local' : ''}
             </option>
           ))}
         </SelectField>
