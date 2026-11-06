@@ -302,3 +302,38 @@ Estado final: sin commit ni push. Hallazgos abiertos: ninguno conocido; los arre
 - Fallos reales encontrados por la prueba en Firefox y corregidos: patrones con puerto no coincidían (bridge en dev, Odoo con puerto, tabs.query); rutas relativas de `scripting.executeScript` resueltas desde la página que llama.
 - Pruebas: typecheck, lint, 192 tests, build (zip + xpi), prettier, `web-ext lint` (0 errores, 2 avisos de innerHTML de React). Firefox 159 real (Selenium, tools/ext-smoke/run-firefox.mjs): 13/13. Chrome/Edge (tools/ext-smoke/run.mjs): 18/18; web con la extensión en Edge: indicador verde y detección.
 - Pendiente del usuario: cuenta AMO + `npm run ext:sign:firefox` para el .xpi firmado; Redirect URL de Firefox en Supabase para OAuth. Sin probar: flujo con cuenta real en Firefox (OAuth, bóveda, envío a Odoo real).
+
+---
+
+# Plan 10 — Robustez envío Odoo, descripción elegible, Firefox 0.2.0 (2026-11-06)
+
+- Roles: host/planner/builder = Claude (Claude Code, Opus 5.5); plan reviewer + final inspector = Codex CLI 0.164.0 (default model from CLI config).
+- Plan: PLAN-10.md. Max review rounds 5; fix rounds 2; inspection rounds 2.
+- Authorization: user asked to implement the improvements and regenerate the signed Firefox build.
+
+## Round 1 — Codex (gpt-6-astra, effort high, read-only) — REVISE
+Result: scratchpad claudex/r1/claudex-kb5nx5wx/result.json (session 01a1b1eb-2cc0-7693-b22d-e04d02b282ee)
+- P10-01 (high): disconnect-in-finally races with async form-saved handling → interrupted instead of verified. ACCEPTED: worker owns disconnect; terminal flag set synchronously; listeners bound to attempt object; regression test.
+- P10-02 (medium): VERIFY_MS doesn't bound count()/pagination; focus loop would run through counting. ACCEPTED: absolute verification deadline + race; ready() API stops focus before counting; 75 s focus cap.
+
+## Round 2 — Codex (resumed session) — APPROVED
+Result: scratchpad claudex/r2/claudex-gqwzi4r4/result.json. No findings. Limitations: static review; implementation files were being edited concurrently (detection + description helper already in progress); browser focus, real Odoo, TDZ and signing unverified.
+
+## Build (Claude) — pre-build commit f9eaf5e
+- Deviations from PLAN-10: worker message handling moved to `extension/src/background/attemptMessages.ts` (no chrome.* calls) so the P10-01 race is unit-tested in `tests/extensionAttemptPort.test.ts`; the extra `terminal` flag was dropped (setting `expectDisconnect` synchronously is enough); a storage failure while saving the `form-saved` phase still settles `form-saved` (verification decides).
+- Proof: typecheck, lint OK; npm test 199/199; prettier OK on touched files (repo-wide format:check already failed at HEAD, CRLF); ext build OK; tools/ext-smoke/run.mjs 18/18 in Edge; scratchpad plan10.mjs 10/10 (display_project_id + [T…] title detection, late form start, second attempt same page, old port disconnect, ready()/bounded count(), form never appears).
+- Not tested: worker-level window focus loop (needs real extension + session), description dialog visually, real Odoo.
+
+## Inspection 1 — fresh Codex session — REVISE
+Result: scratchpad claudex/i1/claudex-p9tclrcw/result.json
+- P10-IR-001 (high): signed 0.2.0 xpi missing. DEFERRED BY DESIGN: a version can be signed only once, so signing runs after code inspection passes; verified afterwards (signed file, ext:pack reports firmado, extension.json firefoxSigned true).
+- P10-IR-002 (medium): focus loop started before the "processing" update with no cleanup if it rejects. ACCEPTED: holdFocus now starts only after the update succeeds; on failure the new tab/window is closed; processQueue stops after an unexpected failure instead of retrying in a tight loop.
+- Rerun: typecheck, lint, 199/199 tests, build, ext-smoke 18/18.
+
+## Inspection 2 — fresh Codex session — APPROVED
+Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitations: static; smoke scripts don't pass count()'s new deadline (defaults to unbounded); signing to verify after.
+
+## Release
+- npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.2.0.xpi (AMO unlisted, META-INF signature present, manifest 0.2.0). 0.1.0 kept.
+- npm run ext:pack → public/downloads zip 0.2.0 + xpi firmado; extension.json {version 0.2.0, firefoxSigned true}.
+- Not committed (no commit authorization).

@@ -19,16 +19,22 @@ import {
 import { parseOdooTaskUrl } from '../shared/odooTask';
 import type { QueueItem, QueuePhase } from '../shared/queue';
 import { ATTEMPT_PORT_PREFIX } from '../shared/automation';
-import type { AttemptConfig, DateFormat, ScriptMessage, WorkerMessage } from '../shared/automation';
+import type { AttemptConfig, DateFormat, ScriptMessage } from '../shared/automation';
+import { onAttemptDisconnect, onScriptMessage } from './attemptMessages';
+import type { Attempt, AttemptResult } from './attemptMessages';
 import type { QueueView } from '../shared/messages';
 import { getSettings, hasOdooPermission } from './settings';
 import { command, currentSession, message } from './supabase';
 import { loadEntryRows, loadTaskAndProject } from './workspace';
 
 const QUEUE_KEY = 'chambapp_odoo_queue_v1';
-const ATTEMPT_MS = 90_000;
-const VERIFY_MS = 60_000;
+// The attempt includes up to 60 s for Odoo to render the task in the new window.
+const ATTEMPT_MS = 150_000;
+/** Whole verification: reload, render and count across every page. */
+const VERIFY_MS = 120_000;
 const ACK_GRACE_MS = 5_000;
+/** Odoo does not render in a background window: it is kept in front at most this long. */
+const FOCUS_HOLD_MS = 75_000;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -164,33 +170,8 @@ export async function queueAction(requestId: string, action: QueueAction) {
 
 // ---------------------------------------------------------------- attempts
 
-type Attempt = {
-  itemId: string;
-  tabId: number;
-  config: AttemptConfig;
-  port: chrome.runtime.Port | null;
-  /** The old document's port closes on purpose while we reload for verification. */
-  expectDisconnect: boolean;
-  /** Settled: no further write may be acknowledged. */
-  done: boolean;
-  settle: (result: AttemptResult) => void;
-};
-
-type AttemptResult =
-  | { kind: 'form-saved' }
-  | { kind: 'failed'; error: string }
-  | { kind: 'interrupted'; error: string };
-
 const attempts = new Map<string, Attempt>();
 let running = false;
-
-function postToScript(attempt: Attempt, message: WorkerMessage) {
-  try {
-    attempt.port?.postMessage(message);
-  } catch {
-    // The page is gone; the timeout or disconnect handler settles the attempt.
-  }
-}
 
 /** Port opened by content/odoo-timesheet.js for one attempt. */
 export function handleAttemptPort(port: chrome.runtime.Port) {
@@ -211,49 +192,9 @@ export function handleAttemptPort(port: chrome.runtime.Port) {
   attempt.port = port;
   port.onMessage.addListener((raw: ScriptMessage) => {
     if (!raw || raw.attemptId !== attemptId) return;
-    void onScriptMessage(attempt, raw);
+    void onScriptMessage(attempt, raw, { update }).catch(() => undefined);
   });
-  port.onDisconnect.addListener(() => {
-    attempt.port = null;
-    if (!attempt.expectDisconnect)
-      attempt.settle({
-        kind: 'interrupted',
-        error: 'Se perdió la conexión con la pestaña de Odoo.',
-      });
-  });
-}
-
-async function onScriptMessage(attempt: Attempt, message: ScriptMessage) {
-  switch (message.type) {
-    case 'heartbeat':
-      return;
-    case 'phase':
-      await update(attempt.itemId, { phase: message.phase });
-      return;
-    case 'counted':
-      if (Number.isSafeInteger(message.count) && message.count >= 0)
-        await update(attempt.itemId, { before: message.count });
-      return;
-    case 'about-to-write': {
-      if (attempt.done) return;
-      // Persist first: after this point a restart can never treat the attempt as safe to retry.
-      const saved = await update(attempt.itemId, { phase: 'may-have-written' });
-      if (
-        !attempt.done &&
-        saved?.attemptId === attempt.config.attemptId &&
-        saved.status === 'processing'
-      )
-        postToScript(attempt, { type: 'write-ack', attemptId: attempt.config.attemptId });
-      return;
-    }
-    case 'form-saved':
-      await update(attempt.itemId, { phase: 'form-saved' });
-      attempt.settle({ kind: 'form-saved' });
-      return;
-    case 'failed':
-      attempt.settle({ kind: 'failed', error: String(message.error).slice(0, 500) });
-      return;
-  }
+  port.onDisconnect.addListener(() => onAttemptDisconnect(attempt));
 }
 
 function waitForLoad(tabId: number, timeout: number) {
@@ -271,6 +212,36 @@ function waitForLoad(tabId: number, timeout: number) {
       );
     check();
   });
+}
+
+/**
+ * Keeps the Odoo window focused (Odoo does not render in a background window) until
+ * the returned function is called, the window closes or FOCUS_HOLD_MS passes.
+ */
+function holdFocus(windowId: number | undefined): () => void {
+  if (windowId === undefined) return () => undefined;
+  let stopped = false;
+  const started = Date.now();
+  const stop = () => {
+    stopped = true;
+  };
+  const tick = async () => {
+    if (stopped || Date.now() - started > FOCUS_HOLD_MS) return;
+    try {
+      const current = await chrome.windows.get(windowId);
+      if (stopped) return;
+      if (!current.focused)
+        await chrome.windows.update(windowId, {
+          focused: true,
+          ...(current.state === 'minimized' ? { state: 'normal' as const } : {}),
+        });
+    } catch {
+      return; // The window is gone.
+    }
+    setTimeout(() => void tick(), 500);
+  };
+  void tick();
+  return stop;
 }
 
 async function closeWindow(item: QueueItem) {
@@ -382,31 +353,30 @@ async function runAttempt(item: QueueItem): Promise<void> {
     descripcion: item.request.descripcion,
     horasFormato: item.request.horasFormato,
   };
-  let window: chrome.windows.Window | undefined;
-  try {
-    window = await chrome.windows.create({
-      url: item.request.odooUrl,
-      focused: false,
-      type: 'normal',
-    });
-  } catch {
-    // Some browsers (Firefox) refuse an unfocused new window: open it normally.
-    window = await chrome.windows
-      .create({ url: item.request.odooUrl, type: 'normal' })
-      .catch(() => undefined);
-  }
+  // In front: Odoo does not finish rendering in a background window.
+  const window = await chrome.windows
+    .create({ url: item.request.odooUrl, type: 'normal', focused: true })
+    .catch(() => undefined);
   const tabId = window?.tabs?.[0]?.id;
   if (tabId === undefined) return void (await fail('No se pudo abrir Odoo.'));
-  await update(item.id, {
-    status: 'processing',
-    phase: 'opening',
-    error: '',
-    attempts: item.attempts + 1,
-    attemptId,
-    tabId,
-    windowId: window?.id ?? null,
-    before: null,
-  });
+  try {
+    await update(item.id, {
+      status: 'processing',
+      phase: 'opening',
+      error: '',
+      attempts: item.attempts + 1,
+      attemptId,
+      tabId,
+      windowId: window?.id ?? null,
+      before: null,
+    });
+  } catch (cause) {
+    // Nothing was started in Odoo: close the window instead of leaving it behind.
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+    throw cause;
+  }
+  // Only once the attempt is recorded, so every path below releases it in settle().
+  const stopFocus = holdFocus(window?.id);
 
   const result = await new Promise<AttemptResult>((resolve) => {
     let settled = false;
@@ -417,12 +387,22 @@ async function runAttempt(item: QueueItem): Promise<void> {
       port: null,
       expectDisconnect: false,
       done: false,
+      stopFocus,
       settle: (value) => {
         if (settled) return;
         settled = true;
         attempt.done = true;
         clearTimeout(timer);
         attempt.expectDisconnect = true;
+        stopFocus();
+        // The worker closes the port: the script never does, so its final message
+        // cannot race with its own disconnect.
+        try {
+          attempt.port?.disconnect();
+        } catch {
+          // Already closed.
+        }
+        attempt.port = null;
         resolve(value);
       },
     };
@@ -485,40 +465,72 @@ async function runAttempt(item: QueueItem): Promise<void> {
   }
 
   // 2. Verification after a reload: exactly one more matching line, across every page.
-  let after: number | null = null;
-  try {
+  // VERIFY_MS bounds all of it; past that the line is left "uncertain" for review.
+  const verifyDeadline = Date.now() + VERIFY_MS;
+  const releaseFocus = holdFocus(current.windowId ?? window?.id);
+  let timedOut = false;
+  const verify = async (): Promise<number | null> => {
     await update(item.id, { phase: 'reloading' });
     await chrome.tabs.reload(tabId);
     await new Promise((resolve) => setTimeout(resolve, 300));
-    const tab = await waitForLoad(tabId, VERIFY_MS);
-    if (tab.url && sameOrigin(tab.url, odooOrigin)) {
-      await update(item.id, { phase: 'verifying' });
-      await chrome.scripting.executeScript({
-        target: { tabId, frameIds: [0] },
-        files: ['/content/odoo-timesheet.js'],
-      });
-      const [counted] = await chrome.scripting.executeScript({
-        target: { tabId, frameIds: [0] },
-        func: (
-          recordId: number,
-          fecha: string,
-          format: DateFormat,
-          descripcion: string,
-          horas: string,
-        ) => globalThis.__chambappOdoo?.count(recordId, fecha, format, descripcion, horas) ?? null,
-        args: [
-          record.recordId,
-          item.request.fecha,
-          odooDateFormat,
-          item.request.descripcion,
-          item.request.horasFormato,
-        ],
-      });
-      after = typeof counted?.result === 'number' ? counted.result : null;
-    }
+    const tab = await waitForLoad(tabId, Math.max(0, verifyDeadline - Date.now()));
+    if (timedOut || !tab.url || !sameOrigin(tab.url, odooOrigin)) return null;
+    await update(item.id, { phase: 'verifying' });
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      files: ['/content/odoo-timesheet.js'],
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      func: (recordId: number, timeoutMs: number) =>
+        globalThis.__chambappOdoo?.ready(recordId, timeoutMs) ?? false,
+      args: [record.recordId, Math.max(0, verifyDeadline - Date.now())],
+    });
+    // Rendered (or out of time): counting and paging work in the background too.
+    releaseFocus();
+    const [counted] = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      func: (
+        recordId: number,
+        fecha: string,
+        format: DateFormat,
+        descripcion: string,
+        horas: string,
+        deadline: number,
+      ) =>
+        globalThis.__chambappOdoo?.count(recordId, fecha, format, descripcion, horas, deadline) ??
+        null,
+      args: [
+        record.recordId,
+        item.request.fecha,
+        odooDateFormat,
+        item.request.descripcion,
+        item.request.horasFormato,
+        verifyDeadline,
+      ],
+    });
+    return typeof counted?.result === 'number' ? counted.result : null;
+  };
+  let after: number | null;
+  let verifyTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    after = await Promise.race([
+      verify(),
+      new Promise<null>((resolve) => {
+        verifyTimer = setTimeout(
+          () => {
+            timedOut = true;
+            resolve(null);
+          },
+          Math.max(0, verifyDeadline - Date.now()) + ACK_GRACE_MS,
+        );
+      }),
+    ]);
   } catch {
     after = null;
   } finally {
+    clearTimeout(verifyTimer);
+    releaseFocus();
     attempts.delete(attemptId);
   }
   const verified = (await readQueue()).find((entry) => entry.id === item.id);
@@ -596,6 +608,8 @@ export async function processQueue() {
         await runAttempt(next);
       } catch (cause) {
         await failUnexpectedly(next.id, message(cause));
+        // Do not retry in a tight loop (e.g. storage failing); the next trigger resumes.
+        return;
       }
     }
   } finally {

@@ -40,12 +40,16 @@ export type WorkerMessage =
 export type OdooPageApi = {
   start(config: AttemptConfig): boolean;
   cancel(): void;
+  /** Waits until the tab shows that task's form; false when it does not appear in time. */
+  ready(recordId: number, timeoutMs: number): Promise<boolean>;
+  /** Matching lines across every page, or null (also once `deadline`, epoch ms, passes). */
   count(
     recordId: number,
     fecha: string,
     format: DateFormat,
     descripcion: string,
     horasFormato: string,
+    deadline: number,
   ): Promise<number | null>;
 };
 

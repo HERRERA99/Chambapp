@@ -4,6 +4,7 @@ import type { Task, TimeEntry } from '../src/domain/models.ts';
 import {
   applyImputationResult,
   buildOdooRequest,
+  odooDescriptionChoices,
   buildTimesheetWeek,
   formatRange,
   groupRounding,
@@ -400,4 +401,45 @@ test('buildOdooRequest rounds the sum once, then up to whole minutes for Odoo', 
   });
   assert.ok('request' in long);
   assert.equal(long.request.confirmLong, true);
+});
+
+test('odooDescriptionChoices: distinct, trimmed, in send order; ignores empty and unsendable', () => {
+  const parts = [
+    entry('b', { inicio_en: `${monday}T09:00:00Z`, descripcion: ' Revisión ' }),
+    entry('a', { inicio_en: `${monday}T08:00:00Z`, descripcion: 'Análisis' }),
+    entry('c', { inicio_en: `${monday}T10:00:00Z`, descripcion: 'Revisión' }),
+    entry('d', { inicio_en: `${monday}T11:00:00Z`, descripcion: '   ' }),
+    entry('e', { inicio_en: `${monday}T12:00:00Z`, descripcion: 'En curso', fin_en: null }),
+  ];
+  assert.deepEqual(odooDescriptionChoices(parts), ['Análisis', 'Revisión']);
+  assert.deepEqual(odooDescriptionChoices([entry('f', { descripcion: null })]), []);
+});
+
+test('buildOdooRequest uses the description chosen by the user', () => {
+  const odooTask = task('a', {
+    version: 1,
+    odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/9',
+  });
+  const group = { date: monday, taskId: 'a', title: 'Tarea a', odooUrl: null };
+  const base = {
+    group,
+    entries: [
+      entry('1', { descripcion: 'Análisis' }),
+      entry('2', { inicio_en: `${monday}T09:00:00Z`, descripcion: 'Revisión' }),
+    ],
+    task: odooTask,
+    userId: '00000000-0000-4000-8000-000000000001',
+    requestId: '00000000-0000-4000-8000-000000000002',
+  };
+  const chosen = buildOdooRequest({ ...base, descripcion: '  Reunión de seguimiento  ' });
+  assert.ok('request' in chosen);
+  assert.equal(chosen.request.descripcion, 'Reunión de seguimiento');
+  const long = buildOdooRequest({ ...base, descripcion: 'x'.repeat(1200) });
+  assert.ok('request' in long);
+  assert.equal(long.request.descripcion.length, 1000);
+  const empty = buildOdooRequest({ ...base, descripcion: '   ' });
+  assert.ok('problem' in empty);
+  const joined = buildOdooRequest(base);
+  assert.ok('request' in joined);
+  assert.equal(joined.request.descripcion, 'Análisis · Revisión');
 });

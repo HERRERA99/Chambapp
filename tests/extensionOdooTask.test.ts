@@ -5,6 +5,7 @@ import {
   findExistingTask,
   normalizeOdooCode,
   parseOdooTaskUrl,
+  splitTaskTitle,
   suggestProject,
 } from '../extension/src/shared/odooTask.ts';
 
@@ -89,4 +90,17 @@ test('suggestProject matches names ignoring case, accents and the [CODE] prefix'
   assert.equal(suggestProject(projects, 'Web'), null);
   assert.equal(suggestProject(projects, 'Soporte'), null);
   assert.equal(suggestProject(projects, ''), null);
+});
+
+test('splitTaskTitle takes the T code from "[T…] title" and leaves the rest', () => {
+  assert.deepEqual(splitTaskTitle('[T457973] Revisar  informe'), {
+    code: 'T457973',
+    title: 'Revisar informe',
+  });
+  assert.deepEqual(splitTaskTitle('[t12] Minúsculas'), { code: 'T12', title: 'Minúsculas' });
+  assert.deepEqual(splitTaskTitle('Sin código'), { code: null, title: 'Sin código' });
+  assert.deepEqual(splitTaskTitle('[P0431] Kialens'), { code: null, title: '[P0431] Kialens' });
+  assert.deepEqual(splitTaskTitle('Revisar [T1]'), { code: null, title: 'Revisar [T1]' });
+  // Nothing left after the code: keep the original title.
+  assert.deepEqual(splitTaskTitle('[T1]'), { code: 'T1', title: '[T1]' });
 });
