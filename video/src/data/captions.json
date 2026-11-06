@@ -1,0 +1,1450 @@
+{
+  "01-intro": [
+    {
+      "text": "Esto",
+      "startMs": 400,
+      "endMs": 560,
+      "timestampMs": 480,
+      "confidence": null
+    },
+    {
+      "text": " es",
+      "startMs": 560,
+      "endMs": 720,
+      "timestampMs": 640,
+      "confidence": null
+    },
+    {
+      "text": " Chambapp.",
+      "startMs": 720,
+      "endMs": 1840,
+      "timestampMs": 1280,
+      "confidence": null
+    },
+    {
+      "text": " Tu",
+      "startMs": 2160,
+      "endMs": 2400,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " jornada,",
+      "startMs": 2400,
+      "endMs": 2920,
+      "timestampMs": 2660,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 3020,
+      "endMs": 3300,
+      "timestampMs": 3160,
+      "confidence": null
+    },
+    {
+      "text": " proyectos",
+      "startMs": 3300,
+      "endMs": 3620,
+      "timestampMs": 3460,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 3620,
+      "endMs": 3760,
+      "timestampMs": 3690,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 3760,
+      "endMs": 3960,
+      "timestampMs": 3860,
+      "confidence": null
+    },
+    {
+      "text": " horas,",
+      "startMs": 3960,
+      "endMs": 4380,
+      "timestampMs": 4170,
+      "confidence": null
+    },
+    {
+      "text": " por",
+      "startMs": 4460,
+      "endMs": 4660,
+      "timestampMs": 4560,
+      "confidence": null
+    },
+    {
+      "text": " fin",
+      "startMs": 4660,
+      "endMs": 4780,
+      "timestampMs": 4720,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 4780,
+      "endMs": 4860,
+      "timestampMs": 4820,
+      "confidence": null
+    },
+    {
+      "text": " un",
+      "startMs": 4860,
+      "endMs": 5100,
+      "timestampMs": 4980,
+      "confidence": null
+    },
+    {
+      "text": " mismo",
+      "startMs": 5100,
+      "endMs": 5400,
+      "timestampMs": 5250,
+      "confidence": null
+    },
+    {
+      "text": " sitio.",
+      "startMs": 5400,
+      "endMs": 5520,
+      "timestampMs": 5460,
+      "confidence": null
+    }
+  ],
+  "02-proyectos": [
+    {
+      "text": "Organiza",
+      "startMs": 440,
+      "endMs": 840,
+      "timestampMs": 640,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 840,
+      "endMs": 1140,
+      "timestampMs": 990,
+      "confidence": null
+    },
+    {
+      "text": " proyectos",
+      "startMs": 1140,
+      "endMs": 1460,
+      "timestampMs": 1300,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 1460,
+      "endMs": 1720,
+      "timestampMs": 1590,
+      "confidence": null
+    },
+    {
+      "text": " clientes,",
+      "startMs": 1720,
+      "endMs": 2240,
+      "timestampMs": 1980,
+      "confidence": null
+    },
+    {
+      "text": " cada",
+      "startMs": 2400,
+      "endMs": 2600,
+      "timestampMs": 2500,
+      "confidence": null
+    },
+    {
+      "text": " uno",
+      "startMs": 2600,
+      "endMs": 2780,
+      "timestampMs": 2690,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 2780,
+      "endMs": 2920,
+      "timestampMs": 2850,
+      "confidence": null
+    },
+    {
+      "text": " su",
+      "startMs": 2920,
+      "endMs": 3160,
+      "timestampMs": 3040,
+      "confidence": null
+    },
+    {
+      "text": " color,",
+      "startMs": 3160,
+      "endMs": 3480,
+      "timestampMs": 3320,
+      "confidence": null
+    },
+    {
+      "text": " su",
+      "startMs": 3580,
+      "endMs": 3920,
+      "timestampMs": 3750,
+      "confidence": null
+    },
+    {
+      "text": " contexto",
+      "startMs": 3920,
+      "endMs": 4140,
+      "timestampMs": 4030,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 4140,
+      "endMs": 4320,
+      "timestampMs": 4230,
+      "confidence": null
+    },
+    {
+      "text": " todo",
+      "startMs": 4320,
+      "endMs": 4500,
+      "timestampMs": 4410,
+      "confidence": null
+    },
+    {
+      "text": " lo",
+      "startMs": 4500,
+      "endMs": 4620,
+      "timestampMs": 4560,
+      "confidence": null
+    },
+    {
+      "text": " que",
+      "startMs": 4620,
+      "endMs": 4760,
+      "timestampMs": 4690,
+      "confidence": null
+    },
+    {
+      "text": " cuelga",
+      "startMs": 4760,
+      "endMs": 5040,
+      "timestampMs": 4900,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 5040,
+      "endMs": 5220,
+      "timestampMs": 5130,
+      "confidence": null
+    },
+    {
+      "text": " él.",
+      "startMs": 5220,
+      "endMs": 5600,
+      "timestampMs": 5410,
+      "confidence": null
+    }
+  ],
+  "03-tareas": [
+    {
+      "text": "Crea",
+      "startMs": 380,
+      "endMs": 620,
+      "timestampMs": 500,
+      "confidence": null
+    },
+    {
+      "text": " tareas,",
+      "startMs": 620,
+      "endMs": 1180,
+      "timestampMs": 900,
+      "confidence": null
+    },
+    {
+      "text": " enlázalas",
+      "startMs": 1260,
+      "endMs": 1800,
+      "timestampMs": 1530,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 1800,
+      "endMs": 1960,
+      "timestampMs": 1880,
+      "confidence": null
+    },
+    {
+      "text": " Odoo",
+      "startMs": 1960,
+      "endMs": 2140,
+      "timestampMs": 2050,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 2140,
+      "endMs": 2340,
+      "timestampMs": 2240,
+      "confidence": null
+    },
+    {
+      "text": " arranca",
+      "startMs": 2340,
+      "endMs": 2620,
+      "timestampMs": 2480,
+      "confidence": null
+    },
+    {
+      "text": " el",
+      "startMs": 2620,
+      "endMs": 2760,
+      "timestampMs": 2690,
+      "confidence": null
+    },
+    {
+      "text": " cronómetro",
+      "startMs": 2760,
+      "endMs": 3240,
+      "timestampMs": 3000,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 3240,
+      "endMs": 3380,
+      "timestampMs": 3310,
+      "confidence": null
+    },
+    {
+      "text": " un",
+      "startMs": 3380,
+      "endMs": 3580,
+      "timestampMs": 3480,
+      "confidence": null
+    },
+    {
+      "text": " clic.",
+      "startMs": 3580,
+      "endMs": 3800,
+      "timestampMs": 3690,
+      "confidence": null
+    },
+    {
+      "text": " Cada",
+      "startMs": 4860,
+      "endMs": 5040,
+      "timestampMs": 4950,
+      "confidence": null
+    },
+    {
+      "text": " sesión,",
+      "startMs": 5040,
+      "endMs": 5560,
+      "timestampMs": 5300,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 5640,
+      "endMs": 5760,
+      "timestampMs": 5700,
+      "confidence": null
+    },
+    {
+      "text": " su",
+      "startMs": 5760,
+      "endMs": 6000,
+      "timestampMs": 5880,
+      "confidence": null
+    },
+    {
+      "text": " lugar.",
+      "startMs": 6000,
+      "endMs": 6200,
+      "timestampMs": 6100,
+      "confidence": null
+    }
+  ],
+  "04-partes": [
+    {
+      "text": "Ficha",
+      "startMs": 340,
+      "endMs": 600,
+      "timestampMs": 470,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 600,
+      "endMs": 820,
+      "timestampMs": 710,
+      "confidence": null
+    },
+    {
+      "text": " entrada",
+      "startMs": 820,
+      "endMs": 1020,
+      "timestampMs": 920,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 1020,
+      "endMs": 1120,
+      "timestampMs": 1070,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 1120,
+      "endMs": 1300,
+      "timestampMs": 1210,
+      "confidence": null
+    },
+    {
+      "text": " salida,",
+      "startMs": 1300,
+      "endMs": 1860,
+      "timestampMs": 1580,
+      "confidence": null
+    },
+    {
+      "text": " revisa",
+      "startMs": 2060,
+      "endMs": 2400,
+      "timestampMs": 2230,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 2400,
+      "endMs": 2660,
+      "timestampMs": 2530,
+      "confidence": null
+    },
+    {
+      "text": " partes",
+      "startMs": 2660,
+      "endMs": 2860,
+      "timestampMs": 2760,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 2860,
+      "endMs": 3020,
+      "timestampMs": 2940,
+      "confidence": null
+    },
+    {
+      "text": " horas",
+      "startMs": 3020,
+      "endMs": 3240,
+      "timestampMs": 3130,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 3240,
+      "endMs": 3360,
+      "timestampMs": 3300,
+      "confidence": null
+    },
+    {
+      "text": " el",
+      "startMs": 3360,
+      "endMs": 3520,
+      "timestampMs": 3440,
+      "confidence": null
+    },
+    {
+      "text": " redondeo",
+      "startMs": 3520,
+      "endMs": 3940,
+      "timestampMs": 3730,
+      "confidence": null
+    },
+    {
+      "text": " que",
+      "startMs": 3940,
+      "endMs": 4060,
+      "timestampMs": 4000,
+      "confidence": null
+    },
+    {
+      "text": " tú",
+      "startMs": 4060,
+      "endMs": 4200,
+      "timestampMs": 4130,
+      "confidence": null
+    },
+    {
+      "text": " elijas,",
+      "startMs": 4200,
+      "endMs": 4800,
+      "timestampMs": 4500,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 5020,
+      "endMs": 5040,
+      "timestampMs": 5030,
+      "confidence": null
+    },
+    {
+      "text": " cierra",
+      "startMs": 5120,
+      "endMs": 5380,
+      "timestampMs": 5250,
+      "confidence": null
+    },
+    {
+      "text": " la",
+      "startMs": 5380,
+      "endMs": 5700,
+      "timestampMs": 5540,
+      "confidence": null
+    },
+    {
+      "text": " semana",
+      "startMs": 5700,
+      "endMs": 5960,
+      "timestampMs": 5830,
+      "confidence": null
+    },
+    {
+      "text": " sabiendo",
+      "startMs": 5960,
+      "endMs": 6340,
+      "timestampMs": 6150,
+      "confidence": null
+    },
+    {
+      "text": " cuánto",
+      "startMs": 6340,
+      "endMs": 6600,
+      "timestampMs": 6470,
+      "confidence": null
+    },
+    {
+      "text": " has",
+      "startMs": 6600,
+      "endMs": 6780,
+      "timestampMs": 6690,
+      "confidence": null
+    },
+    {
+      "text": " imputado.",
+      "startMs": 6780,
+      "endMs": 7240,
+      "timestampMs": 7010,
+      "confidence": null
+    }
+  ],
+  "05-contrasenas": [
+    {
+      "text": "Guarda",
+      "startMs": 400,
+      "endMs": 660,
+      "timestampMs": 530,
+      "confidence": null
+    },
+    {
+      "text": " usuarios",
+      "startMs": 660,
+      "endMs": 1060,
+      "timestampMs": 860,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 1060,
+      "endMs": 1280,
+      "timestampMs": 1170,
+      "confidence": null
+    },
+    {
+      "text": " contraseñas",
+      "startMs": 1280,
+      "endMs": 1760,
+      "timestampMs": 1520,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 1760,
+      "endMs": 1920,
+      "timestampMs": 1840,
+      "confidence": null
+    },
+    {
+      "text": " una",
+      "startMs": 1920,
+      "endMs": 2060,
+      "timestampMs": 1990,
+      "confidence": null
+    },
+    {
+      "text": " bóveda",
+      "startMs": 2060,
+      "endMs": 2360,
+      "timestampMs": 2210,
+      "confidence": null
+    },
+    {
+      "text": " cifrada",
+      "startMs": 2360,
+      "endMs": 2860,
+      "timestampMs": 2610,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 2860,
+      "endMs": 2980,
+      "timestampMs": 2920,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 2980,
+      "endMs": 3120,
+      "timestampMs": 3050,
+      "confidence": null
+    },
+    {
+      "text": " clave",
+      "startMs": 3120,
+      "endMs": 3380,
+      "timestampMs": 3250,
+      "confidence": null
+    },
+    {
+      "text": " maestra.",
+      "startMs": 3380,
+      "endMs": 4000,
+      "timestampMs": 3690,
+      "confidence": null
+    },
+    {
+      "text": " Solo",
+      "startMs": 4920,
+      "endMs": 5140,
+      "timestampMs": 5030,
+      "confidence": null
+    },
+    {
+      "text": " tú",
+      "startMs": 5140,
+      "endMs": 5400,
+      "timestampMs": 5270,
+      "confidence": null
+    },
+    {
+      "text": " puedes",
+      "startMs": 5400,
+      "endMs": 5680,
+      "timestampMs": 5540,
+      "confidence": null
+    },
+    {
+      "text": " abrirla.",
+      "startMs": 5680,
+      "endMs": 6000,
+      "timestampMs": 5840,
+      "confidence": null
+    }
+  ],
+  "06-notas": [
+    {
+      "text": "Escribe",
+      "startMs": 380,
+      "endMs": 740,
+      "timestampMs": 560,
+      "confidence": null
+    },
+    {
+      "text": " notas",
+      "startMs": 740,
+      "endMs": 1020,
+      "timestampMs": 880,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 1020,
+      "endMs": 1180,
+      "timestampMs": 1100,
+      "confidence": null
+    },
+    {
+      "text": " Markdown,",
+      "startMs": 1180,
+      "endMs": 1860,
+      "timestampMs": 1520,
+      "confidence": null
+    },
+    {
+      "text": " con",
+      "startMs": 1860,
+      "endMs": 2140,
+      "timestampMs": 2000,
+      "confidence": null
+    },
+    {
+      "text": " vista",
+      "startMs": 2140,
+      "endMs": 2360,
+      "timestampMs": 2250,
+      "confidence": null
+    },
+    {
+      "text": " previa",
+      "startMs": 2360,
+      "endMs": 2560,
+      "timestampMs": 2460,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 2560,
+      "endMs": 2760,
+      "timestampMs": 2660,
+      "confidence": null
+    },
+    {
+      "text": " directo,",
+      "startMs": 2760,
+      "endMs": 3320,
+      "timestampMs": 3040,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 3320,
+      "endMs": 3460,
+      "timestampMs": 3390,
+      "confidence": null
+    },
+    {
+      "text": " asócialas",
+      "startMs": 3460,
+      "endMs": 3920,
+      "timestampMs": 3690,
+      "confidence": null
+    },
+    {
+      "text": " a",
+      "startMs": 3920,
+      "endMs": 4040,
+      "timestampMs": 3980,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 4040,
+      "endMs": 4320,
+      "timestampMs": 4180,
+      "confidence": null
+    },
+    {
+      "text": " proyectos",
+      "startMs": 4320,
+      "endMs": 4640,
+      "timestampMs": 4480,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 4640,
+      "endMs": 4760,
+      "timestampMs": 4700,
+      "confidence": null
+    },
+    {
+      "text": " tareas.",
+      "startMs": 4760,
+      "endMs": 5000,
+      "timestampMs": 4880,
+      "confidence": null
+    }
+  ],
+  "07-extension": [
+    {
+      "text": "Con",
+      "startMs": 340,
+      "endMs": 460,
+      "timestampMs": 400,
+      "confidence": null
+    },
+    {
+      "text": " la",
+      "startMs": 460,
+      "endMs": 640,
+      "timestampMs": 550,
+      "confidence": null
+    },
+    {
+      "text": " extensión",
+      "startMs": 640,
+      "endMs": 1080,
+      "timestampMs": 860,
+      "confidence": null
+    },
+    {
+      "text": " para",
+      "startMs": 1080,
+      "endMs": 1400,
+      "timestampMs": 1240,
+      "confidence": null
+    },
+    {
+      "text": " Chrome,",
+      "startMs": 1400,
+      "endMs": 1660,
+      "timestampMs": 1530,
+      "confidence": null
+    },
+    {
+      "text": " Edge",
+      "startMs": 1740,
+      "endMs": 1820,
+      "timestampMs": 1780,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 1820,
+      "endMs": 2140,
+      "timestampMs": 1980,
+      "confidence": null
+    },
+    {
+      "text": " Firefox,",
+      "startMs": 2140,
+      "endMs": 2560,
+      "timestampMs": 2350,
+      "confidence": null
+    },
+    {
+      "text": " importas",
+      "startMs": 2800,
+      "endMs": 3120,
+      "timestampMs": 2960,
+      "confidence": null
+    },
+    {
+      "text": " tareas",
+      "startMs": 3120,
+      "endMs": 3380,
+      "timestampMs": 3250,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 3380,
+      "endMs": 3500,
+      "timestampMs": 3440,
+      "confidence": null
+    },
+    {
+      "text": " Odoo,",
+      "startMs": 3500,
+      "endMs": 3900,
+      "timestampMs": 3700,
+      "confidence": null
+    },
+    {
+      "text": " envías",
+      "startMs": 4160,
+      "endMs": 4500,
+      "timestampMs": 4330,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 4500,
+      "endMs": 4800,
+      "timestampMs": 4650,
+      "confidence": null
+    },
+    {
+      "text": " partes",
+      "startMs": 4800,
+      "endMs": 5080,
+      "timestampMs": 4940,
+      "confidence": null
+    },
+    {
+      "text": " sin",
+      "startMs": 5080,
+      "endMs": 5180,
+      "timestampMs": 5130,
+      "confidence": null
+    },
+    {
+      "text": " teclearlos",
+      "startMs": 5180,
+      "endMs": 5720,
+      "timestampMs": 5450,
+      "confidence": null
+    },
+    {
+      "text": " dos",
+      "startMs": 5720,
+      "endMs": 5920,
+      "timestampMs": 5820,
+      "confidence": null
+    },
+    {
+      "text": " veces",
+      "startMs": 5920,
+      "endMs": 6140,
+      "timestampMs": 6030,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 6140,
+      "endMs": 6280,
+      "timestampMs": 6210,
+      "confidence": null
+    },
+    {
+      "text": " rellenas",
+      "startMs": 6280,
+      "endMs": 6700,
+      "timestampMs": 6490,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 6700,
+      "endMs": 7000,
+      "timestampMs": 6850,
+      "confidence": null
+    },
+    {
+      "text": " accesos",
+      "startMs": 7000,
+      "endMs": 7400,
+      "timestampMs": 7200,
+      "confidence": null
+    },
+    {
+      "text": " automáticamente.",
+      "startMs": 7400,
+      "endMs": 8400,
+      "timestampMs": 7900,
+      "confidence": null
+    }
+  ],
+  "08-herramientas": [
+    {
+      "text": "Y",
+      "startMs": 320,
+      "endMs": 520,
+      "timestampMs": 420,
+      "confidence": null
+    },
+    {
+      "text": " tienes",
+      "startMs": 520,
+      "endMs": 780,
+      "timestampMs": 650,
+      "confidence": null
+    },
+    {
+      "text": " herramientas",
+      "startMs": 780,
+      "endMs": 1280,
+      "timestampMs": 1030,
+      "confidence": null
+    },
+    {
+      "text": " útiles",
+      "startMs": 1280,
+      "endMs": 1600,
+      "timestampMs": 1440,
+      "confidence": null
+    },
+    {
+      "text": " a",
+      "startMs": 1600,
+      "endMs": 1800,
+      "timestampMs": 1700,
+      "confidence": null
+    },
+    {
+      "text": " mano:",
+      "startMs": 1800,
+      "endMs": 2140,
+      "timestampMs": 1970,
+      "confidence": null
+    },
+    {
+      "text": " calculadora",
+      "startMs": 2320,
+      "endMs": 2760,
+      "timestampMs": 2540,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 2760,
+      "endMs": 2920,
+      "timestampMs": 2840,
+      "confidence": null
+    },
+    {
+      "text": " horas,",
+      "startMs": 2920,
+      "endMs": 3300,
+      "timestampMs": 3110,
+      "confidence": null
+    },
+    {
+      "text": " porcentajes,",
+      "startMs": 3460,
+      "endMs": 4400,
+      "timestampMs": 3930,
+      "confidence": null
+    },
+    {
+      "text": " datos",
+      "startMs": 4600,
+      "endMs": 4860,
+      "timestampMs": 4730,
+      "confidence": null
+    },
+    {
+      "text": " ficticios",
+      "startMs": 4860,
+      "endMs": 5420,
+      "timestampMs": 5140,
+      "confidence": null
+    },
+    {
+      "text": " para",
+      "startMs": 5420,
+      "endMs": 5440,
+      "timestampMs": 5430,
+      "confidence": null
+    },
+    {
+      "text": " pruebas",
+      "startMs": 5640,
+      "endMs": 5900,
+      "timestampMs": 5770,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 5900,
+      "endMs": 6060,
+      "timestampMs": 5980,
+      "confidence": null
+    },
+    {
+      "text": " utilidades",
+      "startMs": 6060,
+      "endMs": 6580,
+      "timestampMs": 6320,
+      "confidence": null
+    },
+    {
+      "text": " para",
+      "startMs": 6580,
+      "endMs": 6900,
+      "timestampMs": 6740,
+      "confidence": null
+    },
+    {
+      "text": " desarrolladores.",
+      "startMs": 6900,
+      "endMs": 7480,
+      "timestampMs": 7190,
+      "confidence": null
+    }
+  ],
+  "09-almacenamiento": [
+    {
+      "text": "Lo",
+      "startMs": 380,
+      "endMs": 540,
+      "timestampMs": 460,
+      "confidence": null
+    },
+    {
+      "text": " más",
+      "startMs": 540,
+      "endMs": 1020,
+      "timestampMs": 780,
+      "confidence": null
+    },
+    {
+      "text": " importante:",
+      "startMs": 1020,
+      "endMs": 1460,
+      "timestampMs": 1240,
+      "confidence": null
+    },
+    {
+      "text": " tú",
+      "startMs": 1540,
+      "endMs": 1840,
+      "timestampMs": 1690,
+      "confidence": null
+    },
+    {
+      "text": " decides",
+      "startMs": 1840,
+      "endMs": 2080,
+      "timestampMs": 1960,
+      "confidence": null
+    },
+    {
+      "text": " dónde",
+      "startMs": 2080,
+      "endMs": 2300,
+      "timestampMs": 2190,
+      "confidence": null
+    },
+    {
+      "text": " viven",
+      "startMs": 2300,
+      "endMs": 2580,
+      "timestampMs": 2440,
+      "confidence": null
+    },
+    {
+      "text": " tus",
+      "startMs": 2580,
+      "endMs": 2820,
+      "timestampMs": 2700,
+      "confidence": null
+    },
+    {
+      "text": " datos.",
+      "startMs": 2820,
+      "endMs": 3000,
+      "timestampMs": 2910,
+      "confidence": null
+    },
+    {
+      "text": " En",
+      "startMs": 4120,
+      "endMs": 4220,
+      "timestampMs": 4170,
+      "confidence": null
+    },
+    {
+      "text": " la",
+      "startMs": 4220,
+      "endMs": 4300,
+      "timestampMs": 4260,
+      "confidence": null
+    },
+    {
+      "text": " nube,",
+      "startMs": 4300,
+      "endMs": 4740,
+      "timestampMs": 4520,
+      "confidence": null
+    },
+    {
+      "text": " para",
+      "startMs": 4920,
+      "endMs": 5120,
+      "timestampMs": 5020,
+      "confidence": null
+    },
+    {
+      "text": " tenerlos",
+      "startMs": 5120,
+      "endMs": 5480,
+      "timestampMs": 5300,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 5480,
+      "endMs": 5700,
+      "timestampMs": 5590,
+      "confidence": null
+    },
+    {
+      "text": " cualquier",
+      "startMs": 5700,
+      "endMs": 6040,
+      "timestampMs": 5870,
+      "confidence": null
+    },
+    {
+      "text": " dispositivo.",
+      "startMs": 6040,
+      "endMs": 7000,
+      "timestampMs": 6520,
+      "confidence": null
+    },
+    {
+      "text": " En",
+      "startMs": 7600,
+      "endMs": 7800,
+      "timestampMs": 7700,
+      "confidence": null
+    },
+    {
+      "text": " local,",
+      "startMs": 7800,
+      "endMs": 8200,
+      "timestampMs": 8000,
+      "confidence": null
+    },
+    {
+      "text": " cifrados",
+      "startMs": 8320,
+      "endMs": 8780,
+      "timestampMs": 8550,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 8780,
+      "endMs": 8860,
+      "timestampMs": 8820,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 8860,
+      "endMs": 9000,
+      "timestampMs": 8930,
+      "confidence": null
+    },
+    {
+      "text": " navegador,",
+      "startMs": 9000,
+      "endMs": 9620,
+      "timestampMs": 9310,
+      "confidence": null
+    },
+    {
+      "text": " sin",
+      "startMs": 9820,
+      "endMs": 10060,
+      "timestampMs": 9940,
+      "confidence": null
+    },
+    {
+      "text": " salir",
+      "startMs": 10060,
+      "endMs": 10220,
+      "timestampMs": 10140,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 10220,
+      "endMs": 10340,
+      "timestampMs": 10280,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 10340,
+      "endMs": 10600,
+      "timestampMs": 10470,
+      "confidence": null
+    },
+    {
+      "text": " equipo.",
+      "startMs": 10600,
+      "endMs": 11000,
+      "timestampMs": 10800,
+      "confidence": null
+    },
+    {
+      "text": " O",
+      "startMs": 11860,
+      "endMs": 12100,
+      "timestampMs": 11980,
+      "confidence": null
+    },
+    {
+      "text": " combinado:",
+      "startMs": 12100,
+      "endMs": 12700,
+      "timestampMs": 12400,
+      "confidence": null
+    },
+    {
+      "text": " lo",
+      "startMs": 12800,
+      "endMs": 13040,
+      "timestampMs": 12920,
+      "confidence": null
+    },
+    {
+      "text": " mejor",
+      "startMs": 13040,
+      "endMs": 13180,
+      "timestampMs": 13110,
+      "confidence": null
+    },
+    {
+      "text": " de",
+      "startMs": 13180,
+      "endMs": 13320,
+      "timestampMs": 13250,
+      "confidence": null
+    },
+    {
+      "text": " los",
+      "startMs": 13320,
+      "endMs": 13460,
+      "timestampMs": 13390,
+      "confidence": null
+    },
+    {
+      "text": " dos",
+      "startMs": 13460,
+      "endMs": 13680,
+      "timestampMs": 13570,
+      "confidence": null
+    },
+    {
+      "text": " mundos,",
+      "startMs": 13680,
+      "endMs": 14120,
+      "timestampMs": 13900,
+      "confidence": null
+    },
+    {
+      "text": " moviendo",
+      "startMs": 14320,
+      "endMs": 14700,
+      "timestampMs": 14510,
+      "confidence": null
+    },
+    {
+      "text": " cada",
+      "startMs": 14700,
+      "endMs": 15140,
+      "timestampMs": 14920,
+      "confidence": null
+    },
+    {
+      "text": " proyecto",
+      "startMs": 15140,
+      "endMs": 15400,
+      "timestampMs": 15270,
+      "confidence": null
+    },
+    {
+      "text": " cuando",
+      "startMs": 15400,
+      "endMs": 15700,
+      "timestampMs": 15550,
+      "confidence": null
+    },
+    {
+      "text": " quieras.",
+      "startMs": 15700,
+      "endMs": 16000,
+      "timestampMs": 15850,
+      "confidence": null
+    }
+  ],
+  "10-cierre": [
+    {
+      "text": "Chambapp.",
+      "startMs": 360,
+      "endMs": 1000,
+      "timestampMs": 680,
+      "confidence": null
+    },
+    {
+      "text": " Cada",
+      "startMs": 1800,
+      "endMs": 2020,
+      "timestampMs": 1910,
+      "confidence": null
+    },
+    {
+      "text": " minuto,",
+      "startMs": 2020,
+      "endMs": 2540,
+      "timestampMs": 2280,
+      "confidence": null
+    },
+    {
+      "text": " en",
+      "startMs": 2660,
+      "endMs": 2800,
+      "timestampMs": 2730,
+      "confidence": null
+    },
+    {
+      "text": " su",
+      "startMs": 2800,
+      "endMs": 3040,
+      "timestampMs": 2920,
+      "confidence": null
+    },
+    {
+      "text": " sitio.",
+      "startMs": 3040,
+      "endMs": 3440,
+      "timestampMs": 3240,
+      "confidence": null
+    },
+    {
+      "text": " Crea",
+      "startMs": 4320,
+      "endMs": 4540,
+      "timestampMs": 4430,
+      "confidence": null
+    },
+    {
+      "text": " tu",
+      "startMs": 4540,
+      "endMs": 4720,
+      "timestampMs": 4630,
+      "confidence": null
+    },
+    {
+      "text": " cuenta",
+      "startMs": 4720,
+      "endMs": 4900,
+      "timestampMs": 4810,
+      "confidence": null
+    },
+    {
+      "text": " y",
+      "startMs": 4900,
+      "endMs": 5200,
+      "timestampMs": 5050,
+      "confidence": null
+    },
+    {
+      "text": " empieza",
+      "startMs": 5200,
+      "endMs": 5440,
+      "timestampMs": 5320,
+      "confidence": null
+    },
+    {
+      "text": " hoy.",
+      "startMs": 5440,
+      "endMs": 5800,
+      "timestampMs": 5620,
+      "confidence": null
+    }
+  ]
+}

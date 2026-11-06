@@ -1,0 +1,49 @@
+{
+  "name": "chambapp-video",
+  "version": "1.0.0",
+  "description": "Vídeo promocional de Chambapp (Remotion)",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0",
+    "@mediabunny/server": "1.64.0",
+    "@remotion/captions": "4.0.541",
+    "@remotion/cli": "4.0.541",
+    "@remotion/google-fonts": "4.0.541",
+    "@remotion/media": "4.0.541",
+    "@remotion/transitions": "4.0.541",
+    "@remotion/whisper-webgpu": "4.0.541",
+    "lucide-react": "^1.48.0",
+    "mediabunny": "1.64.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.541"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.541",
+    "@types/react": "19.3.0",
+    "@types/web": "0.0.166",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "voice": "node scripts/generate-voice.mjs",
+    "transcribe": "node scripts/transcribe.mts",
+    "align": "node scripts/align.mjs",
+    "captions": "npm run transcribe && npm run align",
+    "render": "remotion render ChambappPromo out/chambapp-promo.mp4 --codec=h264 --crf=22 && remotion still ChambappPromo out/chambapp-promo-poster.jpg --frame=-8 --image-format=jpeg --jpeg-quality=85",
+    "to-landing": "node -e \"const f=require('fs');f.mkdirSync('../public/video',{recursive:true});for(const n of ['chambapp-promo.mp4','chambapp-promo-poster.jpg'])f.copyFileSync('out/'+n,'../public/video/'+n)\""
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

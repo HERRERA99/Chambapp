@@ -18,6 +18,7 @@ import { FeatureCards } from './components/FeatureCards';
 import { ExtensionShowcase } from './components/ExtensionShowcase';
 import { RoundingLab } from './components/RoundingLab';
 import { WeekExplorer } from './components/WeekExplorer';
+import { PromoVideo } from './components/PromoVideo';
 import { Reveal } from './components/Reveal';
 import './landing.css';
 
@@ -45,6 +46,9 @@ function LandingContent() {
             className={`landing-nav ${mobileMenu ? 'landing-nav--open' : ''}`}
             aria-label="Navegación pública"
           >
+            <a href="#video" onClick={() => setMobileMenu(false)}>
+              Vídeo
+            </a>
             <a href="#producto" onClick={() => setMobileMenu(false)}>
               El producto
             </a>
@@ -194,6 +198,19 @@ function LandingContent() {
             </div>
           ))}
         </div>
+        <section id="video" className="landing-section landing-container">
+          <Reveal className="landing-section__heading landing-section__heading--center">
+            <p className="landing-eyebrow">CHAMBAPP EN 90 SEGUNDOS</p>
+            <h2>
+              Todo tu trabajo.
+              <br />
+              <span className="landing-muted-heading">En la nube, en local o en los dos.</span>
+            </h2>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <PromoVideo />
+          </Reveal>
+        </section>
         <section id="producto" className="landing-section landing-container">
           <Reveal className="landing-section__heading">
             <p className="landing-eyebrow">TODO ENCAJA</p>

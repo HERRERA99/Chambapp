@@ -1,0 +1,46 @@
+{
+  "voice": "es-ES-AlvaroNeural",
+  "rate": "+6%",
+  "scenes": [
+    {
+      "id": "01-intro",
+      "text": "Esto es Chambapp. Tu jornada, tus proyectos y tus horas, por fin en un mismo sitio."
+    },
+    {
+      "id": "02-proyectos",
+      "text": "Organiza tus proyectos y clientes, cada uno con su color, su contexto y todo lo que cuelga de él."
+    },
+    {
+      "id": "03-tareas",
+      "text": "Crea tareas, enlázalas con Odoo y arranca el cronómetro con un clic. Cada sesión, en su lugar."
+    },
+    {
+      "id": "04-partes",
+      "text": "Ficha tu entrada y tu salida, revisa tus partes de horas con el redondeo que tú elijas, y cierra la semana sabiendo cuánto has imputado."
+    },
+    {
+      "id": "05-contrasenas",
+      "text": "Guarda usuarios y contraseñas en una bóveda cifrada con tu clave maestra. Solo tú puedes abrirla."
+    },
+    {
+      "id": "06-notas",
+      "text": "Escribe notas en Markdown, con vista previa en directo, y asócialas a tus proyectos y tareas."
+    },
+    {
+      "id": "07-extension",
+      "text": "Con la extensión para Chrome, Edge y Firefox, importas tareas de Odoo, envías tus partes sin teclearlos dos veces y rellenas tus accesos automáticamente."
+    },
+    {
+      "id": "08-herramientas",
+      "text": "Y tienes herramientas útiles a mano: calculadora de horas, porcentajes, datos ficticios para pruebas y utilidades para desarrolladores."
+    },
+    {
+      "id": "09-almacenamiento",
+      "text": "Lo más importante: tú decides dónde viven tus datos. En la nube, para tenerlos en cualquier dispositivo. En local, cifrados en tu navegador, sin salir de tu equipo. O combinado: lo mejor de los dos mundos, moviendo cada proyecto cuando quieras."
+    },
+    {
+      "id": "10-cierre",
+      "text": "Chambapp. Cada minuto, en su sitio. Crea tu cuenta y empieza hoy."
+    }
+  ]
+}
