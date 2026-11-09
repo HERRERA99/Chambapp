@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ask } from '../shared/messages';
 import type { ExtensionState } from '../shared/messages';
-import { ErrorText, Icon, IconButton } from '../shared/ui';
+import { Button, ErrorText, Icon, IconButton } from '../shared/ui';
 import { errorMessage } from '../shared/feedback';
 import { LoginView } from './LoginView';
 import { OdooView } from './OdooView';
 import { PasswordsView } from './PasswordsView';
+import { FichajeView } from './FichajeView';
 
-type Tab = 'odoo' | 'passwords';
+type Tab = 'odoo' | 'passwords' | 'fichaje';
 
 async function activeTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -110,15 +111,26 @@ export function App() {
                 <Icon name="lock" size={14} /> Bloquear bóveda
               </button>
             ) : null}
-            <button type="button" role="menuitem" onClick={() => void run({ type: 'sign-out' })}>
-              <Icon name="logout" size={14} /> Cerrar sesión
-            </button>
+            {state?.settings.backend === 'local' ? null : (
+              <button type="button" role="menuitem" onClick={() => void run({ type: 'sign-out' })}>
+                <Icon name="logout" size={14} /> Cerrar sesión
+              </button>
+            )}
           </div>
         ) : null}
       </header>
       {!state ? (
         <div className="popup__body">
           {error ? <ErrorText>{error}</ErrorText> : <p className="dim">Cargando…</p>}
+        </div>
+      ) : !state.user && state.settings.backend === 'local' ? (
+        <div className="popup__body stack">
+          <p className="dim">Modo local · {state.settings.localOrigin}</p>
+          <ErrorText>{state.localProblem ?? 'No se puede conectar con Chambapp local.'}</ErrorText>
+          <div className="row">
+            <Button onClick={() => void run({ type: 'state' })}>Reintentar</Button>
+            <Button onClick={() => void chrome.runtime.openOptionsPage()}>Ajustes</Button>
+          </div>
         </div>
       ) : !state.user ? (
         <div className="popup__body">
@@ -138,11 +150,19 @@ export function App() {
               >
                 <Icon name="key" size={14} /> Contraseñas
               </button>
+              <button
+                type="button"
+                aria-pressed={tab === 'fichaje'}
+                onClick={() => setTab('fichaje')}
+              >
+                <Icon name="timer" size={14} /> Fichaje
+              </button>
             </div>
           </nav>
           <main className="popup__body">
             <ErrorText>{error}</ErrorText>
             {tab === 'odoo' ? <OdooView state={state} tab={browserTab} /> : null}
+            {tab === 'fichaje' ? <FichajeView /> : null}
             {tab === 'passwords' ? (
               <PasswordsView state={state} tab={browserTab} onState={setState} />
             ) : null}

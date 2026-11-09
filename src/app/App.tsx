@@ -10,10 +10,21 @@ import { AttendanceProvider } from '../features/attendance/AttendanceProvider';
 import { RequireAuth } from './RequireAuth';
 import { paths } from './paths';
 
-const LandingPage = lazy(() => import('../features/landing/LandingPage'));
-const AuthPage = lazy(() => import('../features/auth/AuthPage'));
-const OAuthCallbackPage = lazy(() => import('../features/auth/OAuthCallbackPage'));
-const PasswordRecoveryPage = lazy(() => import('../features/auth/PasswordRecoveryPage'));
+// Cloud edition only (the local edition has no landing page or accounts).
+const LandingPage =
+  import.meta.env.VITE_EDITION === 'local'
+    ? null
+    : lazy(() => import('../features/landing/LandingPage'));
+const AuthPage =
+  import.meta.env.VITE_EDITION === 'local' ? null : lazy(() => import('../features/auth/AuthPage'));
+const OAuthCallbackPage =
+  import.meta.env.VITE_EDITION === 'local'
+    ? null
+    : lazy(() => import('../features/auth/OAuthCallbackPage'));
+const PasswordRecoveryPage =
+  import.meta.env.VITE_EDITION === 'local'
+    ? null
+    : lazy(() => import('../features/auth/PasswordRecoveryPage'));
 const OnboardingPage = lazy(() => import('../features/onboarding/OnboardingPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage'));
@@ -83,11 +94,30 @@ export function App() {
                   }
                 >
                   <Routes>
-                    <Route path={paths.home} element={<LandingPage />} />
-                    <Route path={paths.login} element={<AuthPage />} />
-                    <Route path={paths.authCallback} element={<OAuthCallbackPage />} />
-                    <Route path={paths.register} element={<AuthPage />} />
-                    <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
+                    {LandingPage && AuthPage && OAuthCallbackPage && PasswordRecoveryPage ? (
+                      <>
+                        <Route path={paths.home} element={<LandingPage />} />
+                        <Route path={paths.login} element={<AuthPage />} />
+                        <Route path={paths.authCallback} element={<OAuthCallbackPage />} />
+                        <Route path={paths.register} element={<AuthPage />} />
+                        <Route path={paths.recovery} element={<PasswordRecoveryPage />} />
+                      </>
+                    ) : (
+                      // Local edition: straight to the app; old account links land there too.
+                      [
+                        paths.home,
+                        paths.login,
+                        paths.authCallback,
+                        paths.register,
+                        paths.recovery,
+                      ].map((path) => (
+                        <Route
+                          key={path}
+                          path={path}
+                          element={<Navigate to={paths.dashboard} replace />}
+                        />
+                      ))
+                    )}
                     <Route element={<RequireAuth onboarding />}>
                       <Route
                         path={paths.onboarding}

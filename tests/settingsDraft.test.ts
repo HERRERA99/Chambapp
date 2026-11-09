@@ -156,3 +156,29 @@ test('profile drafts retain valid saved preferences and safely default incompati
   assert.equal(profileDraft(data).almacenamiento, 'nube');
   assert.equal(profileDraft(data).avisoCopiaDias, 7);
 });
+
+test('weekly hours are spread evenly over the chosen days, the remainder on the first ones', async () => {
+  const { distributeWeekly, workedDays, splitHours } =
+    await import('../src/features/settings/settingsDraft.ts');
+  assert.deepEqual(distributeWeekly(2400, [0, 1, 2, 3, 4]), [480, 480, 480, 480, 480, 0, 0]);
+  assert.deepEqual(distributeWeekly(2251, [4, 0, 2, 1, 3]), [451, 450, 450, 450, 450, 0, 0]);
+  assert.deepEqual(distributeWeekly(1000, [0, 2, 5]), [334, 0, 333, 0, 0, 333, 0]);
+  assert.deepEqual(distributeWeekly(0, [0, 1]), [0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(distributeWeekly(600, []), [0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(workedDays([0, 0, 0, 0, 0, 0, 0]), [0, 1, 2, 3, 4]);
+  assert.deepEqual(workedDays([60, 0, 0, 0, 0, 0, 30]), [0, 6]);
+  assert.deepEqual(splitHours(450), { hours: 7, minutes: 30 });
+  assert.deepEqual(splitHours(0), { hours: 0, minutes: 0 });
+});
+
+test('an even split that is not a preset is recognised as weekly hours', () => {
+  const data = workspace();
+  data.configurations = [configuration('current', '2026-09-28', 1800)];
+  data.days = [0, 1, 2, 3].map((index) => ({
+    configuracion_id: 'current',
+    dia_semana: index + 1,
+    minutos_objetivo: 450,
+  }));
+  assert.equal(initialSchedule(data, today).mode, 'semanal');
+  assert.deepEqual(initialSchedule(data, today).minutes, [450, 450, 450, 450, 0, 0, 0]);
+});

@@ -358,3 +358,42 @@ Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitat
 ## Release 0.3.0
 - npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.3.0.xpi (AMO unlisted, signature in META-INF, manifest 0.3.0). 0.1.0 and 0.2.0 kept.
 - npm run ext:pack → public/downloads zip 0.3.0 + signed xpi; extension.json {0.3.0, firefoxSigned: true}. Not committed.
+
+---
+
+# Plan 12 — Chambapp local en Docker + extensión nube/local + panel Contexto del día (2026-11-09)
+
+- Roles: host/planner/builder = Claude (Claude Code, Opus 5.5); plan reviewer + final inspector = Codex CLI 0.164.0 (default config; model reported by runner).
+- Plan: PLAN-12.md. Max review rounds 5; fix rounds 2; inspection rounds 2. Inspection on.
+- Authorization: user asked to implement (opción 2: imágenes en GHCR), remove landing/users/local-cloud mode in local edition, keep master key, encrypted backups, extension cloud/local selector, day-context side panel, README/docs, using Claudex Loop. No commit/push authorization.
+- Host-resolved routine choices (recorded in plan): port 47800, fixed user id, side panel in both editions, backup import = replace only.
+
+## Review round 1 — Codex (gpt-6-astra, observed) — REVISE
+Result: scratchpad claudex/r1/claudex-0dmf7nri/result.json. Findings R12-01..05 (3 high, 2 medium): migration atomicity vs BEGIN/COMMIT wrappers; import graph integrity under replica mode; public/downloads untracked; extension identity across local installs; stale pending ops after restore. All accepted; plan revised (dispositions in PLAN-12.md).
+
+## Review round 2 — Codex — REVISE
+Result: scratchpad claudex/r2/claudex-0o3jaeef/result.json. R12-06 (high) preserved dedup returns stale results after restore; R12-07 (high) in-flight stale-generation writes; R12-08 (medium) trigger-only invariants skipped on import; R12-09 (medium) queue transition contradicted state machine. All accepted; server-side generation check via PGRST_DB_PRE_REQUEST added.
+
+## Review round 3 — Codex — REVISE
+Result: scratchpad claudex/r3/claudex-b907zegj/result.json. R12-10 (high) hook cannot see RPC args; R12-11 (medium) lock-upgrade deadlock; R12-12 (high) note links to soft-deleted records wrongly rejected. All accepted (split RPCs, exempt by path, exclusive lock first, three-class trigger classification).
+
+## Review round 4 — Codex — APPROVED
+Result: scratchpad claudex/r4/claudex-ltc228vw/result.json. No findings. Limitations: plan-level only; runtime concurrency, HTTP protections, resources and browser compat are implementation-validation items.
+
+## Build (Claude) — base 6e043af
+- Builder: Claude (host). Deviation recorded in PLAN-12 (PostgREST channel kept enabled for schema reload on upgrades); plan edited after approval for that line only.
+- Proof (host-run): typecheck app+extension OK; eslint OK; prettier on touched files OK (repo-wide format:check already fails on CRLF checkouts, pre-existing); npm test 243/243; db:test 55 groups + local-edition 11/11 (embedded PG 17); npm run build (cloud) OK, landing present, no local-only RPC in bundle; build:local with no landing/auth chunks; Docker images built (db, web with extension 0.4.0 packaged); tools/docker-smoke 7/7 (one port 127.0.0.1:47899, 403 foreign Origin/Host, PostgREST flows, export/import round trip, 409 stale generation, restart persistence, migrate idempotent, failing migration leaves nothing, idle RAM 52 MiB); ext-smoke Edge 18/18 (selector updated for the new options form); ext-smoke run-local 8/8 against real Docker; UI in built-in browser: no landing/login, 5-step onboarding, dashboard, Ajustes Datos/Seguridad, day panel in Nuevo parte / Editar / Iniciar a otra hora (overlap warning, toggle, mobile stacking, no console errors); actionlint OK; compose config OK.
+- Not verified: GitHub Actions run and GHCR publish (no push authorization, no gh); arm64 image build; backup download/import through the browser UI (covered at API level); Firefox local mode.
+
+## Inspection 1 — fresh Codex session — REVISE
+Result: scratchpad claudex/i1/claudex-9hitji39/result.json. All 6 accepted and fixed (fix round 1):
+- I01 (high) command() now uses the checked session's own client and a connection epoch; reads that resolve a session use that client.
+- I02 (high) backend-set always runs the departure protocol (lock, caches, interrupt attempts); a local installation/generation change detected by the state probe triggers it too; the Odoo write-ack boundary re-checks the item's account and fails the attempt safely before writing.
+- I03 (medium) enqueue dedup/replacement only within the current account.
+- I04 (medium) host permissions removed only when no remaining address (Odoo or local) shares the port-less pattern; same rule for setOdooOrigin.
+- I05 (medium) one limit chain: data ≤ 55 MiB (download refused above it with COPIA_DEMASIADO_GRANDE), file read ≤ 4/3·55 MiB + 8 MiB, nginx body 64 MiB; boundary round-trip test.
+- I06 (medium) draft overlaps checked against every live entry (also other days), labelled with their date; tests for cross-midnight drafts and retroactive timers.
+- Proof rerun: typecheck, lint, npm test 246/246, ext:build, Docker images, docker-smoke 7/7 (54 MiB), ext-smoke run-local 8/8, ext-smoke 18/18.
+
+## Inspection 2 — fresh Codex session — FAILED (operational)
+Codex usage limit reached (resets 2026-11-10 00:41). Not a verdict. Fix-round-1 edits (I01–I06) are therefore NOT independently inspected yet; host proof checks rerun and pass.

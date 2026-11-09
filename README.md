@@ -1,6 +1,6 @@
 # Chambapp
 
-Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, notas Markdown, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
+Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Hay dos ediciones en el mismo código: **la nube** (Vercel + Supabase, con cuentas) y **Chambapp local** (Docker en tu PC, sin cuentas, los datos no salen del equipo; ver [Chambapp local](#chambapp-local-docker)). Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, notas Markdown, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
 
 ## Arrancar en local
 
@@ -81,9 +81,37 @@ El provider de fichajes conserva las operaciones pendientes por usuario en el na
 
 Las lecturas se paginan en bloques de 500 para recuperar todos los registros sin truncarlos con el límite de respuesta de Supabase. La caché se actualiza después de escribir, al recuperar el foco y periódicamente. Si crece el volumen de datos, la siguiente optimización consiste en consultas filtradas y agregaciones en el servidor por pantalla y periodo.
 
+## Chambapp local (Docker)
+
+Versión para usar Chambapp sin que los datos salgan del PC: corre en Docker, sin página de inicio, sin cuentas ni inicio de sesión, y con todos los datos en una base de datos local. Mantiene la clave maestra para notas y contraseñas y permite descargar copias de seguridad cifradas con contraseña desde **Ajustes → Datos**. Ocupa un único puerto, solo en `127.0.0.1` (por defecto `47800`), y unos 50–60 MB de memoria en reposo.
+
+Con las imágenes publicadas (se construyen solas al subir a `main`), basta el compose de [`docker/`](docker/):
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Abre [http://127.0.0.1:47800](http://127.0.0.1:47800). Para construir las imágenes desde este repositorio:
+
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.build.yml up -d --build
+```
+
+Instalación, actualización, puerto, copias de seguridad, extensión, arquitectura y pruebas en [docker/README.md](docker/README.md).
+
+Para desarrollar la edición local: `npm run build:local` compila con `VITE_EDITION=local` (fichero `.env.edicion-local`). La app usa entonces la API del mismo origen (`/rest/v1`), un usuario fijo y ninguna pantalla de cuenta. Sin esa variable se compila la edición de la nube, igual que siempre.
+
 ## Extensión de navegador
 
+La extensión funciona con las dos ediciones: en sus opciones, **Conexión → Nube o Local** (con la dirección de la instalación local). Su pestaña **Fichaje** añade a Chambapp tu último fichaje de Hera (entrada o salida) con un clic.
+
+**Jornada (Ajustes → Jornada semanal):** además de los modelos de 35, 37,5 y 40 horas, puedes indicar tus **horas semanales** (en horas y minutos) y los días que trabajas para repartirlas por igual, o definir **día a día** las horas y minutos de cada día.
+
 La carpeta `extension/` contiene la extensión de Chrome, Edge y Firefox: importa tareas de Odoo, envía los partes de Parte semanal a Odoo sin usar su API y rellena contraseñas de la bóveda. Se compila con `npm run ext:build` (`extension/dist` y `extension/dist-firefox`), se empaqueta para la web con `npm run ext:pack` y la versión de Firefox se firma con `npm run ext:sign:firefox`. Instalación, configuración y pruebas en [docs/extension.md](docs/extension.md).
+
+## Contexto del día
+
+Los formularios **Nuevo parte manual**, **Editar parte de horas** e **Iniciar cronómetro** (a otra hora) tienen un panel lateral que se muestra u oculta con «Contexto del día». Enseña las entradas y salidas de ese día (con el total fichado, la primera entrada y la última salida), los partes del día en orden horario y el intervalo que estás editando, y avisa si se solapa con otro parte. Se actualiza al cambiar la fecha y recuerda en el navegador si lo quieres visible. En móvil aparece debajo del formulario. La lógica está en `src/domain/dayContext.ts` (con pruebas) y el componente en `src/features/day-context/`.
 
 ## Reglas de tiempo y persistencia
 
@@ -127,7 +155,7 @@ npm run format:check
 
 `npm test` usa el runner de Node para comprobar redondeo, zonas horarias, configuración, validaciones, rutas de retorno, operaciones pendientes y coordinación del cronómetro; también verifica la selección y los agregados del calendario semanal. `npm run format` aplica el formato acordado.
 
-Pruebas de base de datos sin Docker:
+Pruebas de base de datos sin Docker (incluyen la base de datos de la edición local, `tools/db-tests/local-edition.mjs`):
 
 ```powershell
 npm run db:test:install
@@ -136,4 +164,4 @@ npm run db:test
 
 La suite levanta PostgreSQL 17 aislado con datos sintéticos, aplica todas las migraciones y verifica RLS, propiedad, versiones, redondeo, DST, cronómetro, referencias Odoo, fichajes, reintentos y concurrencia. No modifica la base alojada. `supabase/verify.sql` comprueba catálogo y permisos después de aplicar una migración; las pruebas de SQL no sustituyen la verificación de registro, confirmación por correo y login en el navegador.
 
-La migración [Inicio retroactivo y credenciales de Odoo](supabase/migrations/20261005185736_selected_timer_start_and_odoo_credentials.sql) está aplicada al proyecto alojado y verificada con PostgreSQL aislado y con el script remoto de catálogo y permisos. Es necesaria para activar «Iniciar a otra hora» y el guardado de la API key en el tutorial y en Ajustes. Las tareas se paginan de seis en seis y todas las vistas de partes muestran su estado de imputación en Odoo.
+La migración [Inicio retroactivo y credenciales de Odoo](supabase/migrations/20261005185736_selected_timer_start_and_odoo_credentials.sql) está aplicada al proyecto alojado y verificada con PostgreSQL aislado y con el script remoto de catálogo y permisos. Es necesaria para activar «Iniciar a otra hora». (La API key de Odoo ya no se pide en la app; la tabla `chambapp_private.odoo_credenciales` queda sin uso.) Las tareas se paginan de seis en seis y todas las vistas de partes muestran su estado de imputación en Odoo.

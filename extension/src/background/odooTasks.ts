@@ -6,13 +6,21 @@ import type { TabContext } from '../shared/messages';
 import { getSettings } from './settings';
 import type { Project, Task } from '../../../src/domain/models';
 import { createProject, createTask, loadProjects, loadStorageMode, loadTasks } from './workspace';
-import { requireUser } from './supabase';
+import { requireSession } from './supabase';
 import { askApp } from './appTabs';
 
 type LocalList = { proyectos: Project[]; tareas: Task[] };
 
-/** Projects and tasks kept in the browser, from an open Chambapp tab (null: none answered). */
-async function localData(userId: string): Promise<LocalList | null> {
+/** The cloud user of an account key; null for a local installation (it has no browser data). */
+const cloudUser = (account: string) => (account.startsWith('nube:') ? account.slice(5) : null);
+
+/**
+ * Projects and tasks kept in the browser (cloud edition), from an open Chambapp tab
+ * (null: none answered, or a local installation, which keeps everything in its database).
+ */
+async function localData(account: string): Promise<LocalList | null> {
+  const userId = cloudUser(account);
+  if (!userId) return null;
   try {
     const data = await askApp<LocalList>(userId, { kind: 'listar' }, 4_000);
     if (!data || !Array.isArray(data.proyectos) || !Array.isArray(data.tareas)) return null;
@@ -104,11 +112,11 @@ export async function tabContext(tabId: number): Promise<TabContext> {
   const current = tab?.url ? parseOdooTaskUrl(tab.url, { assumeTask: true }) : null;
   if (!detected || current?.recordId !== detected.recordId || current.origin !== detected.origin)
     return base;
-  const user = await requireUser();
-  const local = await localData(user.id);
+  const { account } = await requireSession();
+  const local = await localData(account);
   const [tasks, projects] = await Promise.all([
-    allTasks(user.id, local),
-    allProjects(user.id, local),
+    allTasks(account, local),
+    allProjects(account, local),
   ]);
   const names = new Map(projects.map((project) => [project.id, project.nombre]));
   const existing = findExistingTask(tasks, detected);
@@ -141,14 +149,16 @@ const importTask = createImporter<Project, Task>({
     return allProjects(userId, lastLocal);
   },
   loadTasks: async (userId) => allTasks(userId, lastLocal ?? (await localData(userId))),
-  createProject: async (name, userId) => {
-    if ((await loadStorageMode(userId)) === 'nube') return createProject(name, userId);
+  createProject: async (name, account) => {
+    const userId = cloudUser(account);
+    if (!userId || (await loadStorageMode(account)) === 'nube') return createProject(name, account);
     const created = await askApp<Project>(userId, { kind: 'crear-proyecto', nombre: name });
     return { ...created, origen: 'local' };
   },
-  createTask: async (task, userId) => {
+  createTask: async (task, account) => {
+    const userId = cloudUser(account);
     const local = lastLocal?.proyectos.some((project) => project.id === task.proyecto_id);
-    if (!local) return createTask(task, userId);
+    if (!local || !userId) return createTask(task, account);
     const created = await askApp<Task>(userId, { kind: 'crear-tarea', tarea: task });
     return { ...created, origen: 'local' };
   },
@@ -162,9 +172,10 @@ export async function importDetected(input: {
 }) {
   const detected = await detectedFor(input.tabId);
   if (!detected) throw new Error('Abre una tarea de Odoo para añadirla.');
-  const user = await requireUser();
+  // The importer passes this account key to every read and write it makes.
+  const { account } = await requireSession();
   const result = await importTask({
-    userId: user.id,
+    userId: account,
     detected,
     title: input.title,
     choice: input.choice,

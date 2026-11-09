@@ -3,6 +3,7 @@ import { formatDuration } from '../../../domain/time';
 import { Button } from '../../../shared/ui/Button';
 import { Modal } from '../../../shared/ui/Modal';
 import { OriginBadge } from '../../local/OriginBadge';
+import { isLocalEdition } from '../../../lib/edition';
 
 export function ProjectDetails({
   project,
@@ -33,9 +34,11 @@ export function ProjectDetails({
       <div className="page-stack">
         <p className="muted">{project.descripcion || 'Sin descripción'}</p>
         <div className="summary-pairs">
-          <span>
-            Guardado en <OriginBadge origin={project.origen} />
-          </span>
+          {isLocalEdition ? null : (
+            <span>
+              Guardado en <OriginBadge origin={project.origen} />
+            </span>
+          )}
           <span>
             Cliente <strong>{project.cliente || 'Sin cliente'}</strong>
           </span>

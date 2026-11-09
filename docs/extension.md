@@ -56,6 +56,26 @@ El manifiesto lleva una clave fija, así que el ID es siempre `bpaahhebkaiaihnkj
 
 ## Configuración
 
+### Fichaje (Hera)
+
+La pestaña **Fichaje** del popup añade tu último fichaje de Hera (`https://netkia.heraempleados.es/`) a Chambapp, en la conexión activa (nube o local). Al pulsar «Añadir mi último fichaje», la extensión lee el texto `Última acción: ENTRADA|SALIDA dd/mm/aaaa hh:mm` (elemento `#ultima_accion_flexible`). Lo toma de una pestaña de Hera abierta o, si no hay ninguna, de una pestaña en segundo plano que cierra al terminar. Hay que tener la sesión iniciada en Hera.
+
+- Una **ENTRADA** abre un fichaje a esa hora (en tu zona horaria).
+- Una **SALIDA** cierra el fichaje abierto a esa hora.
+
+Si ya está registrado, no lo duplica. Si no encaja (por ejemplo, una salida sin entrada abierta, una entrada con otra abierta o anterior a fichajes ya guardados), lo explica y no cambia nada. Necesita el permiso de host para Hera, incluido en el manifiesto; en Firefox, si falta, la sección ofrece «Conceder permiso».
+
+### Conexión: nube o Chambapp local
+
+En **Opciones → Conexión** se elige dónde están los datos. **Nube** es tu cuenta de Chambapp (con inicio de sesión). **Local** es una instalación de [Chambapp local](../docker/README.md), sin cuentas: indica su dirección (por defecto `http://127.0.0.1:47800`) y concede el permiso que pide el navegador para ella. En modo local:
+
+- El popup no pide iniciar sesión. Si la instalación no responde, explica que Docker no está en marcha o que la dirección no es correcta.
+- La extensión reconoce las pestañas de la app local (el puente se registra para esa dirección) y la app la muestra como conectada.
+- Todas las instalaciones locales comparten el mismo usuario. Por eso la extensión distingue la cuenta por conexión, dirección, instalación y generación de datos (cambia al restaurar una copia). Los envíos a Odoo, la bóveda y las contraseñas en caché son de esa cuenta: al cambiar de conexión se bloquea la bóveda, los intentos en curso se detienen como al cerrar sesión (conservando su estado según lo que llegó a Odoo) y los envíos de otra cuenta quedan apartados hasta volver a ella.
+- Cada escritura lleva la generación de datos: si se restauró una copia, el servidor la rechaza.
+
+Prueba en navegador del modo local contra una instalación de prueba: `node tools/docker-smoke/smoke.mjs --build --keep` y después `node tools/ext-smoke/run-local.mjs`.
+
 ### Supabase (solo para entrar con Google u otros proveedores)
 
 En **Authentication → URL Configuration → Redirect URLs** añade:

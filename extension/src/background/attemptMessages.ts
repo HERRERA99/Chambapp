@@ -24,6 +24,8 @@ export type Attempt = {
 export type AttemptDeps = {
   /** Persists a patch of the queue item; resolves to the updated copy (null if gone). */
   update: (id: string, patch: Partial<QueueItem>) => Promise<QueueItem | null>;
+  /** Whether the item's account is still the extension's account (checked before writing). */
+  stillCurrent?: () => Promise<boolean>;
 };
 
 function postToScript(attempt: Attempt, message: WorkerMessage) {
@@ -37,7 +39,7 @@ function postToScript(attempt: Attempt, message: WorkerMessage) {
 export async function onScriptMessage(
   attempt: Attempt,
   message: ScriptMessage,
-  { update }: AttemptDeps,
+  { update, stillCurrent }: AttemptDeps,
 ) {
   switch (message.type) {
     case 'heartbeat':
@@ -52,6 +54,15 @@ export async function onScriptMessage(
         await update(attempt.itemId, { before: message.count });
       return;
     case 'about-to-write': {
+      if (attempt.done) return;
+      // Nothing written yet: a changed account or restored data fails the attempt safely.
+      if (stillCurrent && !(await stillCurrent())) {
+        attempt.settle({
+          kind: 'failed',
+          error: 'La extensión cambió de cuenta o de instalación antes de guardar en Odoo.',
+        });
+        return;
+      }
       if (attempt.done) return;
       // Persist first: after this point a restart can never treat the attempt as safe to retry.
       const saved = await update(attempt.itemId, { phase: 'may-have-written' });

@@ -9,6 +9,7 @@ export function Modal({
   description,
   size = 'default',
   className = '',
+  aside,
   children,
 }: {
   open: boolean;
@@ -17,6 +18,11 @@ export function Modal({
   description?: string;
   size?: 'default' | 'wide';
   className?: string;
+  /**
+   * Side column next to the content (e.g. the day context of the time-entry forms).
+   * `undefined`: a plain modal; `null`: the side column is hidden right now.
+   */
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -27,10 +33,11 @@ export function Modal({
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
   }, [open]);
+  const withAside = aside !== undefined;
   return (
     <dialog
       ref={ref}
-      className={`modal ${size === 'wide' ? 'modal--wide' : ''} ${className}`}
+      className={`modal ${size === 'wide' ? 'modal--wide' : ''} ${withAside && aside ? 'modal--aside' : ''} ${className}`}
       aria-labelledby={id}
       aria-describedby={description ? `${id}-description` : undefined}
       onCancel={(event) => {
@@ -50,7 +57,14 @@ export function Modal({
           {description}
         </p>
       ) : null}
-      {children}
+      {withAside ? (
+        <div className={`modal__layout ${aside ? '' : 'modal__layout--single'}`}>
+          <div className="page-stack">{children}</div>
+          {aside}
+        </div>
+      ) : (
+        children
+      )}
     </dialog>
   );
 }

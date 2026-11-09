@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && npm run ext:pack && vite build",
+    "build:local": "tsc --noEmit && vite build --mode edicion-local",
+    "dev:local": "vite --host 127.0.0.1 --mode edicion-local",
     "preview": "vite preview --host 127.0.0.1",
     "lint": "eslint src extension/src",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.extension.json",

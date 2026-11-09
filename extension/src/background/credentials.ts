@@ -14,7 +14,7 @@ import type {
   OpenCredential,
 } from '../../../src/features/passwords/credentials.model';
 import type { CredentialView } from '../shared/messages';
-import { command, fail, requireUser, supabase } from './supabase';
+import { command, fail, requireSession, requireUser, db } from './supabase';
 import { assertCurrentGeneration, assertSameEpoch, lock, unlockedKey, VAULT_LOCKED } from './vault';
 import { loadProjects } from './workspace';
 
@@ -41,7 +41,9 @@ async function requireKey() {
 async function loadRows(userId: string): Promise<CredentialRow[]> {
   const rows: CredentialRow[] = [];
   for (let from = 0; ; from += 500) {
-    const { data, error, status } = await supabase
+    const { data, error, status } = await (
+      await db()
+    )
       .from('credenciales_detalle')
       .select('*')
       .eq('usuario_id', userId)
@@ -121,7 +123,9 @@ export async function credentialValue(id: string, fieldId: string) {
 
 /** Creates or edits an entry with the same checks and envelope as the app. */
 async function storedRow(userId: string, id: string): Promise<CredentialRow | null> {
-  const { data, error, status } = await supabase
+  const { data, error, status } = await (
+    await db()
+  )
     .from('credenciales')
     .select('*')
     .eq('usuario_id', userId)
@@ -140,6 +144,8 @@ export async function saveCredential(input: {
   proyectoId: string;
   secret: CredentialSecret;
 }) {
+  // The account this save belongs to: the write is refused if it changes meanwhile.
+  const { account } = await requireSession();
   const { user, key, generation } = await requireKey();
   const parsed = parseCredential(input.secret);
   const problem = parsed ? credentialProblem(parsed) : 'La entrada no es válida.';
@@ -179,7 +185,7 @@ export async function saveCredential(input: {
   };
   let saved: CredentialRow;
   try {
-    saved = await command<CredentialRow>('guardar_credencial', payload, user.id);
+    saved = await command<CredentialRow>('guardar_credencial', payload, account);
   } catch (cause) {
     if (cause instanceof DataError && /BOVEDA/.test(`${cause.code} ${cause.rawMessage}`))
       await lock();

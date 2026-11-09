@@ -7,6 +7,19 @@ import { Notice } from '../../../shared/ui/Panel';
 import { useWorkspace } from '../../workspace/useWorkspace';
 import { useEntryEditor } from './useEntryEditor';
 import { OdooLink } from '../../tasks/components/OdooLink';
+import { localDateTimeToIso } from '../../../domain/time';
+import { DayContextPanel, DayContextToggle } from '../../day-context/DayContextPanel';
+import { useDayContextVisibility } from '../../day-context/useDayContextVisibility';
+
+/** ISO instant of a date and time typed in the form; null while incomplete or invalid. */
+function typedInstant(date: string, time: string, zone: string) {
+  if (!date || !time) return null;
+  try {
+    return localDateTimeToIso(date, time, zone);
+  } catch {
+    return null;
+  }
+}
 
 export type EntryModalProps = {
   open: boolean;
@@ -36,6 +49,8 @@ function EntryEditor({
   onClose,
 }: Omit<EntryModalProps, 'open'> & { data: WorkspaceData }) {
   const editor = useEntryEditor({ data, entry, taskId, date, onClose });
+  const dayPanel = useDayContextVisibility();
+  const panelId = 'entry-day-context';
   const projects = data.projects.filter(
     (project) =>
       !project.eliminado_en &&
@@ -49,7 +64,23 @@ function EntryEditor({
       }}
       title={entry ? 'Editar parte de horas' : 'Nuevo parte manual'}
       description={`Introduce horas exactas en ${editor.zone}. El redondeo solo modifica la duración imputada.`}
+      aside={
+        dayPanel.visible ? (
+          <DayContextPanel
+            id={panelId}
+            data={data}
+            date={editor.startDate}
+            zone={editor.zone}
+            excludeEntryId={entry?.id ?? null}
+            draft={{
+              start: typedInstant(editor.startDate, editor.startTime, editor.zone),
+              end: typedInstant(editor.endDate, editor.endTime, editor.zone),
+            }}
+          />
+        ) : null
+      }
     >
+      <DayContextToggle visible={dayPanel.visible} onToggle={dayPanel.toggle} controls={panelId} />
       {entry && !entry.fin_en ? (
         <Notice title="Cronómetro activo">Detén el cronómetro antes de editar su intervalo.</Notice>
       ) : (

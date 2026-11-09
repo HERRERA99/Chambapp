@@ -65,6 +65,10 @@ const messages: Record<string, string> = {
   COPIA_INVALIDA: 'El archivo no es una copia de seguridad válida de Chambapp.',
   COPIA_OTRA_CUENTA: 'Esta copia pertenece a otra cuenta de Chambapp.',
   COPIA_CONTRASENA: 'La contraseña de la copia no es correcta.',
+  COPIA_DEMASIADO_GRANDE:
+    'Tus datos superan los 55 MB que admite una copia desde la app. Haz la copia con pg_dump (ver docker/README.md).',
+  GENERACION_CAMBIADA:
+    'Los datos se han restaurado desde una copia de seguridad. La página se recargará para mostrar los datos actuales.',
   TRASPASO_ID_EXISTENTE: 'Algún registro de este proyecto ya existe en la nube.',
   CONFIRMACION_CASCADA_REQUERIDA: 'Confirma que quieres eliminar también sus elementos.',
   CONFIRMAR_CAMBIO_ZONA:
@@ -101,7 +105,7 @@ export function readableError(error: unknown): string {
     return 'El correo o la contraseña no son correctos.';
   if (/Email not confirmed/.test(message)) return 'Confirma tu correo antes de iniciar sesión.';
   if (/Failed to fetch|NetworkError|network|fetch failed/i.test(message))
-    return 'No se puede conectar con Supabase. Revisa tu conexión y vuelve a intentarlo.';
+    return 'No se puede conectar con el servidor de Chambapp. Revisa tu conexión (o que Docker esté en marcha, en la versión local) y vuelve a intentarlo.';
   if (/AbortError|TimeoutError|timed out|aborted/i.test(message))
     return 'La solicitud no se ha podido confirmar a tiempo. Reintenta para comprobar el resultado.';
   if (/JWT.*expired|Invalid.*JWT|session.*expired/i.test(message))

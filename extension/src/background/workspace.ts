@@ -1,7 +1,7 @@
 import type { Project, Task } from '../../../src/domain/models';
 import { assertTask } from '../../../src/lib/supabase/rowValidation';
 import type { EntryRow, ProjectRow, TaskRow } from '../shared/queue';
-import { command, fail, requireUser, supabase } from './supabase';
+import { command, fail, requireSession } from './supabase';
 
 async function readAll<T>(
   page: (
@@ -24,8 +24,8 @@ async function readAll<T>(
 
 /** Where the user keeps new projects (perfiles.preferencias.almacenamiento). */
 export async function loadStorageMode(expectedUserId?: string): Promise<'nube' | 'local'> {
-  const user = await requireUser(expectedUserId);
-  const { data, error, status } = await supabase
+  const { user, client } = await requireSession(expectedUserId);
+  const { data, error, status } = await client
     .from('perfiles')
     .select('preferencias')
     .eq('id', user.id)
@@ -38,9 +38,9 @@ export async function loadStorageMode(expectedUserId?: string): Promise<'nube' |
 
 /** Live projects of the signed-in user (archived ones included; callers filter). */
 export async function loadProjects(expectedUserId?: string): Promise<Project[]> {
-  const user = await requireUser(expectedUserId);
+  const { user, client } = await requireSession(expectedUserId);
   return readAll<Project>((from, to) =>
-    supabase
+    client
       .from('proyectos')
       .select('*')
       .eq('usuario_id', user.id)
@@ -53,9 +53,9 @@ export async function loadProjects(expectedUserId?: string): Promise<Project[]> 
 }
 
 export async function loadTasks(expectedUserId?: string): Promise<Task[]> {
-  const user = await requireUser(expectedUserId);
+  const { user, client } = await requireSession(expectedUserId);
   const rows = await readAll((from, to) =>
-    supabase
+    client
       .from('tareas')
       .select('*')
       .eq('usuario_id', user.id)
@@ -97,10 +97,10 @@ export async function createTask(
 
 /** Entries of a request, read again right before writing anything to Odoo. */
 export async function loadEntryRows(ids: string[], expectedUserId?: string): Promise<EntryRow[]> {
-  const user = await requireUser(expectedUserId);
+  const { user, client } = await requireSession(expectedUserId);
   const rows: EntryRow[] = [];
   for (let index = 0; index < ids.length; index += 100) {
-    const { data, error, status } = await supabase
+    const { data, error, status } = await client
       .from('partes_detalle')
       .select(
         'id, usuario_id, version, tarea_id, fecha, fin_en, eliminado_en, imputacion_odoo_id, duracion_real_segundos, intervalo_redondeo_minutos',
@@ -118,8 +118,8 @@ export async function loadTaskAndProject(
   taskId: string,
   expectedUserId?: string,
 ): Promise<{ task: TaskRow | null; project: ProjectRow | null }> {
-  const user = await requireUser(expectedUserId);
-  const taskResult = await supabase
+  const { user, client } = await requireSession(expectedUserId);
+  const taskResult = await client
     .from('tareas')
     .select('id, usuario_id, proyecto_id, version, odoo_url, eliminado_en')
     .eq('usuario_id', user.id)
@@ -129,7 +129,7 @@ export async function loadTaskAndProject(
   if (taskResult.error) fail(taskResult.error, taskResult.status);
   const task = (taskResult.data as TaskRow | null) ?? null;
   if (!task) return { task: null, project: null };
-  const projectResult = await supabase
+  const projectResult = await client
     .from('proyectos')
     .select('id, eliminado_en')
     .eq('usuario_id', user.id)

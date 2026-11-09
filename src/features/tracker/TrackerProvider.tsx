@@ -16,12 +16,25 @@ import {
 } from './pendingOperation';
 import type { PendingOperation } from './pendingOperation';
 import { withTrackerLock } from './trackerLock';
+import { storageScope } from '../../lib/localGeneration';
 
-function TrackerSession({ children, userId }: { children: ReactNode; userId: string | null }) {
+/**
+ * `userId` is the account; `scope` names where pending operations are kept (the
+ * account, plus the data generation in the local edition: see localGeneration.ts).
+ */
+function TrackerSession({
+  children,
+  userId,
+  scope,
+}: {
+  children: ReactNode;
+  userId: string | null;
+  scope: string | null;
+}) {
   const { data } = useWorkspace();
   const queryClient = useQueryClient();
-  const [queued, setQueued] = useState(() => readPending(userId));
-  const [pausedTaskId, setPausedTaskId] = useState(() => readPaused(userId));
+  const [queued, setQueued] = useState(() => readPending(scope));
+  const [pausedTaskId, setPausedTaskId] = useState(() => readPaused(scope));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
@@ -36,40 +49,41 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (
-        !userId ||
+        !scope ||
         (event.key !== null &&
-          event.key !== trackerStorageKey(userId) &&
-          event.key !== `${trackerStorageKey(userId)}:paused`)
+          event.key !== trackerStorageKey(scope) &&
+          event.key !== `${trackerStorageKey(scope)}:paused`)
       )
         return;
-      setQueued(readPending(userId));
-      setPausedTaskId(readPaused(userId));
+      setQueued(readPending(scope));
+      setPausedTaskId(readPaused(scope));
       void queryClient.invalidateQueries({ queryKey: ['workspace', userId] });
     };
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
-  }, [userId, queryClient]);
+  }, [userId, scope, queryClient]);
 
   function paused(taskId: string | null) {
-    if (userId) savePaused(userId, taskId);
+    if (scope) savePaused(scope, taskId);
     setPausedTaskId(taskId);
   }
 
   async function perform(operation: PendingOperation, retry = false) {
     if (!userId) throw new Error('Inicia sesión para registrar tiempo.');
+    if (!scope) throw new Error('Espera a que terminen de cargarse tus datos.');
     if (inFlight.current) throw new Error('Espera a que termine la operación actual.');
     setBusy(true);
     setError(null);
     inFlight.current = true;
     try {
       await withTrackerLock(userId, async () => {
-        const stored = readPending(userId);
+        const stored = readPending(scope);
         if (!retry && stored)
           throw new Error('Confirma la operación pendiente antes de registrar más tiempo.');
         if (retry && (!stored || stored.payload.operacion_id !== operation.payload.operacion_id))
           return;
         try {
-          savePending(userId, operation);
+          savePending(scope, operation);
         } catch {
           throw new Error(
             'El navegador no permite guardar la operación pendiente. Activa el almacenamiento local para registrar tiempo con seguridad.',
@@ -78,14 +92,14 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
         setQueued(operation);
         try {
           await executeCommand(operation.action, operation.payload, undefined, userId);
-          clearPending(userId, String(operation.payload.operacion_id));
+          clearPending(scope, String(operation.payload.operacion_id));
           paused(operation.after === 'pause' ? operation.taskId : null);
         } catch (cause) {
           if (cause instanceof DataError && !cause.retryable)
-            clearPending(userId, String(operation.payload.operacion_id));
+            clearPending(scope, String(operation.payload.operacion_id));
           throw cause;
         } finally {
-          setQueued(readPending(userId));
+          setQueued(readPending(scope));
         }
       });
     } catch (cause) {
@@ -97,7 +111,7 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
       await queryClient
         .invalidateQueries({ queryKey: ['workspace', userId] })
         .catch(() => undefined);
-      setQueued(readPending(userId));
+      setQueued(readPending(scope));
       inFlight.current = false;
       setBusy(false);
     }
@@ -127,7 +141,7 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
   }
 
   async function retryPending() {
-    const operation = readPending(userId);
+    const operation = readPending(scope);
     if (operation) await perform(operation, true);
   }
 
@@ -161,8 +175,10 @@ function TrackerSession({ children, userId }: { children: ReactNode; userId: str
 
 export function TrackerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { data } = useWorkspace();
+  const scope = storageScope(user?.id, data?.dataGeneration);
   return (
-    <TrackerSession key={user?.id ?? 'signed-out'} userId={user?.id ?? null}>
+    <TrackerSession key={scope ?? 'sin-ambito'} userId={user?.id ?? null} scope={scope}>
       {children}
     </TrackerSession>
   );

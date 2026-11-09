@@ -9,6 +9,8 @@ import { formatDate, formatTime, localDateTimeToIso } from '../../domain/time';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useTracker } from './useTracker';
 import { readableError } from '../../lib/supabase/errors';
+import { DayContextPanel, DayContextToggle } from '../day-context/DayContextPanel';
+import { useDayContextVisibility } from '../day-context/useDayContextVisibility';
 
 type When = 'now' | 'other';
 
@@ -86,6 +88,17 @@ function StartTimerForm({
     .sort((a, b) => Date.parse(b.fin_en!) - Date.parse(a.fin_en!))[0];
   const busy = tracker.busy || tracker.pending;
   const selectedTask = tasks.find((task) => task.id === selected);
+  const dayPanel = useDayContextVisibility();
+  const panelId = 'timer-day-context';
+  // The instant the new timer would start, for the day panel (null while invalid).
+  let draftStart: string | null = now.toISO();
+  if (when === 'other') {
+    try {
+      draftStart = lastEnd ?? localDateTimeToIso(date, time, zone);
+    } catch {
+      draftStart = null;
+    }
+  }
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -111,7 +124,19 @@ function StartTimerForm({
       onClose={() => {
         if (!busy) onClose();
       }}
+      aside={
+        dayPanel.visible ? (
+          <DayContextPanel
+            id={panelId}
+            data={data!}
+            date={when === 'other' ? date : now.toISODate()!}
+            zone={zone}
+            draft={{ start: draftStart, end: null }}
+          />
+        ) : null
+      }
     >
+      <DayContextToggle visible={dayPanel.visible} onToggle={dayPanel.toggle} controls={panelId} />
       <form className="page-stack" onSubmit={submit}>
         <SelectField
           label="Tarea"
