@@ -16,11 +16,21 @@ import {
   withAttendanceLock,
 } from './pendingAttendance';
 import type { PendingAttendance } from './pendingAttendance';
+import { storageScope } from '../../lib/localGeneration';
 
-function AttendanceSession({ children, userId }: { children: ReactNode; userId: string | null }) {
+/** `scope` names where the pending intent is kept (see TrackerSession). */
+function AttendanceSession({
+  children,
+  userId,
+  scope,
+}: {
+  children: ReactNode;
+  userId: string | null;
+  scope: string | null;
+}) {
   const { data } = useWorkspace();
   const cache = useQueryClient();
-  const [operation, setOperation] = useState(() => readPendingAttendance(userId));
+  const [operation, setOperation] = useState(() => readPendingAttendance(scope));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientNow, setClientNow] = useState(Date.now);
@@ -37,28 +47,29 @@ function AttendanceSession({ children, userId }: { children: ReactNode; userId: 
 
   useEffect(() => {
     function sync(event: StorageEvent) {
-      if (!userId || (event.key !== null && event.key !== attendanceStorageKey(userId))) return;
-      setOperation(readPendingAttendance(userId));
+      if (!scope || (event.key !== null && event.key !== attendanceStorageKey(scope))) return;
+      setOperation(readPendingAttendance(scope));
       void cache.invalidateQueries({ queryKey: ['workspace', userId] });
     }
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
-  }, [userId, cache]);
+  }, [userId, scope, cache]);
 
   async function perform(intent: PendingAttendance, retry = false) {
     if (!userId) throw new Error('Inicia sesión para fichar.');
+    if (!scope) throw new Error('Espera a que terminen de cargarse tus datos.');
     if (inFlight.current) throw new Error('Espera a que termine el fichaje actual.');
     inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
       await withAttendanceLock(userId, async () => {
-        const stored = readPendingAttendance(userId);
+        const stored = readPendingAttendance(scope);
         if (!retry && stored)
           throw new Error('Reintenta el fichaje pendiente antes de guardar otro cambio.');
         if (retry && !sameAttendanceIntent(stored, intent)) return;
         try {
-          savePendingAttendance(userId, intent);
+          savePendingAttendance(scope, intent);
         } catch {
           throw new Error(
             'Activa el almacenamiento local del navegador para conservar el fichaje hasta confirmar su resultado.',
@@ -67,10 +78,9 @@ function AttendanceSession({ children, userId }: { children: ReactNode; userId: 
         setOperation(intent);
         try {
           await executeCommand(intent.action, intent.payload, undefined, userId);
-          clearPendingAttendance(userId, intent);
+          clearPendingAttendance(scope, intent);
         } catch (cause) {
-          if (cause instanceof DataError && !cause.retryable)
-            clearPendingAttendance(userId, intent);
+          if (cause instanceof DataError && !cause.retryable) clearPendingAttendance(scope, intent);
           throw cause;
         }
       });
@@ -79,7 +89,7 @@ function AttendanceSession({ children, userId }: { children: ReactNode; userId: 
       throw cause;
     } finally {
       await cache.invalidateQueries({ queryKey: ['workspace', userId] }).catch(() => undefined);
-      setOperation(readPendingAttendance(userId));
+      setOperation(readPendingAttendance(scope));
       inFlight.current = false;
       setBusy(false);
     }
@@ -90,7 +100,7 @@ function AttendanceSession({ children, userId }: { children: ReactNode; userId: 
     await perform({ action: 'fichar_salida', payload: { id: active.id, version: active.version } });
   }
   async function retry() {
-    const intent = readPendingAttendance(userId);
+    const intent = readPendingAttendance(scope);
     if (intent) await perform(intent, true);
   }
 
@@ -119,8 +129,10 @@ function AttendanceSession({ children, userId }: { children: ReactNode; userId: 
 
 export function AttendanceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { data } = useWorkspace();
+  const scope = storageScope(user?.id, data?.dataGeneration);
   return (
-    <AttendanceSession key={user?.id ?? 'signed-out'} userId={user?.id ?? null}>
+    <AttendanceSession key={scope ?? 'sin-ambito'} userId={user?.id ?? null} scope={scope}>
       {children}
     </AttendanceSession>
   );

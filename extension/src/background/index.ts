@@ -4,6 +4,7 @@ import { ATTEMPT_PORT_PREFIX } from '../shared/automation';
 import type { ExtensionState, PopupRequest, PopupResponse } from '../shared/messages';
 import { accountChange, signInWithPassword, signInWithProvider, signOut } from './auth';
 import { autofill } from './autofill';
+import { syncHera } from './hera';
 import {
   clearCredentialCache,
   credentialValue,
@@ -16,6 +17,7 @@ import {
   enqueue,
   forgetOtherAccounts,
   handleAttemptPort,
+  interruptAttempts,
   onQueueChange,
   onTabClosed,
   onWorkspaceChanged,
@@ -30,12 +32,20 @@ import {
   getSettings,
   hasOdooPermission,
   setAutoLock,
+  setBackend,
   setDateFormat,
   setOdooOrigin,
   syncDetector,
+  syncLocalBridge,
 } from './settings';
-import { currentSession, message } from './supabase';
-import { APP_ORIGINS, appTabs, onLocalReply, toApp } from './appTabs';
+import {
+  currentSession,
+  localProblem,
+  message,
+  onLocalAccountChanged,
+  resetLocalClient,
+} from './supabase';
+import { appOrigins, appTabs, onLocalReply, setLocalAppOrigin, toApp } from './appTabs';
 import { applyAutoLock, lock, lockIfExpired, onLock, unlock, vaultStatus } from './vault';
 
 // Every lock drops decrypted entries and closes secret views in open extension pages.
@@ -60,13 +70,34 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
 
 /** Clears what belonged to another account whenever the signed-in user changes. */
 async function syncAccount() {
+  await applyBackend();
   const change = await accountChange();
-  if (change.changed) {
-    await lock();
-    clearCredentialCache();
-    if (change.userId) await forgetOtherAccounts(change.userId);
-  }
+  if (change.changed) await leaveAccount(change.account);
   return change;
+}
+
+/**
+ * Leaving an account (sign-in as another user, another backend or local address, or
+ * a restore that changed the local data generation): secrets are dropped, running
+ * Odoo attempts stop through their write boundary (keeping an evidence-based status)
+ * and unsent work of other accounts is forgotten; uncertain items stay with their
+ * account for review.
+ */
+async function leaveAccount(account: string | null) {
+  await lock();
+  clearCredentialCache();
+  await interruptAttempts('La extensión ha cambiado de cuenta o de instalación.');
+  if (account) await forgetOtherAccounts(account);
+}
+
+// A restore or another installation at the local address: leave the previous account.
+onLocalAccountChanged((account) => void leaveAccount(account));
+
+/** Keeps the app origins in line with the settings (the worker may have restarted). */
+async function applyBackend() {
+  const settings = await getSettings();
+  setLocalAppOrigin(settings.backend === 'local' ? settings.localOrigin : null);
+  return settings;
 }
 
 async function state(): Promise<ExtensionState> {
@@ -74,6 +105,7 @@ async function state(): Promise<ExtensionState> {
   const settings = await getSettings();
   return {
     version: chrome.runtime.getManifest().version,
+    localProblem: await localProblem(),
     user: userId ? { id: userId, email } : null,
     vault: userId ? await vaultStatus(userId).catch(() => 'locked' as const) : 'signed-out',
     settings,
@@ -179,7 +211,7 @@ async function handlePage(request: PopupRequest): Promise<unknown> {
     case 'sign-out': {
       const session = await currentSession();
       await lock();
-      if (session) await clearSessionWork(session.user.id);
+      if (session) await clearSessionWork(session.account);
       await signOut();
       void broadcastHello();
       return state();
@@ -191,6 +223,18 @@ async function handlePage(request: PopupRequest): Promise<unknown> {
     case 'date-format-set':
       await setDateFormat(request.format);
       return state();
+    case 'backend-set': {
+      await setBackend(request.backend, String(request.localOrigin ?? ''));
+      resetLocalClient();
+      // Always leave the previous connection, even if the new one cannot be reached yet.
+      await leaveAccount(null);
+      await applyBackend();
+      await syncAccount();
+      void injectBridge();
+      void processQueue();
+      void broadcastHello();
+      return state();
+    }
     case 'odoo-origin-set':
       await setOdooOrigin(request.origin);
       void broadcastHello();
@@ -218,6 +262,12 @@ async function handlePage(request: PopupRequest): Promise<unknown> {
     case 'import-task': {
       const result = await importDetected(request);
       if (result.kind === 'created')
+        void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' });
+      return result;
+    }
+    case 'hera-sync': {
+      const result = await syncHera();
+      if (result.outcome !== 'already')
         void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' });
       return result;
     }
@@ -259,11 +309,18 @@ chrome.runtime.onMessage.addListener((raw, sender, respond) => {
       sender.id !== chrome.runtime.id ||
       sender.tab?.id === undefined ||
       sender.frameId !== 0 ||
-      !APP_ORIGINS.includes(senderOrigin(sender) ?? '') ||
       !isAppMessage(envelope.message)
     )
       return false;
-    handleApp(envelope.message, sender.tab.id).then(respond, () => respond(null));
+    const tabId = sender.tab.id;
+    const appMessage = envelope.message;
+    // The local installation's origin comes from the settings (the worker may have restarted).
+    applyBackend()
+      .then(() => {
+        if (!appOrigins().includes(senderOrigin(sender) ?? '')) return null;
+        return handleApp(appMessage, tabId);
+      })
+      .then(respond, () => respond(null));
     return true;
   }
   if (envelope?.channel === 'odoo-detect') {
@@ -298,6 +355,8 @@ async function startup() {
     .catch(() => undefined);
   if (!(await chrome.alarms.get(TICK))) await chrome.alarms.create(TICK, { periodInMinutes: 1 });
   await syncDetector().catch(() => undefined);
+  await applyBackend();
+  await syncLocalBridge().catch(() => undefined);
   await lockIfExpired();
   await resolveOrphans();
   void processQueue();

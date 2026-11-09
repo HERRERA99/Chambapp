@@ -13,6 +13,8 @@ import { isRetryableStatus, isValidCommandResponse, rpcForAction } from './comma
 import type { CommandAction, Json, WorkspaceData } from '../../domain/models';
 import { isLocalAction } from '../local/engine';
 import { mergeLocal, registerCloudCommand, routeCommand } from '../local/runtime';
+import { isLocalEdition } from '../edition';
+import { setDataGeneration } from '../localGeneration';
 
 type PageResult<T> = {
   data: T[] | null;
@@ -47,6 +49,8 @@ export async function executeCommand<T = unknown>(
   signal = AbortSignal.timeout(20_000),
   expectedUserId?: string,
 ): Promise<T> {
+  // Local edition: everything lives in the local database; no browser store.
+  if (isLocalEdition) return executeCloudCommand<T>(action, payload, signal, expectedUserId);
   if (isLocalAction(action))
     return (await routeCommand(action, payload, signal, expectedUserId)) as T;
   return executeCloudCommand<T>(action, payload, signal, expectedUserId);
@@ -87,7 +91,9 @@ export async function executeCloudCommand<T = unknown>(
   const request = db
     .rpc(rpcForAction(action), { p_accion: action, p_datos: payload })
     .abortSignal(signal);
-  if (expectedUserId) {
+  // The local edition has no sessions: one fixed user, and the data generation
+  // (sent by generationFetch) guards against stale requests instead.
+  if (expectedUserId && !isLocalEdition) {
     const { data: auth, error: authError } = await db.auth.getSession();
     if (authError || auth.session?.user.id !== expectedUserId)
       throw new DataError(
@@ -124,6 +130,23 @@ export async function loadWorkspace(
   const db = getSupabase();
   const timeout = AbortSignal.timeout(30_000);
   const signal = cancelSignal ? AbortSignal.any([cancelSignal, timeout]) : timeout;
+  let dataGeneration: string | undefined;
+  if (isLocalEdition) {
+    // First the generation: every later request (and pending operation) uses it.
+    const { data, error, status } = await db.rpc('chambapp_copia_estado').abortSignal(signal);
+    if (error)
+      throw new DataError(
+        readableError(error),
+        isRetryableStatus(status),
+        error.code,
+        error.message,
+      );
+    const state = data as { generacion?: unknown } | null;
+    if (typeof state?.generacion !== 'string')
+      throw new DataError('La base de datos local no ha devuelto su estado.', true);
+    dataGeneration = state.generacion;
+    setDataGeneration(dataGeneration);
+  }
   const results = await Promise.all([
     db.from('perfiles').select('*').eq('id', userId).abortSignal(signal).single(),
     readAll((from, to) =>
@@ -279,8 +302,9 @@ export async function loadWorkspace(
     }),
     serverTime: clock.hora_servidor,
     receivedAt: clock.receivedAt,
+    ...(dataGeneration ? { dataGeneration } : {}),
   };
-  return mergeLocal(cloud, userId);
+  return isLocalEdition ? cloud : mergeLocal(cloud, userId);
 }
 
 registerCloudCommand(executeCloudCommand);

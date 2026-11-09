@@ -24,7 +24,8 @@ import { onAttemptDisconnect, onScriptMessage } from './attemptMessages';
 import type { Attempt, AttemptResult } from './attemptMessages';
 import type { QueueView } from '../shared/messages';
 import { getSettings, hasOdooPermission } from './settings';
-import { command, currentSession, message } from './supabase';
+import { command, currentSession, message, requireSession } from './supabase';
+import { itemAccount } from '../shared/backend';
 import { loadEntryRows, loadTaskAndProject } from './workspace';
 import { askApp } from './appTabs';
 
@@ -49,10 +50,10 @@ async function loadRequestData(item: QueueItem, withEntries = true): Promise<Req
     withEntries
       ? loadEntryRows(
           request.partes.map((part) => part.id),
-          request.userId,
+          itemAccount(item),
         )
       : Promise.resolve([]),
-    loadTaskAndProject(request.taskId, request.userId),
+    loadTaskAndProject(request.taskId, itemAccount(item)),
   ]);
   return { rows, task, project };
 }
@@ -102,13 +103,15 @@ function update(id: string, patch: Partial<QueueItem>) {
 
 export async function queueSummary() {
   const session = await currentSession();
-  return summarizeQueue(await readQueue(), session?.user.id ?? null);
+  // Only the current account's items (an installation shares its user id with others).
+  const mine = (await readQueue()).filter((item) => itemAccount(item) === session?.account);
+  return summarizeQueue(mine, session?.user.id ?? null);
 }
 
 export async function queueViews(): Promise<QueueView[]> {
   const session = await currentSession();
   return (await readQueue())
-    .filter((item) => item.request.userId === session?.user.id)
+    .filter((item) => itemAccount(item) === session?.account)
     .map((item) => ({
       requestId: item.id,
       status: item.status,
@@ -127,11 +130,11 @@ export async function queueViews(): Promise<QueueView[]> {
 }
 
 /** Drops what a previous account left waiting; its uncertain items stay hidden for review. */
-export function forgetOtherAccounts(userId: string) {
+export function forgetOtherAccounts(account: string) {
   return withQueue((queue) => {
     for (let index = queue.length - 1; index >= 0; index -= 1) {
       const item = queue[index]!;
-      if (item.request.userId !== userId && ['pending', 'error'].includes(item.status))
+      if (itemAccount(item) !== account && ['pending', 'error'].includes(item.status))
         queue.splice(index, 1);
     }
   });
@@ -156,8 +159,12 @@ export async function enqueue(raw: unknown): Promise<QueueItem> {
       'Falta el permiso para acceder a tu Odoo: revísalo en los ajustes de la extensión.',
     );
   const item = await withQueue((queue) => {
-    const decision = enqueueDecision(queue, request, Date.now());
+    // Only this account's items can match or be replaced: another installation or data
+    // generation shares ids but never blocks (or is replaced by) this one.
+    const own = queue.filter((entry) => itemAccount(entry) === session.account);
+    const decision = enqueueDecision(own, request, Date.now());
     if (decision.kind === 'existing') return { ...decision.item };
+    decision.item.account = session.account;
     for (const id of decision.replaced) {
       const index = queue.findIndex((entry) => entry.id === id);
       if (index >= 0) queue.splice(index, 1);
@@ -175,7 +182,7 @@ export async function queueAction(requestId: string, action: QueueAction) {
   const token = crypto.randomUUID();
   const outcome = await withQueue((queue) => {
     const index = queue.findIndex(
-      (entry) => entry.id === requestId && entry.request.userId === session.user.id,
+      (entry) => entry.id === requestId && itemAccount(entry) === session.account,
     );
     if (index < 0) throw new Error('El envío ya no existe.');
     const result = applyQueueAction(queue[index]!, action, Date.now(), token);
@@ -222,7 +229,17 @@ export function handleAttemptPort(port: chrome.runtime.Port) {
   attempt.port = port;
   port.onMessage.addListener((raw: ScriptMessage) => {
     if (!raw || raw.attemptId !== attemptId) return;
-    void onScriptMessage(attempt, raw, { update }).catch(() => undefined);
+    void onScriptMessage(attempt, raw, {
+      update,
+      stillCurrent: async () => {
+        const item = (await readQueue()).find((entry) => entry.id === attempt.itemId);
+        if (!item) return false;
+        return requireSession(itemAccount(item)).then(
+          () => true,
+          () => false,
+        );
+      },
+    }).catch(() => undefined);
   });
   port.onDisconnect.addListener(() => onAttemptDisconnect(attempt));
 }
@@ -329,7 +346,7 @@ async function markEntries(item: QueueItem, token: string | null = null) {
     }
     if (item.request.origen === 'local')
       await askApp(item.request.userId, { kind: 'imputar', partes: item.request.partes });
-    else await command('imputar_partes', { partes: item.request.partes }, item.request.userId);
+    else await command('imputar_partes', { partes: item.request.partes }, itemAccount(item));
     await finishMarking(item.id, token, { status: 'success', phase: 'done', error: '' });
   } catch (cause) {
     await finishMarking(item.id, token, {
@@ -600,17 +617,24 @@ async function failUnexpectedly(id: string, reason: string) {
 }
 
 /**
+ * Stops the running attempts through their write boundary: before it they become
+ * errors, after it "uncertain" (resolveOrphans applies the persisted phase).
+ */
+export async function interruptAttempts(reason: string) {
+  for (const attempt of attempts.values()) attempt.settle({ kind: 'interrupted', error: reason });
+  await resolveOrphans();
+}
+
+/**
  * Sign-out: unstarted work of that account is dropped and running attempts are
  * stopped through the write boundary (after it they stay "uncertain" for review).
  */
-export async function clearSessionWork(userId: string) {
-  for (const attempt of attempts.values())
-    attempt.settle({ kind: 'interrupted', error: 'Se cerró la sesión de la extensión.' });
-  await resolveOrphans();
+export async function clearSessionWork(account: string) {
+  await interruptAttempts('Se cerró la sesión de la extensión.');
   await withQueue((queue) => {
     for (let index = queue.length - 1; index >= 0; index -= 1) {
       const item = queue[index]!;
-      if (item.request.userId === userId && ['pending', 'error'].includes(item.status))
+      if (itemAccount(item) === account && ['pending', 'error'].includes(item.status))
         queue.splice(index, 1);
     }
   });
@@ -627,7 +651,7 @@ export async function processQueue() {
       const queue = await readQueue();
       if (queue.some((entry) => entry.status === 'processing')) return;
       const next = queue.find(
-        (entry) => entry.status === 'pending' && entry.request.userId === session.user.id,
+        (entry) => entry.status === 'pending' && itemAccount(entry) === session.account,
       );
       if (!next) return;
       try {

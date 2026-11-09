@@ -156,6 +156,8 @@ export type WorkspaceData = {
   receivedAt: number;
   /** State of the projects, tasks and entries kept in this browser. */
   local?: LocalSummary;
+  /** Local edition: data generation of the local database (changes on every restore). */
+  dataGeneration?: string;
 };
 
 export type CalendarAbsence = OwnedRecord & {

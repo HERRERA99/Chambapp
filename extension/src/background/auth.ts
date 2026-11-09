@@ -1,9 +1,11 @@
 import type { Provider } from '@supabase/supabase-js';
 import { oauthProviders } from '../../../src/features/auth/oauth';
 import { readableError } from '../../../src/lib/supabase/errors';
-import { currentSession, supabase } from './supabase';
+import { cloud as supabase, currentSession } from './supabase';
 
 const LAST_USER_KEY = 'chambapp_last_user';
+/** Account key (shared/backend.ts) of the last account seen; replaces LAST_USER_KEY. */
+const LAST_ACCOUNT_KEY = 'chambapp_last_account';
 
 export async function signInWithPassword(email: string, password: string) {
   if (!email.trim() || !password) throw new Error('Escribe tu correo y tu contraseña.');
@@ -58,14 +60,18 @@ export async function signOut() {
  */
 export async function accountChange() {
   const session = await currentSession();
-  const userId = session?.user.id ?? null;
+  const account = session?.account ?? null;
+  const stored = await chrome.storage.local.get([LAST_ACCOUNT_KEY, LAST_USER_KEY]);
+  const legacyUser = stored[LAST_USER_KEY] as string | undefined;
   const previous =
-    ((await chrome.storage.local.get(LAST_USER_KEY))[LAST_USER_KEY] as string) ?? null;
-  if (userId && userId !== previous) await chrome.storage.local.set({ [LAST_USER_KEY]: userId });
+    (stored[LAST_ACCOUNT_KEY] as string | undefined) ?? (legacyUser ? `nube:${legacyUser}` : null);
+  if (account && account !== previous)
+    await chrome.storage.local.set({ [LAST_ACCOUNT_KEY]: account });
   return {
     previous,
-    userId,
+    account,
+    userId: session?.user.id ?? null,
     email: session?.user.email ?? null,
-    changed: !!userId && userId !== previous,
+    changed: !!account && account !== previous,
   };
 }

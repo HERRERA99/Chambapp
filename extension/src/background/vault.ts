@@ -6,7 +6,7 @@ import {
   WrongMasterPasswordError,
 } from '../../../src/lib/crypto/vault';
 import type { VaultRow } from '../../../src/domain/models';
-import { fail, requireUser, supabase } from './supabase';
+import { currentSession, fail, requireSession, db } from './supabase';
 import { getSettings } from './settings';
 
 /** In-memory only (chrome.storage.session): gone when the browser closes. */
@@ -14,7 +14,14 @@ const SESSION_KEY = 'chambapp_vault_v1';
 const MAX_ATTEMPTS = 5;
 const COOLDOWN_MS = 30_000;
 
-type Unlocked = { raw: string; generation: string; userId: string; expiresAt: number | null };
+type Unlocked = {
+  raw: string;
+  generation: string;
+  userId: string;
+  /** Account key of the session that unlocked it (absent in keys stored before Plan 12). */
+  account?: string;
+  expiresAt: number | null;
+};
 
 let cached: { key: CryptoKey; state: Unlocked } | null = null;
 /**
@@ -44,7 +51,9 @@ async function expiry() {
 }
 
 export async function loadVaultRow(userId: string): Promise<VaultRow | null> {
-  const { data, error, status } = await supabase
+  const { data, error, status } = await (
+    await db()
+  )
     .from('bovedas')
     .select('*')
     .eq('usuario_id', userId)
@@ -79,7 +88,8 @@ export async function applyAutoLock() {
 }
 
 export async function unlock(password: string) {
-  const user = await requireUser();
+  const session = await requireSession();
+  const { user } = session;
   if (Date.now() < blockedUntil)
     throw new Error(
       `Demasiados intentos. Espera ${Math.ceil((blockedUntil - Date.now()) / 1000)} s.`,
@@ -104,6 +114,7 @@ export async function unlock(password: string) {
     raw: await exportRawKey(key),
     generation: row.generacion,
     userId: user.id,
+    account: session.account,
     expiresAt: await expiry(),
   };
   await chrome.storage.session.set({ [SESSION_KEY]: state });
@@ -119,7 +130,14 @@ export async function unlockedKey(userId: string, touch = true) {
     cached = null;
     return null;
   }
-  if (state.userId !== userId || (state.expiresAt !== null && Date.now() >= state.expiresAt)) {
+  // Every local installation has the same user id: the account key tells them apart.
+  const session = await currentSession();
+  if (
+    state.userId !== userId ||
+    !session ||
+    (state.account ?? `nube:${state.userId}`) !== session.account ||
+    (state.expiresAt !== null && Date.now() >= state.expiresAt)
+  ) {
     await lock();
     return null;
   }

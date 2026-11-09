@@ -21,6 +21,7 @@ import { useAuth } from '../auth/useAuth';
 import { loadCredentials } from '../../lib/supabase/vault.repository';
 import { deleteLocalProjectCredentials } from '../local/localData';
 import { MoveProjectDialog } from '../local/MoveProjectDialog';
+import { isLocalEdition } from '../../lib/edition';
 import { OriginBadge } from '../local/OriginBadge';
 import { usesLocalData } from '../local/origin';
 import { ProjectCard } from './components/ProjectCard';
@@ -358,7 +359,7 @@ export default function ProjectsPage() {
             setSelected(null);
           }}
           onMove={
-            localOpen
+            localOpen && !isLocalEdition
               ? () => {
                   setMoving(selected);
                   setSelected(null);

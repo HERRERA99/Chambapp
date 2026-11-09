@@ -4,10 +4,44 @@ import type { Session } from '@supabase/supabase-js';
 import { configurationError, getSupabase } from '../../lib/supabase/client';
 import { AuthContext } from './AuthContext';
 import { authErrorMessage } from './errors';
+import { isLocalEdition } from '../../lib/edition';
+import { LOCAL_USER_EMAIL, LOCAL_USER_ID } from '../../lib/localUser';
+import type { AuthState } from './AuthContext';
+import type { User } from '@supabase/supabase-js';
+
+// Local edition: no accounts. The single local user is always "signed in".
+const localUser = {
+  id: LOCAL_USER_ID,
+  email: LOCAL_USER_EMAIL,
+  app_metadata: {},
+  user_metadata: {},
+  aud: 'local',
+  created_at: '2026-01-01T00:00:00.000Z',
+} as User;
+const localAuth: AuthState = {
+  session: null,
+  user: localUser,
+  loading: false,
+  error: null,
+  isPasswordRecovery: false,
+  completePasswordRecovery: () => undefined,
+};
+
+function LocalAuthProvider({ children }: { children: ReactNode }) {
+  return <AuthContext.Provider value={localAuth}>{children}</AuthContext.Provider>;
+}
 
 type SessionState = { session: Session | null; loading: boolean; error: string | null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  return isLocalEdition ? (
+    <LocalAuthProvider>{children}</LocalAuthProvider>
+  ) : (
+    <CloudAuthProvider>{children}</CloudAuthProvider>
+  );
+}
+
+function CloudAuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({
     session: null,
     loading: !configurationError,

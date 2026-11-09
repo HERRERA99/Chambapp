@@ -1,0 +1,96 @@
+# Chambapp local — everything on this PC, one port on 127.0.0.1.
+#   docker compose -f docker-compose.yml up -d
+# Settings (optional) in a .env file next to this one; see .env.example.
+name: chambapp-local
+
+x-db-image: &db-image ${CHAMBAPP_IMAGE_PREFIX:-ghcr.io/herrera99}/chambapp-local-db:${CHAMBAPP_TAG:-latest}
+
+services:
+  db:
+    image: *db-image
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chambapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CHAMBAPP_DB_PASSWORD:-chambapp-local}
+    # Tuned for one user and low memory.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=20
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - effective_cache_size=64MB
+      - -c
+      - wal_buffers=1MB
+      - -c
+      - min_wal_size=32MB
+      - -c
+      - max_wal_size=128MB
+      - -c
+      - jit=off
+    volumes:
+      - chambapp-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d chambapp']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 256m
+
+  # Applies new migrations, then exits (uses no resources afterwards).
+  migrate:
+    image: *db-image
+    restart: 'no'
+    entrypoint: ['chambapp-migrate']
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: ${CHAMBAPP_DB_PASSWORD:-chambapp-local}
+      PGDATABASE: chambapp
+      CHAMBAPP_AUTHENTICATOR_PASSWORD: ${CHAMBAPP_DB_PASSWORD:-chambapp-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 64m
+
+  api:
+    image: postgrest/postgrest:v13.0.7
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${CHAMBAPP_DB_PASSWORD:-chambapp-local}@db:5432/chambapp
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      # No JWT: every request runs as the single local user.
+      PGRST_DB_ANON_ROLE: authenticated
+      PGRST_DB_PRE_REQUEST: chambapp_local.antes_peticion
+      PGRST_DB_POOL: 3
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_OPENAPI_MODE: disabled
+      PGRST_SERVER_PORT: 3000
+      PGRST_LOG_LEVEL: error
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: 64m
+
+  web:
+    image: ${CHAMBAPP_IMAGE_PREFIX:-ghcr.io/herrera99}/chambapp-local-web:${CHAMBAPP_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      # The only published port, and only on this PC.
+      - 127.0.0.1:${CHAMBAPP_PORT:-47800}:8080
+    environment:
+      CHAMBAPP_PORT: ${CHAMBAPP_PORT:-47800}
+    depends_on:
+      - api
+    mem_limit: 32m
+
+volumes:
+  chambapp-data:
+    name: ${CHAMBAPP_VOLUME:-chambapp-local-data}

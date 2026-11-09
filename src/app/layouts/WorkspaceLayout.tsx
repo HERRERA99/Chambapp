@@ -17,6 +17,7 @@ import { getSupabase } from '../../lib/supabase/client';
 import { readableError } from '../../lib/supabase/errors';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { VaultProvider } from '../../features/vault/VaultProvider';
+import { isLocalEdition } from '../../lib/edition';
 import { LocalBanners } from '../../features/local/LocalBanners';
 import { ExtensionProvider } from '../../features/extension/ExtensionProvider';
 import { ExtensionDownloadButton } from '../../features/extension/ExtensionDownloadButton';
@@ -242,16 +243,18 @@ export function WorkspaceLayout() {
               <span className="avatar">{initials}</span>
               <div>
                 <strong>{profile?.nombre}</strong>
-                <span className="dim" title={user?.email}>
-                  {user?.email}
+                <span className="dim" title={isLocalEdition ? undefined : user?.email}>
+                  {isLocalEdition ? 'Chambapp local · datos en este PC' : user?.email}
                 </span>
               </div>
-              <IconButton
-                icon="logout"
-                label="Cerrar sesión"
-                disabled={signingOut}
-                onClick={() => void signOut()}
-              />
+              {isLocalEdition ? null : (
+                <IconButton
+                  icon="logout"
+                  label="Cerrar sesión"
+                  disabled={signingOut}
+                  onClick={() => void signOut()}
+                />
+              )}
             </div>
           </div>
         </aside>
@@ -314,7 +317,7 @@ export function WorkspaceLayout() {
             ) : null}
             {/* Keyed by account: switching users drops any key held in memory. */}
             <VaultProvider key={user?.id}>
-              <LocalBanners />
+              {isLocalEdition ? null : <LocalBanners />}
               <Outlet />
             </VaultProvider>
           </main>

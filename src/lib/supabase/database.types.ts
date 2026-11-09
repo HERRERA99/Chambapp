@@ -804,6 +804,10 @@ export type Database = {
         Args: { p_accion: string; p_datos?: Json };
         Returns: Json;
       };
+      /** Local edition only (docker/db/local). */
+      chambapp_copia_estado: { Args: Record<string, never>; Returns: Json };
+      chambapp_copia_exportar: { Args: Record<string, never>; Returns: Json };
+      chambapp_copia_importar: { Args: { p_datos: Json }; Returns: Json };
     };
     Enums: {
       [_ in never]: never;

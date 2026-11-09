@@ -1,0 +1,4 @@
+# Files run or hashed inside Linux containers keep LF line endings.
+*.sh text eol=lf
+docker/** text eol=lf
+supabase/migrations/*.sql text eol=lf

@@ -34,6 +34,8 @@ const writtenPhases: readonly QueuePhase[] = [
 export type QueueItem = {
   id: string;
   request: OdooRequest;
+  /** Account key (shared/backend.ts) of the session that queued it; absent before Plan 12. */
+  account?: string;
   status: QueueStatus;
   phase: QueuePhase;
   error: string;

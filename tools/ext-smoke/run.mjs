@@ -245,7 +245,7 @@ check(
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/options/index.html`);
   await options.fill('#odoo', ORIGIN);
-  await options.click('button[type="submit"]');
+  await options.click('form:has(#odoo) button[type="submit"]');
   await options.waitForSelector('.form-ok', { timeout: 10_000 });
   check('ajustes: Odoo configurado', (await options.textContent('.form-ok')).includes(ORIGIN));
   await options.screenshot({ path: join(shots, 'options.png'), fullPage: true });

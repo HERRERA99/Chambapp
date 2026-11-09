@@ -7,12 +7,21 @@ import { originPattern } from '../shared/patterns.ts';
 
 export const APP_ORIGINS = ['https://chambapp-tracker.vercel.app', 'http://127.0.0.1:5173'];
 
+/** The local installation's address while the extension works in local mode (Plan 12). */
+let localAppOrigin: string | null = null;
+export function setLocalAppOrigin(origin: string | null) {
+  localAppOrigin = origin;
+}
+/** Origins of the Chambapp web app the extension talks to now. */
+export const appOrigins = () => (localAppOrigin ? [...APP_ORIGINS, localAppOrigin] : APP_ORIGINS);
+
 export async function appTabs() {
+  const origins = appOrigins();
   // Patterns without ports (Firefox ignores ported ones); the exact origin is checked here.
-  const tabs = await chrome.tabs.query({ url: APP_ORIGINS.map(originPattern) });
+  const tabs = await chrome.tabs.query({ url: origins.map(originPattern) });
   return tabs.filter((tab) => {
     try {
-      return tab.id !== undefined && !!tab.url && APP_ORIGINS.includes(new URL(tab.url).origin);
+      return tab.id !== undefined && !!tab.url && origins.includes(new URL(tab.url).origin);
     } catch {
       return false;
     }

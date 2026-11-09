@@ -1,5 +1,3 @@
-import { OdooApiKeyField } from '../settings/components/OdooSettings';
-import { configureOdoo } from '../settings/odooCredentials';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -20,6 +18,14 @@ import { mondayForDate, todayInZone } from '../../domain/time';
 import type { Profile, WorkspaceData } from '../../domain/models';
 import { safeReturnTo } from '../auth/returnTo';
 import './onboarding.css';
+import { isLocalEdition } from '../../lib/edition';
+
+/** "Dónde guardar": the local edition keeps everything in its own database. */
+const STORAGE_STEP = 3;
+const skipped = (index: number) => isLocalEdition && index === STORAGE_STEP;
+/** Step number shown to the user (the local edition has one step less). */
+const shownStep = (index: number) => (isLocalEdition && index > STORAGE_STEP ? index : index + 1);
+const shownTotal = isLocalEdition ? 4 : 5;
 
 const steps = [
   'Perfil & Workspace',
@@ -27,7 +33,6 @@ const steps = [
   'Motor de Redondeo',
   'Dónde guardar',
   'Zona Horaria & Proyecto',
-  'Odoo',
 ] as const;
 const titles = [
   'Dale un lugar a tu trabajo',
@@ -35,7 +40,6 @@ const titles = [
   'Cada minuto, con total transparencia',
   '¿Dónde guardamos tus proyectos?',
   'Tu consola, a tu medida',
-  'Configura tu acceso a Odoo',
 ] as const;
 const workdayChoices = [
   {
@@ -91,8 +95,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
   const [currency, setCurrency] = useState(preference(data, 'moneda', 'EUR'));
   const [project, setProject] = useState('');
   const [client, setClient] = useState('');
-  const [odooKey, setOdooKey] = useState('');
-  const [storage, setStorage] = useState(storageMode(data.profile));
+  const [storage, setStorage] = useState(isLocalEdition ? 'nube' : storageMode(data.profile));
   const [keyDialog, setKeyDialog] = useState(false);
   const vault = useVault();
   const localOpen = data.local?.estado === 'abierto' || data.local?.estado === 'sin-datos';
@@ -136,10 +139,6 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
     }
     setSaving(true);
     try {
-      if (odooKey.trim()) {
-        await configureOdoo(odooKey, true);
-        setOdooKey('');
-      }
       // Save the time zone before creating days: every day retains its own zone.
       const profile = await run<Profile>('editar_perfil', {
         version: data.profile.version,
@@ -180,7 +179,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
         await run('crear_proyecto', {
           nombre: projectName,
           cliente: clientName || null,
-          destino: storage,
+          ...(isLocalEdition ? {} : { destino: storage }),
         });
       }
       // Completing onboarding is the final persisted step.
@@ -232,7 +231,10 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
       setKeyDialog(true);
       return;
     }
-    setStep((current) => Math.min(steps.length - 1, current + 1));
+    setStep((current) => {
+      const next = Math.min(steps.length - 1, current + 1);
+      return skipped(next) ? next + 1 : next;
+    });
   }
 
   return (
@@ -240,9 +242,11 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
       <header className="onboarding-header">
         <Brand />
         <Badge>Configuración inicial</Badge>
-        <Button variant="ghost" disabled={saving} onClick={() => void signOut()}>
-          Cerrar sesión
-        </Button>
+        {isLocalEdition ? null : (
+          <Button variant="ghost" disabled={saving} onClick={() => void signOut()}>
+            Cerrar sesión
+          </Button>
+        )}
       </header>
       <main className="onboarding-container">
         <div className="onboarding-status">
@@ -251,42 +255,44 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
             <h2>Tu espacio. Tus reglas.</h2>
           </div>
           <span className="mono accent">
-            {Math.round(((step + 1) / steps.length) * 100)}% del recorrido
+            {Math.round((shownStep(step) / shownTotal) * 100)}% del recorrido
           </span>
         </div>
         <Progress
-          value={Math.round(((step + 1) / steps.length) * 100)}
+          value={Math.round((shownStep(step) / shownTotal) * 100)}
           label="Progreso de configuración"
         />
         <nav className="onboarding-steps" aria-label="Pasos de configuración">
-          {steps.map((label, index) => (
-            <button
-              type="button"
-              key={label}
-              disabled={saving || index > step}
-              className={step === index ? 'active' : step > index ? 'completed' : ''}
-              aria-current={step === index ? 'step' : undefined}
-              onClick={() => setStep(index)}
-            >
-              <span>
-                {step > index ? (
-                  <Icon name="check" size={16} />
-                ) : (
-                  String(index + 1).padStart(2, '0')
-                )}
-              </span>
-              <div>
-                <small>
-                  {step === index ? 'En curso' : step > index ? 'Revisado' : 'Pendiente'}
-                </small>
-                <strong>{label}</strong>
-              </div>
-            </button>
-          ))}
+          {steps.map((label, index) =>
+            skipped(index) ? null : (
+              <button
+                type="button"
+                key={label}
+                disabled={saving || index > step}
+                className={step === index ? 'active' : step > index ? 'completed' : ''}
+                aria-current={step === index ? 'step' : undefined}
+                onClick={() => setStep(index)}
+              >
+                <span>
+                  {step > index ? (
+                    <Icon name="check" size={16} />
+                  ) : (
+                    String(shownStep(index)).padStart(2, '0')
+                  )}
+                </span>
+                <div>
+                  <small>
+                    {step === index ? 'En curso' : step > index ? 'Revisado' : 'Pendiente'}
+                  </small>
+                  <strong>{label}</strong>
+                </div>
+              </button>
+            ),
+          )}
         </nav>
         <header className="onboarding-title">
           <p className="eyebrow">
-            Configuración inicial / Paso {String(step + 1).padStart(2, '0')}
+            Configuración inicial / Paso {String(shownStep(step)).padStart(2, '0')}
           </p>
           <h1>{titles[step]}</h1>
           <p className="muted">Define los parámetros de tus jornadas. Se guardarán al finalizar.</p>
@@ -550,22 +556,18 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
                 </Notice>
               </>
             ) : null}
-            {step === 5 ? (
-              <Panel eyebrow="Bloque 06" title="API key de Odoo (opcional)">
-                <p className="muted">
-                  Añade la clave de tu usuario de Odoo. También puedes hacerlo más adelante desde
-                  Ajustes.
-                </p>
-                <OdooApiKeyField value={odooKey} onChange={setOdooKey} disabled={saving} />
-              </Panel>
-            ) : null}
           </div>
           <footer className="onboarding-actions">
             <Button
               icon="left"
               variant="ghost"
               disabled={step === 0 || saving}
-              onClick={() => setStep((current) => Math.max(0, current - 1))}
+              onClick={() =>
+                setStep((current) => {
+                  const previous = Math.max(0, current - 1);
+                  return skipped(previous) ? previous - 1 : previous;
+                })
+              }
             >
               Volver al paso anterior
             </Button>

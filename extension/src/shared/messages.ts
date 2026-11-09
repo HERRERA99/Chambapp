@@ -8,6 +8,8 @@ import type { DetectedTask } from './odooTask';
 import type { ImportChoice } from './importTask';
 import type { QueuePhase } from './queue';
 import type { DateFormat } from './automation';
+import type { Backend } from './backend';
+import type { HeraAction } from './hera';
 
 export type VaultStatus = 'signed-out' | 'none' | 'locked' | 'unlocked';
 
@@ -16,6 +18,10 @@ export const AUTO_LOCK_OPTIONS = [5, 15, 30, 60, 0] as const;
 export type AutoLock = (typeof AUTO_LOCK_OPTIONS)[number];
 
 export type Settings = {
+  /** Where the data lives: the cloud account or a local installation (Plan 12). */
+  backend: Backend;
+  /** Address of the local installation, e.g. http://127.0.0.1:47800. */
+  localOrigin: string;
   odooOrigin: string | null;
   odooDateFormat: DateFormat;
   autoLockMinutes: AutoLock;
@@ -23,6 +29,8 @@ export type Settings = {
 
 export type ExtensionState = {
   version: string;
+  /** Local mode: why the installation cannot be reached (null when it answers). */
+  localProblem: string | null;
   user: { id: string; email: string | null } | null;
   vault: VaultStatus;
   settings: Settings;
@@ -82,6 +90,8 @@ export type PopupRequest =
   | { type: 'settings-set'; autoLockMinutes: AutoLock }
   | { type: 'date-format-set'; format: DateFormat }
   | { type: 'odoo-origin-set'; origin: string | null }
+  | { type: 'backend-set'; backend: Backend; localOrigin: string }
+  | { type: 'hera-sync' }
   | { type: 'vault-unlock'; password: string }
   | { type: 'vault-lock' }
   | { type: 'credentials-list' }
@@ -107,6 +117,14 @@ export type PopupRequest =
     }
   | { type: 'queue-list' }
   | { type: 'queue-action'; requestId: string; action: QueueAction };
+
+/** Result of the "Fichaje" section (background/hera.ts). */
+export type HeraSyncResult = {
+  text: string;
+  action: HeraAction;
+  outcome: 'created' | 'closed' | 'already';
+  message: string;
+};
 
 export type PopupResponse<T = unknown> = { ok: true; data: T } | { ok: false; error: string };
 

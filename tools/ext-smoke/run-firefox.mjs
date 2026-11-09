@@ -120,7 +120,7 @@ try {
     `fake ${granted} · manifest ${supabase}`,
   );
   await driver.findElement(By.id('odoo')).sendKeys(ORIGIN);
-  await driver.findElement(By.css('button[type="submit"]')).click();
+  await driver.findElement(By.css('form:has(#odoo) button[type="submit"]')).click();
   const notice = await driver.wait(until.elementLocated(By.css('.form-ok, .form-error')), 15_000);
   const saved = await notice.getText();
   check('ajustes: Odoo configurado', saved.includes(ORIGIN), saved);

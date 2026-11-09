@@ -2,7 +2,9 @@
   "name": "chambapp-database-tests",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node verify.mjs" },
+  "scripts": {
+    "test": "node verify.mjs && node local-edition.mjs"
+  },
   "devDependencies": {
     "embedded-postgres": "17.10.0-beta.17",
     "pg": "8.23.1"

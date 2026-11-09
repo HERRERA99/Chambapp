@@ -1,0 +1,15 @@
+# Builds the images from this repository instead of downloading them:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  db:
+    build:
+      context: ..
+      dockerfile: docker/db/Dockerfile
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web/Dockerfile
+      args:
+        # Optional: package the browser extension offered for download.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, QueryClient, QueryClientProvider } from '@tan
 import { loadWorkspace } from '../../lib/supabase/workspace.repository';
 import { recombine, setLocalUser, subscribeLocal } from '../../lib/local/runtime';
 import { useAuth } from '../auth/useAuth';
+import { isLocalEdition } from '../../lib/edition';
 import { WorkspaceContext } from './useWorkspace';
 
 function WorkspaceStateProvider({ children }: { children: ReactNode }) {
@@ -16,13 +17,14 @@ function WorkspaceStateProvider({ children }: { children: ReactNode }) {
     }
     previousUserId.current = user?.id;
     // The local data belongs to one account: another account never sees it.
-    void setLocalUser(user?.id ?? null);
+    // (The local edition keeps nothing in the browser.)
+    if (!isLocalEdition) void setLocalUser(user?.id ?? null);
   }, [user?.id, cache]);
   // Local changes (this tab, another tab, unlock or lock) refresh the combined data.
   useEffect(
     () =>
       subscribeLocal(() => {
-        if (!user) return;
+        if (!user || isLocalEdition) return;
         // Combine again with the cloud data already loaded: no network round trip.
         const combined = recombine(user.id);
         if (combined) cache.setQueryData(['workspace', user.id], combined);

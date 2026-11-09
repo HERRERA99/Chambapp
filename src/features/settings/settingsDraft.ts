@@ -96,10 +96,44 @@ export function presetMinutes(mode: string) {
   return null;
 }
 
+/** Days (0 = Monday) worked by default when the weekly hours are spread evenly. */
+export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4];
+
+/**
+ * Spreads `total` minutes evenly over `days` (indexes 0–6, Monday first). The
+ * remainder goes one minute at a time to the first days, as the database does.
+ */
+export function distributeWeekly(total: number, days: readonly number[]): number[] {
+  const chosen = [...new Set(days)].filter((day) => day >= 0 && day < 7).sort((a, b) => a - b);
+  const minutes = [0, 0, 0, 0, 0, 0, 0];
+  if (!chosen.length || !Number.isFinite(total) || total <= 0) return minutes;
+  const whole = Math.round(total);
+  const base = Math.floor(whole / chosen.length);
+  const extra = whole % chosen.length;
+  chosen.forEach((day, position) => {
+    minutes[day] = base + (position < extra ? 1 : 0);
+  });
+  return minutes;
+}
+
+/** Worked days of an allocation; the default working week when nothing is allocated. */
+export function workedDays(minutes: readonly number[]) {
+  const days = minutes.flatMap((value, index) => (value > 0 ? [index] : []));
+  return days.length ? days : DEFAULT_WORKDAYS;
+}
+
+/** Whole hours and the remaining minutes of a duration in minutes. */
+export function splitHours(total: number) {
+  const value = Math.max(0, Math.round(total));
+  return { hours: Math.floor(value / 60), minutes: value % 60 };
+}
+
 function scheduleMode(minutes: number[]) {
-  return (
-    ['37.5', '40', '35'].find((mode) =>
-      presetMinutes(mode)?.every((value, index) => value === minutes[index]),
-    ) ?? 'manual'
+  const preset = ['37.5', '40', '35'].find((mode) =>
+    presetMinutes(mode)?.every((value, index) => value === minutes[index]),
   );
+  if (preset) return preset;
+  const total = minutes.reduce((sum, value) => sum + value, 0);
+  const even = distributeWeekly(total, workedDays(minutes));
+  return total > 0 && even.every((value, index) => value === minutes[index]) ? 'semanal' : 'manual';
 }

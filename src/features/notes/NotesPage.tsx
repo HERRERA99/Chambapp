@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { useAuth } from '../auth/useAuth';
 import { readableError } from '../../lib/supabase/errors';
+import { storageScope } from '../../lib/localGeneration';
 import { NoteEditor } from './NoteEditor';
 import { clearNoteDraft, encryptNoteSession, restoreNoteSession } from './notesDraft';
 import type { NoteSession, RestoredDraft } from './notesDraft';
@@ -78,7 +79,9 @@ function NotesLoader() {
   const { user } = useAuth();
   const vault = useVault();
   const decrypted = useNotes();
-  const draftKey = `chambapp:notes-draft:${user?.id}`;
+  const { data: workspace } = useWorkspace();
+  // Per data generation in the local edition: a restore never brings back an old draft.
+  const draftKey = `chambapp:notes-draft:${storageScope(user?.id, workspace?.dataGeneration) ?? 'cargando'}`;
   const [restored, setRestored] = useState<RestoredDraft | null>(null);
   const [legacyDraftKept, setLegacyDraftKept] = useState(false);
   const key = vault.key;
