@@ -8,7 +8,6 @@
 ## Criterios de aceptación (observables)
 
 ### A. Tareas (`/tareas`)
-
 - A1. Desaparecen: selector Lista/Tablero, control segmentado de estado, checkbox «Incluir archivadas», paginación, aviso fijo «Inicio y fin exactos». Se mantienen en la cabecera «Nueva tarea» (primario) y «Exportar CSV».
 - A2. Tarea en foco = la elegida por el usuario si sigue visible en la cola o en los resultados; si no, la tarea con cronómetro activo; si no, la `en_curso` actualizada más recientemente (`actualizado_en`); si no, la `pendiente` más reciente; si no hay ninguna, estado vacío actual (crear tarea / ir a proyectos). Se renderiza con `TaskDetail` tal como hoy.
 - A3. Cola lateral («Siguientes»), en desktop a la derecha (`.task-workspace` ya es 2 columnas) y debajo en < 1190px. Contiene dos grupos con contador: «En curso» y «Pendientes»; la tarea en foco se excluye de cualquier grupo (también del de finalizadas) porque ya se ve a la izquierda. Solo tareas no archivadas de proyectos no archivados. Orden: `actualizado_en` desc. Sin paginación.
@@ -18,7 +17,6 @@
 - A7. Se eliminan `TaskBoard.tsx`, `task-board.css`, `TaskPagination.tsx`, `task-pagination.css` y el prop `defaultView` / parámetro `?vista`.
 
 ### B. Parte semanal (`/parte-semanal`)
-
 - B1. Navegación de semana: «‹», «Hoy», «›» y la etiqueta «Semana del 28 sep – 2 oct 2026». Total imputado de la semana en pequeño. Semana actual por defecto (zona del perfil).
 - B2. Columnas: lunes a viernes siempre; sábado y domingo solo si tienen algún parte esa semana. Cabecera de columna: día abreviado + número, y total redondeado del día. Hoy resaltado.
 - B3. **Un item por parte** (`TimeEntry`, no eliminado, `fecha` dentro de la semana), ordenado por `inicio_en` asc dentro del día. Cada item muestra:
@@ -42,27 +40,22 @@
 - Arnés `tools/ui-smoke/main.tsx`: añadir rutas `/tareas` y `/parte-semanal`; mover el `<details>` de «Operaciones de prueba» a un overlay `position: fixed` fuera del flujo del documento para que no altere la medición de scroll; ampliar los partes de `repository.ts` para una semana con varios días (incluido un parte abierto, uno imputado y uno con ID Odoo) para la verificación visual.
 
 ## Decisiones (confirmadas por el usuario)
-
 - Un item por parte (no agrupado). Bloqueo de Odoo solo en la nueva vista. L–V + fin de semana si hay partes. Nombre «Parte semanal», `/tablero` redirige.
 
 ## Decisiones del planificador (reversibles)
-
 - La cola va en columna lateral (reutiliza el layout existente), no debajo del detalle, para que «siguientes» se vea sin pasar por la lista de partes de la tarea.
 - Finalizadas y archivadas se agrupan en un único modo de búsqueda explícito.
 - Sin diálogo de confirmación al marcar «imputado»: el `title` del checkbox avisa de que no se puede desmarcar desde aquí; la corrección sigue siendo posible en «Partes de horas».
 
 ## No objetivos
-
 - Integración real con Odoo. Cambios en BD/RPC. Cambios en `TaskDetail`/`TaskEntries` más allá de lo necesario. Drag & drop.
 
 ## Riesgos
-
 - «Sin scroll» depende de la altura de cabecera del layout; se mide en el arnés con Playwright.
 - `useCommand` concurrente: se deshabilitan los checks mientras `pending`.
 - Riesgo preexistente conocido (no se corrige aquí, sin cambios de BD): `editar_parte` recalcula la jornada con la zona de la jornada aunque no se envíe `inicio_en`. Si el usuario cambió la zona del perfil y un parte quedó asociado a una jornada de otra zona cerca de medianoche, marcar Odoo puede mover el parte de día o fallar con `CONFIRMAR_CAMBIO_ZONA`. Ya ocurre hoy con el checkbox de «Partes de horas». Si falla, la vista muestra el error del comando. Se recomienda una migración aparte que preserve `jornada_id` en cambios solo de estado.
 
 ## Verificación
-
 1. `npm run typecheck` → sin errores.
 2. `npm run lint` → sin errores.
 3. `npm test` → todo verde, incluidos nuevos `tests/timesheet.test.ts` (rango de semana, regla de fin de semana, orden, `(+N)` con N=1 y N=2 y un parte que cruza un cambio de horario, parte abierto, eliminados excluidos, totales) y `tests/taskQueue.test.ts` (prioridad de foco A2, exclusión de completadas/archivadas, modo finalizadas, filtros, límite 20), y `returnTo` actualizado.

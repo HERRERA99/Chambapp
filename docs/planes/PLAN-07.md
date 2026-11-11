@@ -54,7 +54,6 @@ create table public.imputaciones_odoo (
   foreign key(jornada_id, usuario_id) references public.jornadas(id, usuario_id)
 );
 ```
-
 - RLS: `lectura_propia` select; `authenticated` solo `select`; sin DML directo. Índice por `(usuario_id, jornada_id)`.
 - `partes_horas.imputacion_odoo_id uuid` + FK compuesta `(imputacion_odoo_id, usuario_id, tarea_id, jornada_id) references imputaciones_odoo(id, usuario_id, tarea_id, jornada_id)` (MATCH SIMPLE: sin imputación no se comprueba). **La BD garantiza que una imputación solo agrupa partes de la misma tarea y jornada.** Índice por `imputacion_odoo_id`.
 - **Migración de datos**: cada parte con `imputado_en_odoo = true` (incluidas lápidas) recibe su propia imputación `manual` (una por parte: conserva exactamente los totales históricos). El relleno se hace antes de crear los triggers nuevos, con `validar_fila` **y** el constraint trigger diferido `validar_arbol` desactivados en `partes_horas` solo durante esa sentencia (`alter table … disable trigger validar_fila, validar_arbol` → update → `enable`), para no chocar con `REGISTRO_ELIMINADO`, no subir versiones y no dejar eventos diferidos pendientes que harían fallar el `enable`/`add constraint` (P7-001). Además `set constraints all immediate` antes del relleno como defensa. Después: `check (imputado_en_odoo = (imputacion_odoo_id is not null))`. La verificación de actualización (`verify.mjs`, ruta «upgrade») siembra partes marcados activos **y** lápidas marcadas antes de aplicar esta migración y comprueba el resultado. Su limpieza administrativa borra las `imputaciones_odoo` del usuario después de sus `partes_horas` y antes de `jornadas`/`tareas` (P7-006).
@@ -62,7 +61,7 @@ create table public.imputaciones_odoo (
   1. Si `imputacion_odoo_id` cambia explícitamente (lo hace la RPC nueva): `imputado_en_odoo := imputacion_odoo_id is not null`.
   2. Si no, si `imputado_en_odoo` cambia (ruta legacy): `true` → inserta imputación `manual` con la tarea/jornada de NEW y la asigna; `false` → `imputacion_odoo_id := null`.
   3. Si no, si la fila tiene imputación y cambia `tarea_id` o `jornada_id` (editar parte, cambio de zona): se mueve a una imputación nueva de un solo parte para la nueva tarea/jornada (se conserva la marca, como hoy).
-     En INSERT con `imputado_en_odoo = true` aplica la regla 2.
+  En INSERT con `imputado_en_odoo = true` aplica la regla 2.
 - **Trigger AFTER UPDATE OR DELETE** (`limpiar_imputacion_odoo`): si `old.imputacion_odoo_id` deja de usarse (cambio de referencia o borrado físico administrativo), borra esa imputación cuando ya no la referencia ninguna fila.
 - **RPC `public.chambapp_imputaciones(p_accion, p_datos)`** → `chambapp_private.imputaciones`:
   - `imputar_partes` `{ partes: [{ id, version }, …] }`: 1..1000 elementos (límite de tamaño de petición; la UI aplica el mismo límite, ver C — P7-004), ids uuid distintos, versiones enteras. Bloquea perfil y luego los partes (`for update`, orden por id). Cada parte: del usuario, no eliminado (`PARTE_NO_DISPONIBLE`), versión coincide (`CONFLICTO_VERSION`), terminado (`PARTE_EN_CURSO`), sin imputación (`PARTE_YA_IMPUTADO`); todos misma tarea y jornada (`PARTES_DE_DISTINTO_GRUPO`). Inserta la imputación y asigna `imputacion_odoo_id`. Devuelve `{ id, tarea_id, jornada_id, estado, partes: [{ id, version, imputacion_odoo_id, imputado_en_odoo }] }`.
@@ -83,7 +82,6 @@ create table public.imputaciones_odoo (
 ### C. Interfaz — Parte semanal
 
 **Tabla nueva `TimesheetGroups`** (`src/features/timesheet/components/TimesheetGroups.tsx`) encima de la cuadrícula, en un panel con el mismo borde/superficie que la cuadrícula:
-
 - Cabecera de sección por día con partes (capitalizado como la cuadrícula; hoy en acento).
 - Fila por tarea (botón con `aria-expanded`, chevron): título (enlace Odoo si hay URL segura) + chip `odoo_id`, «N partes», real (`formatDuration`, dim), imputable (mono, fuerte), chip de estado `○ Pendiente` / `◐ Parcial` / `✓ Imputado` con los colores existentes (`--warning`, `--success`), `● En curso` en acento si hay parte abierto.
 - Desplegada: lista de partes con casilla (solo pendientes terminados), rango (`formatRange`), real, descripción truncada. Los imputados se muestran agrupados por imputación con ✓, su total redondeado y botón «Deshacer». El parte en curso se ve sin casilla.
