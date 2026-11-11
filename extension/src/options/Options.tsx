@@ -7,6 +7,7 @@ import type { DateFormat } from '../shared/automation';
 import { Button, ErrorText, Icon } from '../shared/ui';
 import { DEFAULT_LOCAL_ORIGIN, normalizeLocalOrigin } from '../shared/backend';
 import type { Backend } from '../shared/backend';
+import { cloudAvailable } from '../shared/cloud';
 import { errorMessage } from '../shared/feedback';
 
 const lockLabel = (minutes: AutoLock) =>
@@ -154,10 +155,13 @@ export function Options() {
                 type="radio"
                 name="backend"
                 checked={backend === 'nube'}
-                disabled={busy}
+                disabled={busy || !cloudAvailable}
                 onChange={() => setBackendChoice('nube')}
               />
               Nube (cuenta de Chambapp)
+              {cloudAvailable
+                ? null
+                : ' — no disponible en esta copia (descargada de Chambapp local)'}
             </label>
             <label className="row">
               <input

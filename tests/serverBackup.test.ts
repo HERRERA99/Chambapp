@@ -103,3 +103,14 @@ test('every backup that fits the import limit can be read back; larger ones are 
     'COPIA_DEMASIADO_GRANDE',
   );
 });
+
+test('copies made before the Odoo API key was removed import without that table', async () => {
+  const { withoutRemovedTables } = await import('../src/lib/serverBackup.ts');
+  const data = {
+    formato: 'chambapp-servidor-datos' as const,
+    version: 1 as const,
+    usuario_id: 'u',
+    tablas: { 'public.perfiles': [{ id: 'u' }], 'chambapp_private.odoo_credenciales': [{}] },
+  };
+  assert.deepEqual(Object.keys(withoutRemovedTables(data).tablas), ['public.perfiles']);
+});

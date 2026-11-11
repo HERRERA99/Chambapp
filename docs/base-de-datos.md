@@ -225,7 +225,7 @@ La migración `20261005185736_selected_timer_start_and_odoo_credentials.sql` est
 
 `iniciar` admite `inicio_en` opcional con un instante que incluya zona horaria. Si se omite, usa el reloj del servidor. Conserva el UUID de operación para reintentos y rechaza instantes futuros y solapamientos. La jornada corresponde a la fecha del inicio seleccionado. El botón «Usar fin del último parte» utiliza el último fin entre todas las tareas y conserva la precisión original.
 
-La tabla `chambapp_private.odoo_credenciales` almacena una clave por usuario, tiene RLS y no concede acceso directo al cliente. La RPC pública `chambapp_configurar_odoo(p_api_key text default null, p_guardar boolean default false)` es SECURITY INVOKER y delega en una función privada que autentica al usuario y limita las operaciones a su cuenta. Con `p_guardar=false` devuelve solo si hay clave configurada; con `true` guarda o sustituye la clave, o la elimina si está vacía. Nunca devuelve la clave ni la incluye en los datos del workspace, preferencias, exportaciones o almacenamiento local. La clave puede configurarse opcionalmente en el tutorial inicial y posteriormente en Ajustes. No activa sincronización automática con Odoo.
+Chambapp no guarda ninguna API key de Odoo. La tabla `chambapp_private.odoo_credenciales` y la RPC `chambapp_configurar_odoo` existieron hasta la migración `20261111000000_remove_odoo_api_key.sql`, que las elimina: la extensión trabaja con la sesión de Odoo abierta en el navegador.
 
 ## Calendario y tablero de tareas
 

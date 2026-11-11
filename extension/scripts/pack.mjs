@@ -6,7 +6,14 @@
 //   temporary add-on.
 // - extension.json: version and whether the Firefox file is signed (read by the tutorial).
 // Usage: node extension/build.mjs && node extension/scripts/pack.mjs
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listFiles, zipFiles } from './zip.mjs';
@@ -27,15 +34,37 @@ const chrome = zipFiles(listFiles(dist), dist, 'chambapp-extension');
 writeFileSync(join(downloads, 'chambapp-extension.zip'), chrome);
 
 const xpi = join(downloads, 'chambapp-extension-firefox.xpi');
-const signed = resolve(here, `../signed/chambapp-firefox-${version}.xpi`);
-const firefoxSigned = existsSync(signed);
-if (firefoxSigned) copyFileSync(signed, xpi);
+const signedDir = resolve(here, '../signed');
+const compareVersions = (a, b) => {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1)
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  return 0;
+};
+// The copy signed for this version; otherwise the newest signed one (an older version
+// that Firefox still installs permanently, better than a temporary add-on).
+const signedVersions = existsSync(signedDir)
+  ? readdirSync(signedDir)
+      .map((name) => /^chambapp-firefox-(\d+(?:\.\d+)*)\.xpi$/.exec(name)?.[1])
+      .filter(Boolean)
+      .sort(compareVersions)
+  : [];
+const firefoxVersion = signedVersions.includes(version) ? version : (signedVersions.at(-1) ?? null);
+const firefoxSigned = firefoxVersion !== null;
+if (firefoxSigned) copyFileSync(join(signedDir, `chambapp-firefox-${firefoxVersion}.xpi`), xpi);
 else writeFileSync(xpi, zipFiles(listFiles(firefoxDist), firefoxDist));
+if (firefoxSigned && firefoxVersion !== version)
+  console.warn(
+    `Aviso: no hay copia firmada de la ${version}; Firefox recibe la ${firefoxVersion} firmada. Firma la nueva con «npm run ext:sign:firefox».`,
+  );
 
+const buildInfo = resolve(here, '../.build-info.json');
+const { cloud = true } = existsSync(buildInfo) ? JSON.parse(readFileSync(buildInfo, 'utf8')) : {};
 writeFileSync(
   join(downloads, 'extension.json'),
-  `${JSON.stringify({ version, firefoxSigned }, null, 2)}\n`,
+  `${JSON.stringify({ version, firefoxSigned, firefoxVersion: firefoxVersion ?? version, cloud }, null, 2)}\n`,
 );
 console.log(
-  `Extensión ${version} empaquetada en ${relative(process.cwd(), downloads)}: zip (${Math.round(chrome.length / 1024)} KB) y xpi ${firefoxSigned ? 'firmado' : 'SIN FIRMAR (solo complemento temporal)'}`,
+  `Extensión ${version} empaquetada en ${relative(process.cwd(), downloads)}: zip (${Math.round(chrome.length / 1024)} KB) y xpi ${firefoxSigned ? `firmado (${firefoxVersion})` : 'SIN FIRMAR (solo complemento temporal)'}${cloud ? '' : ', solo local'}`,
 );

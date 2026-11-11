@@ -82,6 +82,49 @@ function openChannel() {
   };
 }
 
+/**
+ * The data key is shared with this browser's other open tabs of the same account, so the
+ * master key is typed once per browser session instead of once per tab. Same origin
+ * only (BroadcastChannel); nothing is stored: once every tab is closed, it is asked again.
+ */
+type KeyMessage =
+  | { type: 'pedir-clave'; userId: string }
+  | { type: 'clave'; userId: string; key: CryptoKey; generation: string }
+  | { type: 'bloquear'; userId: string };
+let keyChannel: BroadcastChannel | null = null;
+
+function openKeyChannel() {
+  if (keyChannel || typeof BroadcastChannel === 'undefined') return;
+  keyChannel = new BroadcastChannel('chambapp-local-clave');
+  keyChannel.onmessage = (event: MessageEvent<KeyMessage>) => {
+    const message = event.data;
+    if (!message || typeof message !== 'object' || message.userId !== currentUser) return;
+    if (message.type === 'pedir-clave' && session && session.userId === currentUser)
+      postKey({
+        type: 'clave',
+        userId: session.userId,
+        key: session.key,
+        generation: session.generation,
+      });
+    else if (
+      message.type === 'clave' &&
+      !session &&
+      message.key instanceof CryptoKey &&
+      typeof message.generation === 'string'
+    )
+      void provideLocalKey(message.userId, message.key, message.generation);
+    else if (message.type === 'bloquear') closeLocalData(false);
+  };
+}
+
+function postKey(message: KeyMessage) {
+  try {
+    keyChannel?.postMessage(message);
+  } catch {
+    // Not shared: that tab asks for the master key itself.
+  }
+}
+
 function announce() {
   try {
     channel?.postMessage({ userId: currentUser });
@@ -124,7 +167,9 @@ export async function setLocalUser(userId: string | null) {
   lastCloud = null;
   if (userId) {
     openChannel();
+    openKeyChannel();
     await reload();
+    if (localState() === 'bloqueado') postKey({ type: 'pedir-clave', userId });
   } else notify();
 }
 
@@ -145,8 +190,9 @@ export function onVaultGeneration(generation: string | null) {
   }
 }
 
-/** "Bloquear todo", sign-out: forgets the key in this tab. */
-export function closeLocalData() {
+/** "Bloquear todo" (every tab, `everywhere`), sign-out: forgets the key in this tab. */
+export function closeLocalData(everywhere = false) {
+  if (everywhere && currentUser) postKey({ type: 'bloquear', userId: currentUser });
   session = null;
   store = null;
   snapshot = null;

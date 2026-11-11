@@ -20,6 +20,8 @@ import { RoundingLab } from './components/RoundingLab';
 import { WeekExplorer } from './components/WeekExplorer';
 import { PromoVideo } from './components/PromoVideo';
 import { Reveal } from './components/Reveal';
+import { OpenSourceSection } from './components/OpenSourceSection';
+import { REPOSITORY_URL } from '../../lib/project';
 import './landing.css';
 
 function LandingContent() {
@@ -59,7 +61,10 @@ function LandingContent() {
               Tu semana
             </a>
             <a href="#extension" onClick={() => setMobileMenu(false)}>
-              Extensión <span className="landing-new">Nuevo</span>
+              Extensión
+            </a>
+            <a href="#open-source" onClick={() => setMobileMenu(false)}>
+              Open source <span className="landing-new">Nuevo</span>
             </a>
             <Link className="landing-nav__mobile-login" to="/login">
               Iniciar sesión
@@ -149,6 +154,9 @@ function LandingContent() {
               <span>
                 <Icon name="check" size={13} /> Proyectos con contexto
               </span>
+              <a href="#open-source">
+                <Icon name="github" size={13} /> Open source · también 100% local
+              </a>
             </m.div>
           </div>
           <m.div
@@ -328,6 +336,7 @@ function LandingContent() {
             ))}
           </div>
         </section>
+        <OpenSourceSection />
         <Reveal className="landing-container">
           <section className="landing-cta">
             <div className="landing-cta__orb" aria-hidden="true" />
@@ -356,8 +365,11 @@ function LandingContent() {
       </main>
       <footer className="landing-footer landing-container">
         <Brand />
-        <p>© Chambapp · Cada minuto, en su sitio.</p>
+        <p>© Chambapp · Cada minuto, en su sitio. Proyecto open source.</p>
         <div>
+          <a href={REPOSITORY_URL} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
           <Link to="/login">Iniciar sesión</Link>
           <button
             type="button"

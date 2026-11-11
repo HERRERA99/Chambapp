@@ -10,6 +10,11 @@
 
 export const VAULT_ITERATIONS = 600_000;
 export const MIN_MASTER_PASSWORD_LENGTH = 12;
+/** PBKDF2 rounds accepted when reading a vault or a backup (same range as the database). */
+export const MIN_ITERATIONS = 100_000;
+export const MAX_ITERATIONS = 10_000_000;
+const validIterations = (value: number) =>
+  Number.isSafeInteger(value) && value >= MIN_ITERATIONS && value <= MAX_ITERATIONS;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
@@ -178,6 +183,13 @@ async function unwrap(
   } catch {
     throw new UnreadableEnvelopeError();
   }
+  // A crafted value could make the derivation hang the tab (the database enforces the minimum).
+  if (
+    !Number.isSafeInteger(vault.iteraciones) ||
+    vault.iteraciones < 1 ||
+    vault.iteraciones > MAX_ITERATIONS
+  )
+    throw new UnreadableEnvelopeError();
   const kek = await deriveKek(password, salt, vault.iteraciones);
   try {
     return await crypto.subtle.unwrapKey(
@@ -210,8 +222,8 @@ export async function derivePasswordKey(password: string, salt: string, iteratio
   } catch {
     throw new UnreadableEnvelopeError();
   }
-  if (saltBytes.length < 16 || !Number.isSafeInteger(iterations) || iterations < 100_000)
-    throw new UnreadableEnvelopeError();
+  // Backup files are untrusted: a huge round count would freeze the tab.
+  if (saltBytes.length < 16 || !validIterations(iterations)) throw new UnreadableEnvelopeError();
   const material = await crypto.subtle.importKey(
     'raw',
     encoder.encode(password.normalize('NFC')),

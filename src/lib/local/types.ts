@@ -31,7 +31,7 @@ export type LocalOperation = {
   creado_en: string;
 };
 
-/** A project moving between the browser and the cloud (see PLAN-11 §7). */
+/** A project moving between the browser and the cloud (see docs/planes/PLAN-11.md §7). */
 export type LocalTransfer = {
   proyecto_id: string;
   direccion: 'a-local' | 'a-nube';

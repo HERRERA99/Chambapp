@@ -162,8 +162,19 @@ function readPlain(value: unknown, userId: string): ServerReadResult {
     throw new BackupError('COPIA_INVALIDA');
   if (value.usuario_id !== userId) throw new BackupError('COPIA_OTRA_CUENTA');
   if (!isServerData(value.datos, userId)) throw new BackupError('COPIA_INVALIDA');
-  if (!fitsImportLimit(value.datos)) throw new BackupError('COPIA_DEMASIADO_GRANDE');
-  return { kind: 'ok', data: value.datos, exportadoEn: value.exportado_en };
+  const data = withoutRemovedTables(value.datos);
+  if (!fitsImportLimit(data)) throw new BackupError('COPIA_DEMASIADO_GRANDE');
+  return { kind: 'ok', data, exportadoEn: value.exportado_en };
+}
+
+/** Tables that older copies include but the server no longer has (the Odoo API key). */
+export const REMOVED_TABLES = ['chambapp_private.odoo_credenciales'];
+
+export function withoutRemovedTables(data: ServerData): ServerData {
+  const tablas = Object.fromEntries(
+    Object.entries(data.tablas).filter(([name]) => !REMOVED_TABLES.includes(name)),
+  );
+  return { ...data, tablas };
 }
 
 /** Counts shown before replacing everything. */

@@ -2,12 +2,19 @@ import type { Provider } from '@supabase/supabase-js';
 import { oauthProviders } from '../../../src/features/auth/oauth';
 import { readableError } from '../../../src/lib/supabase/errors';
 import { cloud as supabase, currentSession } from './supabase';
+import { cloudAvailable } from '../shared/cloud';
+
+function requireCloud() {
+  if (!cloudAvailable)
+    throw new Error('Esta copia de la extensión solo funciona con Chambapp local.');
+}
 
 const LAST_USER_KEY = 'chambapp_last_user';
 /** Account key (shared/backend.ts) of the last account seen; replaces LAST_USER_KEY. */
 const LAST_ACCOUNT_KEY = 'chambapp_last_account';
 
 export async function signInWithPassword(email: string, password: string) {
+  requireCloud();
   if (!email.trim() || !password) throw new Error('Escribe tu correo y tu contraseña.');
   const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw new Error(readableError(error));
@@ -18,6 +25,7 @@ export async function signInWithPassword(email: string, password: string) {
  * closes as soon as that window takes the focus.
  */
 export async function signInWithProvider(providerId: string) {
+  requireCloud();
   const provider = oauthProviders.find((item) => item.id === providerId);
   if (!provider) throw new Error('Proveedor de acceso no disponible.');
   const redirectTo = chrome.identity.getRedirectURL('auth');

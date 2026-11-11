@@ -1,6 +1,7 @@
 // Builds the browser extension into extension/dist.
 //   node extension/build.mjs          production build
 //   node extension/build.mjs --watch  rebuild on changes (reload the extension in chrome://extensions)
+//   node extension/build.mjs --allow-local-only  without the cloud values: a local-only extension
 // Pages and the service worker are ES modules; content scripts are self-contained IIFE files.
 import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -19,12 +20,20 @@ const env = loadEnv(mode, root, 'VITE_');
 const supabaseUrl = env.VITE_SUPABASE_URL ?? '';
 const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
 const { isPublicApiKey, isSupabaseUrl } = await import('../src/lib/supabase/clientConfig.ts');
-if (!isSupabaseUrl(supabaseUrl) || !isPublicApiKey(supabaseKey)) {
+// Without the cloud project's public values the extension is still built, but it only
+// works with Chambapp local (the Docker edition). See extension/src/shared/cloud.ts.
+// The cloud build (npm run build) must have them; only --allow-local-only (Docker) may skip them.
+const cloud = isSupabaseUrl(supabaseUrl) && isPublicApiKey(supabaseKey);
+if (!cloud && !process.argv.includes('--allow-local-only')) {
   console.error(
-    'Configura VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en .env.local (los mismos de la app) antes de compilar la extensión.',
+    'Configura VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY (los mismos de la app) o usa --allow-local-only.',
   );
   process.exit(1);
 }
+if (!cloud)
+  console.warn(
+    'Sin VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY: la extensión se compila solo para Chambapp local.',
+  );
 
 rmSync(outDir, { recursive: true, force: true });
 rmSync(firefoxDir, { recursive: true, force: true });
@@ -89,10 +98,11 @@ const contentScripts = ['app-bridge', 'odoo-detect', 'odoo-timesheet', 'autofill
 await Promise.all([pages, ...contentScripts]);
 
 const manifest = JSON.parse(readFileSync(resolve(here, 'manifest.json'), 'utf8'));
-const supabaseOrigin = new URL(supabaseUrl).origin;
-manifest.host_permissions = manifest.host_permissions.map((value) =>
-  value.replace('__SUPABASE_ORIGIN__', supabaseOrigin),
-);
+manifest.host_permissions = cloud
+  ? manifest.host_permissions.map((value) =>
+      value.replace('__SUPABASE_ORIGIN__', new URL(supabaseUrl).origin),
+    )
+  : manifest.host_permissions.filter((value) => !value.includes('__SUPABASE_ORIGIN__'));
 if (watch) manifest.name = `${manifest.name} (desarrollo)`;
 writeFileSync(resolve(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -129,6 +139,7 @@ writeFileSync(
   resolve(firefoxDir, 'manifest.json'),
   `${JSON.stringify(firefoxManifest, null, 2)}\n`,
 );
+writeFileSync(resolve(here, '.build-info.json'), `${JSON.stringify({ cloud }, null, 2)}\n`);
 console.log(
-  `Extensión compilada en ${outDir} y ${firefoxDir}${watch ? ' (vigilando cambios)' : ''}`,
+  `Extensión compilada en ${outDir} y ${firefoxDir}${cloud ? '' : ' (solo local)'}${watch ? ' (vigilando cambios)' : ''}`,
 );

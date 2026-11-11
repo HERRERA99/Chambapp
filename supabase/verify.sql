@@ -6,8 +6,8 @@ begin
     where c.relkind = 'r' and c.relrowsecurity and
       ((s.nspname = 'public' and c.relname in ('perfiles','proyectos','tareas','configuraciones_semanales',
         'dias_configuracion_semanal','jornadas','partes_horas','fichajes','ausencias','notas','nota_proyectos','nota_tareas')) or
-       (s.nspname = 'chambapp_private' and c.relname in ('operaciones_cronometro','operaciones_fichajes','odoo_credenciales')));
-  if n <> 15 then raise exception 'Faltan tablas o RLS: % de 15', n; end if;
+       (s.nspname = 'chambapp_private' and c.relname in ('operaciones_cronometro','operaciones_fichajes')));
+  if n <> 14 then raise exception 'Faltan tablas o RLS: % de 14', n; end if;
   if pg_catalog.has_table_privilege('anon','public.notas_detalle','SELECT') or
      pg_catalog.has_function_privilege('anon','public.chambapp_notas(text,jsonb)','EXECUTE') or
      not pg_catalog.has_function_privilege('authenticated','public.chambapp_notas(text,jsonb)','EXECUTE') or
@@ -29,20 +29,14 @@ begin
      pg_catalog.has_table_privilege('authenticated','public.fichajes','INSERT') or
      pg_catalog.has_table_privilege('authenticated','public.fichajes','UPDATE') or
      pg_catalog.has_table_privilege('authenticated','public.fichajes','DELETE') or
-     pg_catalog.has_table_privilege('anon','public.fichajes','SELECT') or
-     pg_catalog.has_table_privilege('authenticated','chambapp_private.odoo_credenciales','SELECT') or
-     pg_catalog.has_table_privilege('authenticated','chambapp_private.odoo_credenciales','INSERT') or
-     pg_catalog.has_table_privilege('authenticated','chambapp_private.odoo_credenciales','UPDATE') or
-     pg_catalog.has_table_privilege('authenticated','chambapp_private.odoo_credenciales','DELETE') then
+     pg_catalog.has_table_privilege('anon','public.fichajes','SELECT') then
     raise exception 'Hay permisos directos inesperados'; end if;
   if not pg_catalog.has_function_privilege('authenticated','public.chambapp_operar(text,jsonb)','EXECUTE') or
      pg_catalog.has_function_privilege('anon','public.chambapp_operar(text,jsonb)','EXECUTE') then
     raise exception 'Permisos de RPC incorrectos'; end if;
-  if not pg_catalog.has_function_privilege('authenticated','public.chambapp_configurar_odoo(text,boolean)','EXECUTE') or
-     pg_catalog.has_function_privilege('anon','public.chambapp_configurar_odoo(text,boolean)','EXECUTE') or
-     not exists(select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace s on s.oid = p.pronamespace
-       where s.nspname='public' and p.proname='chambapp_configurar_odoo' and not p.prosecdef) then
-    raise exception 'Permisos de configuración Odoo incorrectos'; end if;
+  if to_regclass('chambapp_private.odoo_credenciales') is not null or
+     exists(select 1 from pg_catalog.pg_proc p where p.proname in ('chambapp_configurar_odoo','configurar_odoo')) then
+    raise exception 'Quedan restos de la API key de Odoo'; end if;
   if not exists(select 1 from pg_catalog.pg_trigger t
     where t.tgrelid = 'auth.users'::regclass and t.tgname = 'chambapp_crear_perfil' and not t.tgisinternal) then
     raise exception 'Falta el trigger de alta'; end if;

@@ -30,6 +30,7 @@
     "ext:build": "node extension/build.mjs",
     "ext:watch": "node extension/build.mjs --watch",
     "ext:pack": "node extension/build.mjs && node extension/scripts/pack.mjs",
+    "ext:pack:local": "node extension/build.mjs --allow-local-only && node extension/scripts/pack.mjs",
     "ext:sign:firefox": "node extension/scripts/sign-firefox.mjs",
     "ext:icons": "node extension/scripts/make-icons.mjs"
   },
@@ -63,6 +64,6 @@
     "supabase": "2.119.0",
     "typescript": "6.0.2",
     "typescript-eslint": "8.71.0",
-    "vite": "8.3.1"
+    "vite": "8.3.7"
   }
 }

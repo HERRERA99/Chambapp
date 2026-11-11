@@ -12,7 +12,11 @@ El código está en `extension/`. Reutiliza módulos de la app (cifrado, modelo 
 
 En la app, el menú lateral tiene **Descargar extensión** (debajo de la zona horaria). Descarga `chambapp-extension.zip` y abre un tutorial interactivo paso a paso que detecta la extensión en cuanto se carga. El tutorial se puede volver a ver en **Ajustes → Extensión** (también se abre pulsando el indicador «Extensión» de la cabecera, verde si está instalada y roja si no).
 
-El zip lo genera `npm run ext:pack` en `public/downloads/` (ignorado por git); `npm run build` lo ejecuta antes de compilar la app, así que cada despliegue sirve la última versión. En desarrollo, ejecuta `npm run ext:pack` una vez para que la descarga funcione en `npm run dev`.
+El zip lo genera `npm run ext:pack` en `public/downloads/` (ignorado por git); `npm run build` lo ejecuta antes de compilar la app, así que cada despliegue sirve la última versión. En desarrollo, ejecuta `npm run ext:pack` una vez para que la descarga funcione en `npm run dev`. Si el servidor no tiene el paquete, el botón descarga el de la release [`extension-latest`](https://github.com/HERRERA99/Chambapp/releases/tag/extension-latest), que publica `.github/workflows/extension.yml` en cada subida a `main`.
+
+Sin `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY`, `npm run ext:pack:local` compila una extensión **solo local** (la opción «Nube» aparece desactivada y arranca conectada a `http://127.0.0.1:47800`). Es la que lleva la imagen Docker si no se le pasan esos valores. Con `VITE_EXTENSION_DEFAULT_BACKEND=local` una extensión con nube arranca también en modo local.
+
+Firefox: si no hay copia firmada de la versión actual en `extension/signed/`, se sirve la firmada más reciente (y `npm run ext:pack` avisa). Firma la nueva con `npm run ext:sign:firefox`.
 
 ## Firefox
 
@@ -105,7 +109,7 @@ Los tests `tests/extension*.test.ts` cubren el protocolo app↔extensión, la co
 
 ### Prueba en navegador con un Odoo falso
 
-`tools/ext-smoke/odoo-task.html` imita la ficha de una tarea de Odoo (modos normal, lento, rechazado, campo inválido y paginado). `tools/ext-smoke/run.mjs` carga la extensión en Edge, ejecuta el envío contra cada modo, compara los clics con el ejemplo `Extension_App`, comprueba la detección, el recuento paginado y el autocompletado:
+`tools/ext-smoke/odoo-task.html` imita la ficha de una tarea de Odoo (modos normal, lento, rechazado, campo inválido y paginado). `tools/ext-smoke/run.mjs` carga la extensión en Edge, ejecuta el envío contra cada modo, compara los clics con la extensión de referencia (`tools/ext-smoke/reference-extension`), comprueba la detección, el recuento paginado y el autocompletado:
 
 ```bash
 npm i --no-save playwright-core
@@ -155,4 +159,4 @@ Con proyectos locales (ver [datos-locales.md](datos-locales.md)) la extensión p
 - El bloqueo de edición durante un envío solo afecta a las pestañas de Chambapp de este navegador. Importar la misma tarea a la vez desde dos navegadores podría duplicarla.
 - Los tiempos con segundos (redondeo 0) se envían a Odoo redondeados al minuto superior.
 - No hay captura automática de contraseñas al iniciar sesión en webs ni menú dentro de los campos.
-- `Extension_App/` se conserva como referencia; sus archivos tienen los nombres cambiados (por ejemplo, `popup.css` contiene el manifest) y no carga tal cual.
+- `tools/ext-smoke/reference-extension/` (antes `Extension_App/`) se conserva como referencia; sus archivos tienen los nombres cambiados (por ejemplo, `popup.css` contiene el manifest) y no carga tal cual.

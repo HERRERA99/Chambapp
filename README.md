@@ -42,16 +42,22 @@ El entorno Supabase local configura las redirecciones del puerto 5173 en `supaba
 
 ## Estructura
 
-| Ruta                  | Responsabilidad                                                                |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `src/app`             | Rutas, carga de pantallas, protección de sesión y layout.                      |
-| `src/features`        | Funcionalidades independientes con páginas, componentes, hooks y selectores.   |
-| `src/domain`          | Tipos de negocio y utilidades de tiempo, duración y zona horaria.              |
-| `src/lib/supabase`    | Cliente tipado, repositorio de lectura, RPC, validación y errores.             |
-| `src/shared/ui`       | Controles accesibles reutilizables: botones, formularios, tablas y diálogos.   |
-| `src/styles`          | Tokens de diseño y estilos compartidos; cada funcionalidad puede tener su CSS. |
-| `supabase/migrations` | Esquema y cambios versionados.                                                 |
-| `tests`, `tools`      | Pruebas de dominio, cronómetro, seguridad de datos y PostgreSQL.               |
+| Ruta                | Responsabilidad                                                                |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `src/app`           | Rutas, carga de pantallas, protección de sesión y layout.                      |
+| `src/features`      | Funcionalidades independientes con páginas, componentes, hooks y selectores.   |
+| `src/domain`        | Tipos de negocio y utilidades de tiempo, duración y zona horaria.              |
+| `src/lib`           | Supabase (cliente, RPC, validación), datos locales, cifrado y copias.          |
+| `src/shared/ui`     | Controles accesibles reutilizables: botones, formularios, tablas y diálogos.   |
+| `src/styles`        | Tokens de diseño y estilos compartidos; cada funcionalidad puede tener su CSS. |
+| `extension`         | Extensión de navegador (Chrome, Edge y Firefox) y sus scripts de empaquetado.  |
+| `supabase`          | Migraciones de la nube, configuración de la CLI y verificación.                |
+| `docker`            | Chambapp local: imágenes, `docker-compose.yml` y migraciones solo locales.     |
+| `tests`             | Pruebas unitarias (`npm test`).                                                |
+| `tools`             | Pruebas de PostgreSQL, pruebas de humo (UI, extensión, Docker) y utilidades.   |
+| `docs`              | Documentación técnica, planes de cada iteración (`docs/planes`) y diseño.      |
+| `video`             | Vídeo promocional (Remotion), independiente de la app.                         |
+| `.github/workflows` | CI: imágenes Docker y extensión publicadas al subir a `main`.                  |
 
 Los providers de Auth, Workspace y Tracker coordinan la sesión, la caché de consultas y el cronómetro. Los componentes presentan datos y envían comandos a través de esa capa; los cálculos se mantienen en utilidades y selectores verificables.
 
@@ -164,4 +170,4 @@ npm run db:test
 
 La suite levanta PostgreSQL 17 aislado con datos sintéticos, aplica todas las migraciones y verifica RLS, propiedad, versiones, redondeo, DST, cronómetro, referencias Odoo, fichajes, reintentos y concurrencia. No modifica la base alojada. `supabase/verify.sql` comprueba catálogo y permisos después de aplicar una migración; las pruebas de SQL no sustituyen la verificación de registro, confirmación por correo y login en el navegador.
 
-La migración [Inicio retroactivo y credenciales de Odoo](supabase/migrations/20261005185736_selected_timer_start_and_odoo_credentials.sql) está aplicada al proyecto alojado y verificada con PostgreSQL aislado y con el script remoto de catálogo y permisos. Es necesaria para activar «Iniciar a otra hora». (La API key de Odoo ya no se pide en la app; la tabla `chambapp_private.odoo_credenciales` queda sin uso.) Las tareas se paginan de seis en seis y todas las vistas de partes muestran su estado de imputación en Odoo.
+La migración [Inicio retroactivo y credenciales de Odoo](supabase/migrations/20261005185736_selected_timer_start_and_odoo_credentials.sql) está aplicada al proyecto alojado y verificada con PostgreSQL aislado y con el script remoto de catálogo y permisos. Es necesaria para activar «Iniciar a otra hora». (La API key de Odoo se eliminó por completo en [20261111000000_remove_odoo_api_key.sql](supabase/migrations/20261111000000_remove_odoo_api_key.sql): la extensión usa la sesión de Odoo del navegador.) Las tareas se paginan de seis en seis y todas las vistas de partes muestran su estado de imputación en Odoo.

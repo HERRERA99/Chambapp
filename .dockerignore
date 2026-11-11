@@ -15,4 +15,4 @@ extension/dist-firefox
 tools/db-tests/node_modules
 tools/ui-smoke
 tools/ext-smoke
-PLAN*.md
+docs/planes

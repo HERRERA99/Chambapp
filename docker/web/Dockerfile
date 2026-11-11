@@ -8,17 +8,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
-# Public values (the cloud project's URL and publishable key) used only to package the
-# browser extension offered for download. Without them the image has no downloads.
+# Optional public values (the cloud project's URL and publishable key): with them the
+# extension offered for download can also use the cloud; without them it is built for
+# Chambapp local only. The download is always included.
 ARG VITE_SUPABASE_URL=""
 ARG VITE_SUPABASE_PUBLISHABLE_KEY=""
-RUN if [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then \
-      VITE_SUPABASE_URL="$VITE_SUPABASE_URL" VITE_SUPABASE_PUBLISHABLE_KEY="$VITE_SUPABASE_PUBLISHABLE_KEY" \
-        npm run ext:pack; \
-    else \
-      echo "Sin VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY: la imagen no incluye la extensión para descargar."; \
-    fi
-RUN npm run build:local
+RUN VITE_SUPABASE_URL="$VITE_SUPABASE_URL" VITE_SUPABASE_PUBLISHABLE_KEY="$VITE_SUPABASE_PUBLISHABLE_KEY" \
+      VITE_EXTENSION_DEFAULT_BACKEND=local npm run ext:pack:local
+# The extension's values must not leak into the app build (the local edition has no cloud).
+RUN VITE_SUPABASE_URL= VITE_SUPABASE_PUBLISHABLE_KEY= npm run build:local
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY docker/web/default.conf.template /etc/nginx/templates/default.conf.template

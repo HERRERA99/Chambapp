@@ -1,6 +1,6 @@
 // Injected into the Odoo task tab opened by the worker. Creates one timesheet line by
 // driving Odoo's own form (no API), and counts matching lines for the verification.
-// Based on the sequence of Extension_App, with a write boundary acknowledged by the
+// Based on the sequence of the reference extension (tools/ext-smoke/reference-extension), with a write boundary acknowledged by the
 // worker, explicit error detection and a count across every page of the list.
 import { ATTEMPT_PORT_PREFIX, formatOdooDate } from '../shared/automation';
 import { parseOdooTaskUrl } from '../shared/odooTask';

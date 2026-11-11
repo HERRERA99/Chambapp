@@ -19,6 +19,7 @@ import type { Profile, WorkspaceData } from '../../domain/models';
 import { safeReturnTo } from '../auth/returnTo';
 import './onboarding.css';
 import { isLocalEdition } from '../../lib/edition';
+import { LOCAL_EDITION_DOCS } from '../../lib/project';
 
 /** "Dónde guardar": the local edition keeps everything in its own database. */
 const STORAGE_STEP = 3;
@@ -426,10 +427,8 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
             {step === 3 ? (
               <Panel eyebrow="Bloque 04" title="Proyectos, tareas y partes de horas">
                 <p className="muted">
-                  Puedes guardarlos en la nube o solo en este navegador, si tu empresa no quiere que
-                  estén en un servidor externo. El resto (perfil, jornada, fichajes, festivos, notas
-                  y contraseñas) se guarda en la nube. Puedes cambiarlo cuando quieras en Ajustes →
-                  Datos, y los dos tipos de datos se ven siempre juntos.
+                  Elige dónde se guardan. Si no estás seguro, deja «En la nube»: podrás cambiarlo en
+                  Ajustes → Datos con un clic.
                 </p>
                 <fieldset className="choice-fieldset" disabled={saving}>
                   <legend>Guardar los proyectos nuevos</legend>
@@ -463,8 +462,8 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
                       />
                       <strong>En este navegador</strong>
                       <span className="muted">
-                        Cifrados con tu clave maestra y guardados solo aquí. Descarga copias de
-                        seguridad desde Ajustes → Datos.
+                        Solo aquí, cifrados con una clave maestra que crearás ahora. El resto
+                        (perfil, fichajes, notas…) sigue en tu cuenta.
                       </span>
                     </label>
                   </div>
@@ -483,6 +482,13 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
                     </Notice>
                   )
                 ) : null}
+                <Notice title="¿Quieres que nada salga de tu PC?" icon="hardDrive">
+                  Existe <strong>Chambapp local</strong>, una versión 100% en Docker, sin cuenta y
+                  sin nube.{' '}
+                  <a href={LOCAL_EDITION_DOCS} target="_blank" rel="noreferrer noopener">
+                    Cómo instalarla
+                  </a>
+                </Notice>
                 {data.local?.estado === 'no-disponible' ? (
                   <Notice title="Este navegador no permite guardar datos locales">
                     Puede ocurrir en ventanas privadas.

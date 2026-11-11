@@ -9,6 +9,7 @@ import { useEntryEditor } from './useEntryEditor';
 import { OdooLink } from '../../tasks/components/OdooLink';
 import { localDateTimeToIso } from '../../../domain/time';
 import { DayContextPanel, DayContextToggle } from '../../day-context/DayContextPanel';
+import { dayContextSummary } from '../../day-context/dayContextSummary';
 import { useDayContextVisibility } from '../../day-context/useDayContextVisibility';
 
 /** ISO instant of a date and time typed in the form; null while incomplete or invalid. */
@@ -80,7 +81,16 @@ function EntryEditor({
         ) : null
       }
     >
-      <DayContextToggle visible={dayPanel.visible} onToggle={dayPanel.toggle} controls={panelId} />
+      <DayContextToggle
+        visible={dayPanel.visible}
+        onToggle={dayPanel.toggle}
+        controls={panelId}
+        summary={
+          dayPanel.visible
+            ? null
+            : dayContextSummary(data, editor.startDate, editor.zone, entry?.id ?? null)
+        }
+      />
       {entry && !entry.fin_en ? (
         <Notice title="Cronómetro activo">Detén el cronómetro antes de editar su intervalo.</Notice>
       ) : (

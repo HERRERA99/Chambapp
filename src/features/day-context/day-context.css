@@ -140,3 +140,15 @@
     gap: 2px;
   }
 }
+
+.day-context-toggle {
+  flex-wrap: wrap;
+}
+.day-context-toggle__summary {
+  flex-basis: 100%;
+  padding-left: 23px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: left;
+}

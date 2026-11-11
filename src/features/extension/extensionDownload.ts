@@ -1,3 +1,5 @@
+import { EXTENSION_RELEASE_DOWNLOAD } from '../../lib/project';
+
 /** Packages built by `npm run ext:pack` into public/downloads. */
 export const EXTENSION_ZIP = '/downloads/chambapp-extension.zip';
 export const EXTENSION_XPI = '/downloads/chambapp-extension-firefox.xpi';
@@ -6,7 +8,7 @@ export const EXTENSION_FOLDER = 'chambapp-extension';
 
 export type BrowserKind = 'chrome' | 'edge' | 'firefox';
 
-export type PackageInfo = { version: string; firefoxSigned: boolean };
+export type PackageInfo = { version: string; firefoxSigned: boolean; cloud: boolean };
 
 export type DownloadState =
   | { status: 'idle' }
@@ -36,16 +38,50 @@ export async function loadPackageInfo(): Promise<PackageInfo | null> {
     if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) return null;
     const value = (await response.json()) as Partial<PackageInfo>;
     return typeof value.version === 'string'
-      ? { version: value.version, firefoxSigned: value.firefoxSigned === true }
+      ? {
+          version: value.version,
+          firefoxSigned: value.firefoxSigned === true,
+          cloud: value.cloud !== false,
+        }
       : null;
   } catch {
     return null;
   }
 }
 
+/** Same files, published from main in the repository's GitHub release. */
+export function releaseUrl(kind: BrowserKind) {
+  return `${EXTENSION_RELEASE_DOWNLOAD}/${fileName(kind)}`;
+}
+
+export function fileName(kind: BrowserKind) {
+  return (kind === 'firefox' ? EXTENSION_XPI : EXTENSION_ZIP).split('/').at(-1)!;
+}
+
+/** Whether this server really has the package (a dev server answers with the app's HTML). */
+async function packaged(url: string) {
+  try {
+    const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    const type = response.headers.get('content-type') ?? '';
+    return response.ok && !type.includes('text/html');
+  } catch {
+    return false;
+  }
+}
+
+function save(url: string, name?: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  if (name) link.download = name;
+  link.rel = 'noopener';
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 /**
- * Starts the download after checking the file really exists: a dev server
- * without the package answers with the app's HTML, which must not be saved.
+ * Starts the download from this server; when it has no package (a build without
+ * `npm run ext:pack`), from the repository's GitHub release instead.
  * A signed .xpi is opened directly, so Firefox shows its "Add" prompt.
  */
 export async function downloadExtension(
@@ -53,28 +89,15 @@ export async function downloadExtension(
   info: PackageInfo | null,
 ): Promise<DownloadState> {
   const url = kind === 'firefox' ? EXTENSION_XPI : EXTENSION_ZIP;
-  try {
-    const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-    const type = response.headers.get('content-type') ?? '';
-    if (!response.ok || type.includes('text/html'))
-      return {
-        status: 'error',
-        message:
-          'La descarga no está disponible en este entorno. Genera el paquete con «npm run ext:pack».',
-      };
-  } catch {
-    return { status: 'error', message: 'No se pudo conectar para descargar la extensión.' };
+  if (!(await packaged(url))) {
+    save(releaseUrl(kind));
+    return { status: 'started' };
   }
   if (kind === 'firefox' && info?.firefoxSigned) {
     window.location.assign(url);
     return { status: 'started' };
   }
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = url.split('/').at(-1)!;
-  document.body.append(link);
-  link.click();
-  link.remove();
+  save(url, fileName(kind));
   return { status: 'started' };
 }
 

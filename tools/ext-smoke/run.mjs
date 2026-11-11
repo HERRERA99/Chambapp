@@ -47,7 +47,7 @@ const manifest = JSON.parse(readFileSync(join(extension, 'manifest.json'), 'utf8
 manifest.host_permissions.push('http://127.0.0.1/*');
 writeFileSync(join(extension, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timesheetScript = readFileSync(join(extension, 'content/odoo-timesheet.js'), 'utf8');
-const exampleScript = readFileSync(join(root, 'Extension_App/manifest.json'), 'utf8'); // misnamed content script
+const exampleScript = readFileSync(join(root, 'tools/ext-smoke/reference-extension/manifest.json'), 'utf8'); // misnamed content script
 
 const context = await chromium.launchPersistentContext(
   mkdtempSync(join(tmpdir(), 'chambapp-profile-')),
@@ -193,7 +193,7 @@ check(
   `antes ${paginated.before}, después ${paginated.after}`,
 );
 
-// ---------------------------------------------------------------- 2. parity with Extension_App
+// ---------------------------------------------------------------- 2. parity with the reference extension (tools/ext-smoke/reference-extension)
 {
   const page = await context.newPage();
   await page.addInitScript(() => {
