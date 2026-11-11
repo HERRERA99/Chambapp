@@ -42,6 +42,7 @@ services:
       timeout: 3s
       retries: 30
     mem_limit: 256m
+    security_opt: ['no-new-privileges:true']
 
   # Applies new migrations, then exits (uses no resources afterwards).
   migrate:
@@ -58,6 +59,7 @@ services:
       db:
         condition: service_healthy
     mem_limit: 64m
+    security_opt: ['no-new-privileges:true']
 
   api:
     image: postgrest/postgrest:v13.0.7
@@ -78,6 +80,9 @@ services:
       migrate:
         condition: service_completed_successfully
     mem_limit: 64m
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
 
   web:
     image: ${CHAMBAPP_IMAGE_PREFIX:-ghcr.io/herrera99}/chambapp-local-web:${CHAMBAPP_TAG:-latest}
@@ -90,6 +95,8 @@ services:
     depends_on:
       - api
     mem_limit: 32m
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
 
 volumes:
   chambapp-data:

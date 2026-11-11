@@ -4,6 +4,8 @@ Algunas empresas no quieren que sus proyectos y partes de horas estén en un ser
 
 ## Cómo funciona para el usuario
 
+Se activa con **Ajustes → Datos → En este navegador** (o en la configuración inicial). Un solo diálogo explica qué se guarda dónde, pide crear o desbloquear la clave maestra solo si hace falta, guarda la preferencia (sin pulsar «Guardar» después) y pide al navegador almacenamiento persistente. Para no guardar **nada** en la nube está [Chambapp local con Docker](../docker/README.md).
+
 - **Ajustes → Datos** (y un paso de la configuración inicial): «En la nube» o «En este navegador». La opción decide **dónde se crean los proyectos nuevos**. Las tareas y partes van siempre donde está su proyecto.
 - Los dos almacenes **coexisten**: la app muestra siempre los datos locales y los de la nube juntos, con la etiqueta _Local_ / _Nube_ y un filtro en Proyectos. Cambiar de opción nunca oculta ni pierde nada.
 - **Mover proyecto** (detalle del proyecto): lo pasa, con sus tareas y partes, de la nube a este navegador o al revés, conservando los mismos ids. Al moverlo a local se **borra físicamente** de Supabase; Supabase puede conservar sus copias internas durante su periodo de retención.
@@ -14,7 +16,7 @@ Algunas empresas no quieren que sus proyectos y partes de horas estén en un ser
 ## Cifrado y bloqueo
 
 - Los datos locales se guardan en IndexedDB (`chambapp-local`, un registro por cuenta) **cifrados con la clave de datos de la bóveda** (AES-GCM, AAD `chambapp:local:v1:<usuario>`). Hace falta tener clave maestra para usar el modo local.
-- Basta desbloquear la bóveda **una vez por pestaña**: la clave queda en memoria y los datos locales siguen abiertos aunque la bóveda se bloquee por inactividad. Se cierran al cerrar o recargar la pestaña, al cerrar sesión, al cambiar de cuenta y con **Bloquear todo**.
+- Basta desbloquear la bóveda **una vez mientras haya una pestaña abierta**: las pestañas nuevas de la misma cuenta piden la clave de datos a las abiertas por `BroadcastChannel('chambapp-local-clave')` (mismo origen; no se guarda en ningún sitio). La clave queda en memoria y los datos locales siguen abiertos aunque la bóveda se bloquee por inactividad. Se cierran al cerrar o recargar la pestaña, al cerrar sesión, al cambiar de cuenta y con **Bloquear todo** (que cierra todas las pestañas).
 - Cambiar la clave maestra no afecta (la clave de datos es la misma). **Restablecer la bóveda** deja ilegibles los datos locales de ese navegador: la app avisa antes y ofrece descargar una copia, que no depende de la bóveda.
 - Se pide al navegador almacenamiento persistente (`navigator.storage.persist()`), y en Ajustes → Datos se muestra si lo concedió.
 
@@ -46,5 +48,5 @@ La extensión no puede leer el IndexedDB de la app: para importar una tarea de O
 
 - Los datos locales solo existen en ese navegador: no se sincronizan entre dispositivos (se llevan con la copia).
 - La regla de un único cronómetro y sin solapes entre la nube y el navegador se comprueba en el cliente: dos dispositivos podrían saltársela a la vez.
-- Recargar la pestaña pide desbloquear de nuevo (la clave no se guarda fuera de memoria).
+- Recargar la única pestaña abierta pide desbloquear de nuevo (la clave no se guarda fuera de memoria).
 - Rendimiento medido en Edge: con 20 000 partes (16 MB cifrados), unos 0,5 s por escritura.

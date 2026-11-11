@@ -30,14 +30,14 @@ Los identificadores son UUID. `PK` indica clave primaria y `FK`, referencia a ot
 
 Supabase Auth gestiona la cuenta en `auth.users`: identidad, credenciales y sesiones. Chambapp mantiene un perfil con los datos propios de la aplicación, vinculado a esa cuenta con el mismo UUID. Cada cuenta de Chambapp tendrá un único perfil.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK y FK → auth.users.id | Mismo identificador que la cuenta de Supabase Auth. |
-| nombre | Texto | Nombre visible. |
-| zona_horaria | Texto | Zona IANA, por ejemplo `Europe/Madrid`, para determinar la fecha de cada jornada. |
-| intervalo_redondeo_minutos | Entero | Uno de `5`, `10` o `15`. Propuesta de valor inicial: `15`. |
-| modo_redondeo | Valor fijo | `superior`: inicio y fin hacia arriba. Se conserva como dato explícito para mantener la interpretación histórica si se incorporan otros modos en el futuro. |
-| creado_en | Instante UTC | Fecha de creación. |
+| Campo                      | Tipo                          | Descripción                                                                                                                                                 |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                         | UUID, PK y FK → auth.users.id | Mismo identificador que la cuenta de Supabase Auth.                                                                                                         |
+| nombre                     | Texto                         | Nombre visible.                                                                                                                                             |
+| zona_horaria               | Texto                         | Zona IANA, por ejemplo `Europe/Madrid`, para determinar la fecha de cada jornada.                                                                           |
+| intervalo_redondeo_minutos | Entero                        | Uno de `5`, `10` o `15`. Propuesta de valor inicial: `15`.                                                                                                  |
+| modo_redondeo              | Valor fijo                    | `superior`: inicio y fin hacia arriba. Se conserva como dato explícito para mantener la interpretación histórica si se incorporan otros modos en el futuro. |
+| creado_en                  | Instante UTC                  | Fecha de creación.                                                                                                                                          |
 
 El email de acceso y las credenciales los gestiona Supabase Auth; no se duplican en el perfil. El método de registro (email y contraseña, enlace por email o proveedor externo) queda pendiente de decidir.
 
@@ -51,37 +51,37 @@ La zona horaria se configura durante el alta y se puede cambiar en ajustes. Se v
 
 Proyecto, Tarea y ParteHoras incorporan además:
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| eliminado_en | Instante UTC, opcional | Vacío mientras el registro está disponible. Al eliminarlo desaparece de las vistas habituales y de los totales. |
-| actualizado_en | Instante UTC | Última modificación, establecida por el backend. |
-| version | Entero | Empieza en 1 y aumenta en cada modificación; permite detectar ediciones simultáneas. |
+| Campo          | Tipo                   | Descripción                                                                                                     |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| eliminado_en   | Instante UTC, opcional | Vacío mientras el registro está disponible. Al eliminarlo desaparece de las vistas habituales y de los totales. |
+| actualizado_en | Instante UTC           | Última modificación, establecida por el backend.                                                                |
+| version        | Entero                 | Empieza en 1 y aumenta en cada modificación; permite detectar ediciones simultáneas.                            |
 
 En ParteHoras, `actualizado_en` ya existía en la v2. El borrado lógico permite eliminar desde la app conservando referencias internas para recuperar errores y resolver reintentos. No equivale a la eliminación definitiva de datos al dar de baja la cuenta, que se definirá aparte.
 
 ### 2. Proyecto
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | Identificador del proyecto. |
-| usuario_id | UUID, FK → PerfilUsuario | Propietario. |
-| nombre | Texto | Nombre del proyecto. |
-| descripcion | Texto, opcional | Información adicional. |
-| archivado_en | Instante UTC, opcional | Permite retirar el proyecto de las vistas activas conservando su historial. |
-| creado_en | Instante UTC | Fecha de creación. |
+| Campo        | Tipo                     | Descripción                                                                 |
+| ------------ | ------------------------ | --------------------------------------------------------------------------- |
+| id           | UUID, PK                 | Identificador del proyecto.                                                 |
+| usuario_id   | UUID, FK → PerfilUsuario | Propietario.                                                                |
+| nombre       | Texto                    | Nombre del proyecto.                                                        |
+| descripcion  | Texto, opcional          | Información adicional.                                                      |
+| archivado_en | Instante UTC, opcional   | Permite retirar el proyecto de las vistas activas conservando su historial. |
+| creado_en    | Instante UTC             | Fecha de creación.                                                          |
 
 ### 3. Tarea
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | Identificador de la tarea. |
-| proyecto_id | UUID, FK → Proyecto | Proyecto al que pertenece. |
-| titulo | Texto | Nombre de la tarea. |
-| descripcion | Texto, opcional | Detalle del trabajo. |
-| estado | Enumeración | `pendiente`, `en_curso`, `completada`. |
-| estimacion_minutos | Entero, opcional | Tiempo estimado; debe ser mayor o igual a cero. |
-| archivado_en | Instante UTC, opcional | Retira la tarea de las vistas activas sin borrar partes. |
-| creado_en | Instante UTC | Fecha de creación. |
+| Campo              | Tipo                   | Descripción                                              |
+| ------------------ | ---------------------- | -------------------------------------------------------- |
+| id                 | UUID, PK               | Identificador de la tarea.                               |
+| proyecto_id        | UUID, FK → Proyecto    | Proyecto al que pertenece.                               |
+| titulo             | Texto                  | Nombre de la tarea.                                      |
+| descripcion        | Texto, opcional        | Detalle del trabajo.                                     |
+| estado             | Enumeración            | `pendiente`, `en_curso`, `completada`.                   |
+| estimacion_minutos | Entero, opcional       | Tiempo estimado; debe ser mayor o igual a cero.          |
+| archivado_en       | Instante UTC, opcional | Retira la tarea de las vistas activas sin borrar partes. |
+| creado_en          | Instante UTC           | Fecha de creación.                                       |
 
 El propietario se obtiene a través del proyecto. El tiempo trabajado se calcula sumando sus partes no eliminados. Una tarea puede durar varios días: cada parte indica cuándo se trabajó y a qué jornada corresponde. No se duplica la tarea para cada día.
 
@@ -89,13 +89,13 @@ El propietario se obtiene a través del proyecto. El tiempo trabajado se calcula
 
 Define una versión de la jornada habitual del usuario.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | Identificador de la configuración. |
-| usuario_id | UUID, FK → PerfilUsuario | Usuario al que se aplica. |
-| minutos_semanales | Entero | Objetivo de trabajo semanal, mayor que cero. |
-| vigente_desde | Fecha local | Lunes a partir del cual se aplica esta versión. |
-| creado_en | Instante UTC | Fecha de creación. |
+| Campo             | Tipo                     | Descripción                                     |
+| ----------------- | ------------------------ | ----------------------------------------------- |
+| id                | UUID, PK                 | Identificador de la configuración.              |
+| usuario_id        | UUID, FK → PerfilUsuario | Usuario al que se aplica.                       |
+| minutos_semanales | Entero                   | Objetivo de trabajo semanal, mayor que cero.    |
+| vigente_desde     | Fecha local              | Lunes a partir del cual se aplica esta versión. |
+| creado_en         | Instante UTC             | Fecha de creación.                              |
 
 La configuración aplicable a una semana es la más reciente cuyo `vigente_desde` no sea posterior a su lunes. La pareja `(usuario_id, vigente_desde)` es única. Cambiar la jornada habitual crea una nueva versión; las versiones usadas se conservan.
 
@@ -103,11 +103,11 @@ La configuración aplicable a una semana es la más reciente cuyo `vigente_desde
 
 Contiene los días seleccionados y el reparto habitual de minutos.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| configuracion_id | UUID, PK y FK → ConfiguracionSemanal | Configuración semanal. |
-| dia_semana | Entero, PK | De 1 (lunes) a 7 (domingo). |
-| minutos_objetivo | Entero | Minutos asignados al día, mayor que cero. |
+| Campo            | Tipo                                 | Descripción                               |
+| ---------------- | ------------------------------------ | ----------------------------------------- |
+| configuracion_id | UUID, PK y FK → ConfiguracionSemanal | Configuración semanal.                    |
+| dia_semana       | Entero, PK                           | De 1 (lunes) a 7 (domingo).               |
+| minutos_objetivo | Entero                               | Minutos asignados al día, mayor que cero. |
 
 La clave primaria es `(configuracion_id, dia_semana)`. Un día no seleccionado no tiene fila. Cada configuración debe tener al menos un día y la suma de sus objetivos debe coincidir con `minutos_semanales`. La configuración y sus días se guardan juntos en una transacción.
 
@@ -115,16 +115,16 @@ La clave primaria es `(configuracion_id, dia_semana)`. Un día no seleccionado n
 
 Representa un día concreto en el calendario del usuario.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | Identificador de la jornada. |
-| usuario_id | UUID, FK → PerfilUsuario | Propietario. |
-| fecha | Fecha local | Día de trabajo, sin componente horario. |
-| zona_horaria | Texto | Zona IANA copiada al crear la jornada; se conserva para interpretar sus partes y límites de día. |
-| configuracion_id | UUID, FK → ConfiguracionSemanal, opcional | Configuración que originó el objetivo. Vacío en jornadas creadas manualmente. |
-| minutos_objetivo | Entero | Objetivo para esa fecha, mayor o igual a cero. |
-| notas | Texto, opcional | Observaciones del día. |
-| creado_en | Instante UTC | Fecha de creación. |
+| Campo            | Tipo                                      | Descripción                                                                                      |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| id               | UUID, PK                                  | Identificador de la jornada.                                                                     |
+| usuario_id       | UUID, FK → PerfilUsuario                  | Propietario.                                                                                     |
+| fecha            | Fecha local                               | Día de trabajo, sin componente horario.                                                          |
+| zona_horaria     | Texto                                     | Zona IANA copiada al crear la jornada; se conserva para interpretar sus partes y límites de día. |
+| configuracion_id | UUID, FK → ConfiguracionSemanal, opcional | Configuración que originó el objetivo. Vacío en jornadas creadas manualmente.                    |
+| minutos_objetivo | Entero                                    | Objetivo para esa fecha, mayor o igual a cero.                                                   |
+| notas            | Texto, opcional                           | Observaciones del día.                                                                           |
+| creado_en        | Instante UTC                              | Fecha de creación.                                                                               |
 
 La pareja `(usuario_id, fecha)` es única. El objetivo se copia al generar la jornada y se puede editar para esa fecha, sin cambiar la configuración habitual. Esto conserva el objetivo histórico aunque cambie la jornada semanal.
 
@@ -136,19 +136,19 @@ Cambiar la zona horaria del perfil no cambia fechas ni zonas de jornadas existen
 
 Registra el tiempo trabajado en una tarea dentro de una jornada.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | Identificador del parte. |
-| usuario_id | UUID, FK → PerfilUsuario | Propietario; debe coincidir con el de la jornada y el proyecto de la tarea. |
-| jornada_id | UUID, FK → Jornada | Día al que se imputa el trabajo. |
-| tarea_id | UUID, FK → Tarea | Tarea realizada. |
-| inicio_en | Instante (`timestamptz`) | Fecha y hora de inicio del trabajo. |
-| fin_en | Instante (`timestamptz`), opcional | Fecha y hora de fin. `NULL` indica un parte en curso. |
-| intervalo_redondeo_minutos | Entero | Copia del intervalo configurado al crear el parte: `5`, `10` o `15`. |
-| modo_redondeo | Valor fijo | `superior`, copiado al crear el parte. |
-| descripcion | Texto, opcional | Detalle de lo realizado en ese tramo. |
-| creado_en | Instante UTC | Fecha de creación del registro. |
-| actualizado_en | Instante UTC | Última modificación. |
+| Campo                      | Tipo                               | Descripción                                                                 |
+| -------------------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| id                         | UUID, PK                           | Identificador del parte.                                                    |
+| usuario_id                 | UUID, FK → PerfilUsuario           | Propietario; debe coincidir con el de la jornada y el proyecto de la tarea. |
+| jornada_id                 | UUID, FK → Jornada                 | Día al que se imputa el trabajo.                                            |
+| tarea_id                   | UUID, FK → Tarea                   | Tarea realizada.                                                            |
+| inicio_en                  | Instante (`timestamptz`)           | Fecha y hora de inicio del trabajo.                                         |
+| fin_en                     | Instante (`timestamptz`), opcional | Fecha y hora de fin. `NULL` indica un parte en curso.                       |
+| intervalo_redondeo_minutos | Entero                             | Copia del intervalo configurado al crear el parte: `5`, `10` o `15`.        |
+| modo_redondeo              | Valor fijo                         | `superior`, copiado al crear el parte.                                      |
+| descripcion                | Texto, opcional                    | Detalle de lo realizado en ese tramo.                                       |
+| creado_en                  | Instante UTC                       | Fecha de creación del registro.                                             |
+| actualizado_en             | Instante UTC                       | Última modificación.                                                        |
 
 Se guardan instantes completos, no solo una hora del día, para poder representar trabajo que cruza medianoche y cambios de horario. Para imputación y redondeo se usa la zona guardada en la jornada. `creado_en` es la fecha de creación del registro, que puede ser distinta de `inicio_en` en un parte introducido manualmente.
 
@@ -162,11 +162,11 @@ El redondeo se aplica a las horas del reloj, no simplemente a la duración. Con 
 
 Se conservan `inicio_en` y `fin_en` reales. Se calculan `inicio_imputado_en`, `fin_imputado_en` y `duracion_imputada_segundos` para mostrar y sumar el tiempo redondeado. Esos valores no sustituyen los instantes reales ni alteran el cronómetro.
 
-| Intervalo | Parte real | Parte imputado | Duración imputada |
-|---|---|---|---|
-| 15 min | 09:07–09:38 | 09:15–09:45 | 30 min |
-| 10 min | 09:07–09:38 | 09:10–09:40 | 30 min |
-| 5 min | 09:07–09:38 | 09:10–09:40 | 30 min |
+| Intervalo | Parte real  | Parte imputado | Duración imputada |
+| --------- | ----------- | -------------- | ----------------- |
+| 15 min    | 09:07–09:38 | 09:15–09:45    | 30 min            |
+| 10 min    | 09:07–09:38 | 09:10–09:40    | 30 min            |
+| 5 min     | 09:07–09:38 | 09:10–09:40    | 30 min            |
 
 Un parte corto puede quedar con duración imputada cero: por ejemplo, 09:07–09:12 se convierte en 09:15–09:15 con bloques de 15 minutos. No se le añade un bloque mínimo. El cronómetro sigue mostrando el tiempo real y, al cerrar, la app muestra también la duración imputada.
 
@@ -199,15 +199,15 @@ No se añade un estado de pausa: una pausa termina el parte actual y reanudar cr
 
 Registro interno del resultado de cada petición, para resolver reintentos sin repetir sus efectos.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| id | UUID, PK | `operacion_id` generado por el cliente, estable en los reintentos. |
-| usuario_id | UUID, FK → PerfilUsuario | Usuario obtenido de la sesión. |
-| tipo | Enumeración | `iniciar` o `detener`. |
-| parametros | JSON | Parámetros de la petición, para detectar reutilización del ID con otra intención. |
-| parte_id | UUID, FK → ParteHoras, opcional | Parte creado o afectado cuando corresponda. |
-| resultado | JSON | Resultado confirmado o conflicto estable, con las horas y versión devueltas. |
-| creado_en | Instante UTC | Instante de procesamiento en el servidor. |
+| Campo      | Tipo                            | Descripción                                                                       |
+| ---------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| id         | UUID, PK                        | `operacion_id` generado por el cliente, estable en los reintentos.                |
+| usuario_id | UUID, FK → PerfilUsuario        | Usuario obtenido de la sesión.                                                    |
+| tipo       | Enumeración                     | `iniciar` o `detener`.                                                            |
+| parametros | JSON                            | Parámetros de la petición, para detectar reutilización del ID con otra intención. |
+| parte_id   | UUID, FK → ParteHoras, opcional | Parte creado o afectado cuando corresponda.                                       |
+| resultado  | JSON                            | Resultado confirmado o conflicto estable, con las horas y versión devueltas.      |
+| creado_en  | Instante UTC                    | Instante de procesamiento en el servidor.                                         |
 
 El resultado se guarda junto con el efecto en una sola transacción. Si esta falla no se guarda ninguno. Una petición repetida con el mismo ID y parámetros devuelve el resultado persistido; el mismo ID con otros parámetros se rechaza. Si el parte fue editado o eliminado después, el cliente recupera también su estado actual; un reintento nunca restaura un registro eliminado.
 
@@ -215,11 +215,11 @@ La tabla se guarda en un esquema interno sin exposición directa a la API. La co
 
 ## Edición y eliminación
 
-| Entidad | Edición | Eliminación desde la app |
-|---|---|---|
-| Proyecto | Nombre y descripción. | Marca el proyecto, sus tareas y sus partes como eliminados en una sola transacción, tras confirmar el alcance. |
-| Tarea | Título, descripción, estado, estimación y proyecto de destino del mismo usuario. | Marca la tarea y sus partes como eliminados, tras confirmar el alcance. |
-| ParteHoras | Tarea, descripción e inicio y fin reales. | Marca el parte como eliminado y lo excluye de cronómetros y totales. |
+| Entidad    | Edición                                                                          | Eliminación desde la app                                                                                       |
+| ---------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Proyecto   | Nombre y descripción.                                                            | Marca el proyecto, sus tareas y sus partes como eliminados en una sola transacción, tras confirmar el alcance. |
+| Tarea      | Título, descripción, estado, estimación y proyecto de destino del mismo usuario. | Marca la tarea y sus partes como eliminados, tras confirmar el alcance.                                        |
+| ParteHoras | Tarea, descripción e inicio y fin reales.                                        | Marca el parte como eliminado y lo excluye de cronómetros y totales.                                           |
 
 Antes de eliminar un parte activo, su tarea o su proyecto, el usuario debe detener el cronómetro o elegir explícitamente descartar el parte activo. El descarte lo marca como eliminado sin contabilizarlo. El borrado y la comprobación se realizan juntos para evitar que se inicie otro parte durante la operación.
 
@@ -270,13 +270,13 @@ erDiagram
 
 Todas las tablas de Chambapp expuestas por la API tendrán Row Level Security (RLS). Los usuarios autenticados solo podrán consultar y modificar sus propios datos; no habrá acceso público a estos registros.
 
-| Entidad | Comprobación de propiedad |
-|---|---|
-| PerfilUsuario | `id = auth.uid()`. Lectura y edición del perfil propio; el alta automática y el borrado de cuenta se gestionan por flujos específicos. |
-| Proyecto, ConfiguracionSemanal y Jornada | `usuario_id = auth.uid()`. |
-| Tarea | Su proyecto pertenece al usuario autenticado. |
-| DiaConfiguracionSemanal | Su configuración pertenece al usuario autenticado. |
-| ParteHoras | `usuario_id = auth.uid()` y tanto su jornada como el proyecto de su tarea pertenecen al usuario autenticado. |
+| Entidad                                  | Comprobación de propiedad                                                                                                              |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| PerfilUsuario                            | `id = auth.uid()`. Lectura y edición del perfil propio; el alta automática y el borrado de cuenta se gestionan por flujos específicos. |
+| Proyecto, ConfiguracionSemanal y Jornada | `usuario_id = auth.uid()`.                                                                                                             |
+| Tarea                                    | Su proyecto pertenece al usuario autenticado.                                                                                          |
+| DiaConfiguracionSemanal                  | Su configuración pertenece al usuario autenticado.                                                                                     |
+| ParteHoras                               | `usuario_id = auth.uid()` y tanto su jornada como el proyecto de su tarea pertenecen al usuario autenticado.                           |
 
 Las políticas de escritura comprobarán también los valores nuevos para impedir cambiar el propietario o vincular registros a datos ajenos. Las reglas de integridad entre entidades se aplicarán además en la base de datos, incluso en operaciones privilegiadas que omitan RLS. Iniciar, detener, editar y eliminar se realizarán mediante operaciones transaccionales de backend que validen la sesión y mantengan estas reglas. El cliente no modificará directamente los campos de control, versiones o marcas de eliminación.
 
@@ -298,11 +298,11 @@ Ejemplo: **37,5 horas semanales** son **2.250 minutos**. De lunes a viernes, el 
 
 En un lunes con objetivo de 450 minutos, el usuario podría registrar:
 
-| Proyecto | Tarea | Inicio local | Fin local | Duración calculada |
-|---|---|---|---|---|
-| Web corporativa | Preparar diseño | 09:00 | 11:00 | 120 min |
-| Web corporativa | Implementar portada | 11:00 | 15:00 | 240 min |
-| Administración | Preparar documentación | 15:30 | 16:30 | 60 min |
+| Proyecto        | Tarea                  | Inicio local | Fin local | Duración calculada |
+| --------------- | ---------------------- | ------------ | --------- | ------------------ |
+| Web corporativa | Preparar diseño        | 09:00        | 11:00     | 120 min            |
+| Web corporativa | Implementar portada    | 11:00        | 15:00     | 240 min            |
+| Administración  | Preparar documentación | 15:30        | 16:30     | 60 min             |
 
 El total trabajado sería **420 minutos**, con **30 minutos pendientes** respecto al objetivo.
 

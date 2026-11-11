@@ -7,85 +7,109 @@
 - Decisiones del usuario: un item por parte; bloqueo Odoo solo en nueva vista; L–V + finde si hay partes; nombre «Parte semanal».
 
 ## Ronda 1 — Codex — REVISE
+
 Resultado: scratchpad/r1/claudex-0xgg0y6o/result.json (fuera del repo). Modelo efectivo: gpt-6.1-sol (ultra), sandbox read-only. Plan sha256 dd5752…ee28d.
+
 - R001 (medium) editar_parte recalcula jornada → marcar Odoo puede mover el parte de día tras cambiar zona. RECHAZADO (fuera de alcance; preexistente; documentado en Riesgos).
 - R002 (medium) (+1) fijo incorrecto para partes multi-día. ACEPTADO → (+N).
 - R003 (medium) <details> del arnés rompe la medición de scroll. ACEPTADO → overlay fixed.
 
 ## Ronda 2 — Codex — APPROVED
+
 Resultado: scratchpad/r2/claudex-sgi9iy4a/result.json. Plan sha256 ef76b96b…452b4e. Sin hallazgos.
 
 ## Build (Claude) — desviaciones registradas en el plan
+
 Base: 3679303. Cambios en PLAN.md durante la construcción: A3 excluye la tarea en foco de todos los grupos; A5 texto «N más sin mostrar». Nuevo sha256 171efc9d05e27154b0ab6edea9a182675c57b99938fae0ba9959ec1cf7afa5a5.
 
 ## Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/i1/claudex-o2cfco6d/result.json.
+
 - REVIEW-001 (medium) columnas estrechas desbordan. ACEPTADO → container query apila controles; .mono hereda tamaño. Verificado con 6 columnas a 1280x720 (sin desbordes, sin scroll de página; una columna con 5 partes usa scroll interno, fallback de B4).
 - REVIEW-002 (medium) si falla la recarga tras guardar, el check se reactiva. ACEPTADO → estado local de partes confirmados.
 - REVIEW-003 (low) etiqueta acaba en domingo aunque no se muestre. ACEPTADO → último día visible y prefijo «Semana del».
 - REVIEW-004 (low) el arnés recalcula duración en cambios solo de estado. ACEPTADO.
-Plan actualizado (B4); sha256 12086881cca9d2a0571a54a374066738a6eae110541de65d682e69250461a488. Pruebas re-ejecutadas: lint OK, tests OK, build OK, prettier (eol auto) OK.
+  Plan actualizado (B4); sha256 12086881cca9d2a0571a54a374066738a6eae110541de65d682e69250461a488. Pruebas re-ejecutadas: lint OK, tests OK, build OK, prettier (eol auto) OK.
 
 ## Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/i2/claudex-8kvj8jhj/result.json.
+
 - IR-001 (medium) la confirmación local podía ocultar una corrección posterior desde otra pestaña. ACEPTADO → override ligado a la versión devuelta; deja de aplicarse cuando los datos alcanzan esa versión.
 - IR-002 (low) IDs de Odoo de 64 caracteres desbordan chips. ACEPTADO → truncado con title.
-Presupuesto de inspección agotado (2/2): estos dos arreglos NO tienen inspección independiente. Pruebas re-ejecutadas: typecheck, lint, 131 tests, build y prettier (eol auto) OK; verificación visual con IDs de 64 caracteres sin desbordes.
+  Presupuesto de inspección agotado (2/2): estos dos arreglos NO tienen inspección independiente. Pruebas re-ejecutadas: typecheck, lint, 131 tests, build y prettier (eol auto) OK; verificación visual con IDs de 64 caracteres sin desbordes.
 
 # Ronda de cambios 2 (PLAN-2.md)
+
 - Petición: cartas para archivadas con paginación (15), búsqueda que muestra ocultas, popup de tarea con partes, títulos completos en parte semanal, encabezado simplificado (fichaje y cronómetro con popup Ahora/Otra hora). Implementación autorizada. Sin commit.
 
 ## Plan 2 ronda 1 — Codex — REVISE
+
 - P2-001 contradicción A4/enfoque. ACEPTADO.
 - P2-002 el arnés no registra cronómetro/fichaje. ACEPTADO.
 
 ## Plan 2 ronda 2 — Codex — APPROVED
+
 Resultado: scratchpad/p2r2/claudex-vxlqk6vp/result.json. Snapshot pre-build: scratchpad/pre-plan2/tree.tar.
 
 ## Plan 2 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p2i1/claudex-842vdx9h/result.json. Todos ACEPTADOS y corregidos:
+
 - P2-001 popup de fichaje se desmontaba al pasar a pending → QuickAttendanceButton siempre montado; retry dentro. Arnés simula pending; verificado error y éxito.
 - P2-002 página de archivo no se reiniciaba → reset en render al cambiar la clave.
 - P2-003 foco desaparecía de la cola en modo archivo → solo se excluye fuera del modo archivo.
 - P2-004 popup de cronómetro sin aviso de tareas vacías → aviso y submit ligado a tarea válida.
 - P2-005 2 columnas por debajo de 1190px.
 - P2-006 «Sin estimar» vs 0 en cartas.
-Pruebas: typecheck, lint, 130 tests, build, prettier (eol auto) OK; verificación en navegador.
+  Pruebas: typecheck, lint, 130 tests, build, prettier (eol auto) OK; verificación en navegador.
 
 ## Plan 2 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p2i2/claudex-7_58r9um/result.json. Presupuesto de inspección agotado (2/2).
+
 - REVIEW-001 (medium) el editor manual usaba el fichaje vivo (versión nueva) → ACEPTADO y corregido: snapshot al abrir. SIN inspección independiente.
 - REVIEW-002 (low) fidelidad del arnés (cronómetro inicial y tiempo transcurrido). NO corregido: solo afecta a la herramienta de pruebas, no a la app.
-Pruebas tras el arreglo: typecheck, lint, 130 tests, build, prettier OK; editor de salida verificado en navegador.
+  Pruebas tras el arreglo: typecheck, lint, 130 tests, build, prettier OK; editor de salida verificado en navegador.
 
 # Ronda de cambios 3 (PLAN-3.md)
+
 - Petición: estilo de botones de barra superior, biblioteca paginada y minimizable, dividida sincronizada, pantalla completa de sección, asociaciones de notas, buscadores con sugerencias (cada uno lo suyo; proyecto abre detalle), notas en popup de tarea, sustituir interruptor (investigado: pestañas con contador), enlace Odoo en parte semanal. Implementación autorizada. Sin commit.
 
 ## Plan 3 ronda 1 — Codex — APPROVED
+
 Resultado: scratchpad/p3r1/claudex-57nl3516/result.json.
 
 ## Plan 3 — build (Claude)
+
 Base de inspección: 941e430 (commit del usuario con Planes 1–2). Pruebas: typecheck, lint, 133 tests, build, prettier OK; verificación en navegador de todos los criterios.
 
 ## Plan 3 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p3i1/claudex-_v0jsx2d/result.json. Todos ACEPTADOS y corregidos:
+
 - P3-001 (high) guardado tardío de otra nota podía reseleccionarla y perder cambios → ?nota espera a que no haya guardado/importación; diálogo de descarte bloqueado si busy; callbacks de guardar/eliminar ignorados si el editor ya no es el actual.
 - P3-002 búsqueda de tareas/proyectos sensible a acentos → normalizeNoteSearch en taskQueue y lista de proyectos (+ test).
 - P3-003 opción activa fuera de vista con teclado → scroll interno de la lista.
 - P3-004 lista de notas desbordaba en móvil → overflow-y:auto.
 - P3-005 raíl minimizado sobrescrito por media queries → mayor especificidad.
-Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador (1440, 1000, 560 px).
+  Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador (1440, 1000, 560 px).
 
 ## Plan 3 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p3i2/claudex-8i30p792/result.json. Presupuesto de inspección agotado (2/2).
+
 - P3-R2-001 (medium) pantalla completa con biblioteca minimizada dejaba el editor en 44px → clase de colapso solo fuera de pantalla completa. SIN inspección independiente.
 - P3-R2-002 (low) la lista de sugerencias no volvía arriba al reescribir → scroll a 0 al cambiar el texto. SIN inspección independiente.
-Pruebas tras los arreglos: typecheck, lint, 133 tests, build, prettier OK; ambos casos verificados en navegador.
+  Pruebas tras los arreglos: typecheck, lint, 133 tests, build, prettier OK; ambos casos verificados en navegador.
 
 # Ronda de cambios 4 (PLAN-4.md)
+
 - Base 497bfa7. Petición: notas en tareas activas, filtros ocultables y paginación de 5 en partes, varias restas en calculadora, rediseño de datos ficticios (submenú plegable, cantidad secundaria), rediseño de ajustes. Implementación autorizada. Sin commit.
 
 ## Plan 4 ronda 1 — Codex — REVISE
+
 - P4-001 conflicto externo sin barra. ACEPTADO.
 - P4-002 Inmuebles con lotes propios. ACEPTADO (excepción D3b).
 - P4-003 arnés no soporta guardar ajustes/hash. ACEPTADO.
@@ -93,87 +117,112 @@ Pruebas tras los arreglos: typecheck, lint, 133 tests, build, prettier OK; ambos
 - Ronda 2 intento 2: mismo fallo de capacidad. DECISIÓN DEL USUARIO: construir con el plan revisado SIN reaprobación del plan (no consta como APPROVED) e inspeccionar el código con Codex al final.
 
 ## Plan 4 — build (Claude)
+
 Base 497bfa7. Plan no reaprobado (fallo de capacidad de Codex; decisión del usuario). Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador de A–E.
 
 ## Plan 4 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p4i1/claudex-2wgkzjib/result.json. Todos ACEPTADOS y corregidos:
+
 - P4-IR-001 Odoo/Seguridad se desmontaban al cambiar de sección → todas las secciones montadas y ocultas (+ noValidate: submit() valida y muestra el error).
 - P4-IR-002 días demasiado estrechos con el menú → container query (4 / 2 columnas).
 - P4-IR-003 búsqueda solo con espacios no contaba como filtro → cuenta cualquier texto.
 - P4-IR-004 bump del arnés antes de cargar Ajustes → espera al editor.
-Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador.
+  Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador.
 
 ## Plan 4 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p4i2/claudex-3_o96m4s/result.json. Presupuesto de inspección agotado (2/2).
+
 - P4-R2-001 (medium) tarjetas de redondeo apretadas en pantallas estrechas → container queries (6/3/2/1 columnas). SIN inspección independiente. Verificado en navegador a 1280, 1000 y 360 px sin solapamientos.
-Pruebas tras el arreglo: typecheck, lint, 135 tests, build, prettier OK.
+  Pruebas tras el arreglo: typecheck, lint, 135 tests, build, prettier OK.
 
 # Ronda 5 (PLAN-5.md) — cambios menores pedidos directamente
+
 - Plan escrito a partir de la petición (sin revisión previa de Codex por ser cambios pequeños y explícitos). Sustituye Plan 1 B3/B6 (check no desmarcable).
 - Pruebas: typecheck, lint, tests, build, prettier OK; verificación en navegador.
 
 ## Plan 5 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p5i1/claudex-ax8hbmoj/result.json. Ambos ACEPTADOS y corregidos:
+
 - P5-001 con clic real `user-select: all` selecciona el valor y la guarda anulaba la copia → solo se cancela ante una selección parcial manual. Verificado con clics reales de Playwright (perfil, fecha, UUID).
 - P5-002 si fallaba la recarga tras guardar, el check volvía al valor viejo → se aplica a la caché el valor y la versión devueltos (solo si la caché es más antigua).
 
 ## Plan 5 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p5i2/claudex-8ry_v178/result.json. Presupuesto de inspección agotado (2/2).
+
 - P5-R2-001 (medium) arrastrar para seleccionar el valor completo también copiaba → se distingue el gesto: si el puntero se mueve > 4 px entre pulsar y soltar no se copia. SIN inspección independiente. Verificado con ratón real: clic copia, arrastre no copia.
-Pruebas: typecheck, lint, 135 tests, build, prettier OK.
+  Pruebas: typecheck, lint, 135 tests, build, prettier OK.
 
 # Ronda 6 (PLAN-6.md) — cifrado de notas, gestor de contraseñas, búsqueda en notas, Mi semana
+
 - Roles: host/coordinador y builder = Claude (Opus 5.5); revisor del plan e inspector final = Codex (modelo por configuración del CLI).
 - Autorización: el usuario pidió implementar (planificar + construir). Commit/push no autorizados. Migración remota no autorizada.
 - Decisiones del usuario: D1 clave maestra con cifrado en navegador; D2 navegación de semana a la cabecera y se elimina la edición del objetivo diario.
 - Límites: 5 rondas de revisión, 2 de corrección, 2 inspecciones.
 
 ## Plan 6 ronda 1 — Codex (gpt-6.1-sol según rollout) — REVISE
+
 Resultado: scratchpad/p6r1/claudex-lifbtd6q/result.json. 9 hallazgos (2 high, 6 medium, 1 low), todos ACEPTADOS e incorporados al plan:
 R01 permisos RPC (definer privado + envoltorio invoker); R02 generación de bóveda en escrituras cifradas; R03 invariante sin texto en claro en tabla (trigger); R04 límites de tamaño del sobre (formato binario para notas, límites de credenciales); R05 aislamiento de sobres corruptos por nota; R06 borrado lógico de proyectos borra credenciales; R07 petición pendiente persistida en el borrador cifrado; R08 migración de borradores antiguos en claro; R09 /contrasenas en returnTo.
 
 ## Plan 6 ronda 2 — Codex (sesión reanudada) — REVISE
+
 Resultado: scratchpad/p6r2/claudex-tpvij35t/result.json. 3 hallazgos, ACEPTADOS: R10 cambiar_clave valida generación+versión; R11 petición pendiente separada del borrador y reconciliada antes de reenviar; R12 orden único de bloqueos (perfil primero), sin advisory lock, DML directo de notas revocado.
 
 ## Plan 6 ronda 3 — Codex (sesión reanudada) — REVISE
+
 Resultado: scratchpad/p6r3/claudex-f411j6pw/result.json. R13 (fixture de concurrencia de notes.mjs colgaría con el bloqueo de perfil) y R14 (tests existentes de DML directo y recuentos de catálogo) ACEPTADAS; plan ampliado con las adaptaciones de verificación.
 
 ## Plan 6 ronda 4 — Codex (sesión reanudada) — APPROVED
+
 Resultado: scratchpad/p6r4/claudex-8zd00i3q/result.json. Sin hallazgos. Aprobación ligada al hash actual de PLAN-6.md.
+
 - Desviación conocida (registrada, sin cambiar el plan aprobado): en D, `EntryModal` se mantiene en WeekPage porque también lo abre el botón «Registrar bloque manual» de la cabecera; solo se elimina su apertura desde DayCard.
 
 ## Plan 6 — build (Claude), commit base a78b84d
+
 Implementado por Claude (único autor del código). Base a78b84d.
+
 - Migración `20261104120000_encrypted_notes_and_credentials.sql`; cliente: `src/lib/crypto/vault.ts`, `src/features/vault/*`, `src/features/passwords/*`, notas cifradas (`useNotes`, `notesDraft`, `NoteEditor`, `NotesPage`), `TaskNotes`, Ajustes (`VaultSettings`), Mi semana sin `DayCard`/`DayGoalModal`, búsqueda con fragmento resaltado.
 - Desviaciones: `EntryModal` se mantiene en Mi semana (lo usa el botón de la cabecera); `#cifrado` vive dentro de la sección Seguridad de Ajustes y no usa `<form>` propio porque Ajustes ya es un formulario; generador de contraseñas acotado a 4096 valores por llamada (límite de `getRandomValues` detectado por un test).
 - Pruebas: typecheck, lint, 150 tests, build, prettier (eol auto), db:test 45 grupos (PostgreSQL 17.10) OK.
 - Navegador (Playwright con Supabase simulado por rutas interceptadas, porque el remoto no tiene la migración y no hay sesión): Mi semana sin tarjetas y navegación en cabecera; búsqueda por cuerpo con fragmento resaltado; crear clave maestra cifra las 2 notas antiguas (servidor: título/contenido vacíos, sobre v1); guardar/crear nota sin texto en claro en la red; borrador cifrado en sessionStorage y restaurado tras recarga + desbloqueo; clave errónea rechazada; bloqueo; gestor: entrada por defecto Usuario+Contraseña, 2 campos personalizados, generar, mostrar, copiar, buscar (no busca en ocultos), editar, eliminar, sin texto en claro en la red; cambiar clave (la antigua deja de servir); restablecer; vista móvil 560 px. Corregidos durante la verificación: título de pestaña de /contrasenas, `<form>` anidado en Ajustes, alineación de filas de campos, insignia estirada en móvil.
 
 ## Plan 6 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p6i1/claudex-d9vyp8gg/result.json. 9 hallazgos, todos ACEPTADOS:
 P6-IR-001 (high) cambiar clave tras reset en otra pestaña conservaba la clave antigua con la generación nueva; IR-002 el guardia de conflicto impedía reconciliar un guardado pendiente; IR-003 refs desactualizadas tras confirmar el pendiente; IR-004 clave y textos descifrados retenidos tras bloquear; IR-005 caché de notas con vínculos obsoletos; IR-006 fallos de migración silenciosos y notas en claro etiquetadas como cifradas; IR-007 cambios de los últimos 250 ms perdidos al bloquear; IR-008 credencial confirmada sin refrescar al cerrar el modal; IR-009 borrador antiguo en claro sin aviso si falla su cifrado.
 Arreglos (Claude): IR-001 `changePassword` conserva la clave solo si coincide la generación; IR-002 un pendiente se reconcilia antes del guardia de conflicto (botón habilitado); IR-003 `accept` actualiza las refs de forma síncrona; IR-004 `useNotes` borra caché y resultado al bloquear, la migración se detiene y no retiene la clave; IR-005 la caché guarda solo texto y los vínculos salen siempre de la fila actual; IR-006 aviso «N notas siguen sin cifrar» con «Reintentar cifrado», estado «Guardada · sin cifrar todavía» y `handleError` en la migración; IR-007 volcado del borrador al bloquear (`registerFlush`) con secuencia de escritura global por clave; IR-008 refresco de credenciales al cerrar el editor; IR-009 el borrador antiguo se cifra al restaurarlo y, si falla, se avisa; aviso también si falla guardar el borrador.
 Pruebas tras los arreglos: typecheck, lint, 150 tests, build, prettier, db:test 45 grupos OK. Navegador (Supabase simulado): bloquear justo después de teclear conserva el último cambio; dos pestañas (reset + recreación en B, cambio de clave en A) → A queda bloqueada.
 
 ## Plan 6 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p6i2/claudex-u4vmkr8i/result.json. Presupuesto de inspección agotado (2/2). 5 hallazgos, todos ACEPTADOS y corregidos SIN inspección independiente posterior:
+
 - P6-IR2-001 (high) «Reintentar cifrado» con cambios sin guardar remontaba el espacio y perdía el borrador → el botón se deshabilita mientras hay cambios sin guardar.
 - P6-IR2-002 (medium) `es_uuid` devolvía NULL con la generación ausente: reset sin generación borraba la bóveda → `es_uuid`/`es_sobre` nunca devuelven NULL y las generaciones se comparan con `is distinct from`; tests db de generación ausente en reset, cambio de clave, nota y credencial.
 - P6-IR2-003 (medium) las claves tecleadas en Ajustes sobrevivían al bloqueo → se vacían al perder la clave en memoria.
 - P6-IR2-004 (medium) el botón Atrás antes del debounce perdía el último cambio → volcado al desmontar salvo descarte explícito (`clearNoteDraft` invalida escrituras pendientes); test unitario.
 - P6-IR2-005 (medium) la confirmación de borrar proyecto no avisaba de que borra sus contraseñas → texto del diálogo y del aviso actualizado.
-Pruebas: typecheck, lint, 151 tests, build, prettier, db:test 45 grupos OK. Navegador (Supabase simulado): Atrás inmediato conserva el texto; descartar no recrea el borrador.
+  Pruebas: typecheck, lint, 151 tests, build, prettier, db:test 45 grupos OK. Navegador (Supabase simulado): Atrás inmediato conserva el texto; descartar no recrea el borrador.
 
 ## Plan 6 — Corrección tras uso real (Claude, sin inspección independiente)
+
 - Con la migración sin aplicar en el Supabase remoto, `notas_detalle` no devuelve `cifrado`/`boveda_generacion` y `assertNote` rechazaba la nota, bloqueando todo el espacio («La nota contiene datos incompletos o no válidos»). `withNoteDefaults` trata las columnas ausentes como nota en claro; test añadido. VaultGate indica que falta la migración (PGRST205). Pruebas: typecheck, lint, 152 tests, build OK.
 
 # Ronda de cambios 7 (PLAN-7.md)
+
 - Fecha: 2026-11-04. Host/planificador: Claude Code (Opus 5.5). Revisor del plan: Codex (modelo por defecto de su CLI, sin override). Builder: Claude. Inspector final: Codex (sesión nueva).
 - Petición: partes agrupados por tarea y día en Parte semanal; imputar todos o seleccionados juntos (redondeo sobre la suma); botones de envío a Odoo sin funcionalidad todavía; quitar el envío por parte individual. Implementación autorizada. Sin commit ni push.
 - Base: 348ab57. Rondas máx.: 5. Fix rounds máx.: 2. Inspección: on.
 
 ## Plan 7 ronda 1 — Codex — REVISE
+
 Resultado: scratchpad/p7r1/claudex-k7h3v_7m/result.json. Modelo efectivo: gpt-6.1-sol (ultra), sandbox read-only. Plan sha256 eeed9abf…3a25.
+
 - P7-001 (high) el relleno con validar_fila desactivado deja eventos diferidos de validar_arbol → falla el enable. ACEPTADO → desactivar ambos + set constraints immediate; upgrade sembrado con marcados y lápidas.
 - P7-002 (medium) quitar setImputed pierde la recuperación de caché. ACEPTADO → applyImputationResult.
 - P7-003 (medium) odoo-status.mjs no puede pasar sin cambios. ACEPTADO → stripStatus excluye imputacion_odoo_id + aserciones nuevas.
@@ -181,59 +230,78 @@ Resultado: scratchpad/p7r1/claudex-k7h3v_7m/result.json. Modelo efectivo: gpt-6.
 - P7-005 (low) arnés visual sin acciones nuevas. ACEPTADO.
 
 ## Plan 7 ronda 2 — Codex — REVISE
+
 Resultado: scratchpad/p7r2/claudex-9iwa85ro/result.json. Plan sha256 4e46ccd3…8a0f. Los 5 hallazgos previos dados por resueltos; límite 1000 aceptado.
+
 - P7-006 (medium) la limpieza del upgrade en verify.mjs borraría jornadas con imputaciones vivas → FK. ACEPTADO → teardown borra imputaciones; trigger de limpieza también en DELETE.
 
 ## Plan 7 ronda 3 — Codex — APPROVED
+
 Resultado: scratchpad/p7r3/claudex-1qn_eb3l/result.json. Plan sha256 b27e9d05…a5e4. Sin hallazgos. Pre-build: 348ab57 (árbol limpio salvo PLAN-7.md y este log).
 
 ## Plan 7 — Build (Claude)
+
 Base: 348ab57. Desviación registrada en el plan: la timeline muestra duración real por parte. Nuevo sha256 af0f3b83e33a9a3133d0bead7b60b7c02fc4b169c62e6d5322712c4444ac7bb2.
 Pruebas: typecheck, lint, 157 tests, build, prettier (eol auto) OK; db:test 51 grupos OK (incluye upgrade sembrado con marcados y lápidas, suite odoo-imputations). Verificación visual en arnés ui-smoke a 1280x720 y 760x900: desplegar, seleccionar 2 de 3 (05h 36m → 05h 45m), marcar, parcial, marcar todos, deshacer, botones de envío deshabilitados, timeline sin casilla ni botón.
 
 ## Plan 7 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p7i1/claudex-vui87ksg/result.json. Ambos ACEPTADOS y corregidos:
+
 - P7-IR-001 (medium) suma en coma flotante de segundos fraccionarios superaba un límite exacto (900 → 1800). → groupRounding suma en microsegundos enteros y redondea con enteros; tests de límite exacto y +1 µs.
 - P7-IR-002 (low) la selección conservaba ids que dejaron de estar pendientes y reaparecían tras deshacer. → reconcileSelection al cambiar los pendientes (permanente); test de imputar fuera + deshacer.
-Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
+  Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
 
 ## Plan 7 — Inspección 2 — Codex (sesión nueva) — APPROVED
+
 Resultado: scratchpad/p7i2/claudex-rxojjzrh/result.json. Sin hallazgos. Cubre el estado final (25 archivos). Sin commit ni push.
 
 # Ronda de cambios 8 (PLAN-8.md)
+
 - Fecha: 2026-11-04. Host/planificador y builder: Claude Code (Opus 5.5). Revisor del plan e inspector: Codex (modelo por defecto de su CLI).
 - Petición: la timeline obliga a hacer scroll; la tabla por tarea debe ser en columnas por día como la timeline, con tarjetas espaciadas igual que se despliegan al hacer clic. Buenas prácticas de UI. Implementación autorizada (continuación del Plan 7). Sin commit ni push.
 - Base: 348ab57 + cambios sin commitear del Plan 7. Rondas máx.: 5. Inspección: on.
 
 ## Plan 8 ronda 1 — Codex — REVISE
+
 Resultado: scratchpad/p8r1/claudex-u4cgw9b4/result.json.
+
 - P8-001 (medium) «Todo imputado» con partes en curso. ACEPTADO → estados separados (pendientes / en curso / todo imputado / semana vacía).
 
 ## Plan 8 ronda 2 — Codex — APPROVED
+
 Resultado: scratchpad/p8r2/claudex-ylsfg9dw/result.json. Sin hallazgos.
 
 ## Plan 8 — Build (Claude)
+
 Base: 348ab57 + Plan 7 sin commitear (ya inspeccionado). Nuevo componente TimesheetDayHeader compartido; TimesheetGroups en columnas por día con tarjetas desplegables; timeline en su sección con total real por día; CSS sin alturas fijas ni scroll interno.
 Pruebas: typecheck, lint, 159 tests, build, prettier OK. Verificación visual en ui-smoke a 1280x720, 1440x900 y 760x900: columnas alineadas, sin scroll interno, desplegar/seleccionar 2 de 3 (05h 36m → 05h 45m)/marcar/parcial/deshacer sin re-selección; botones 2 por fila en columna ancha. Ajustes durante la verificación: chevron junto al icono de estado, duración de los partes desplegados baja de línea en columnas estrechas, chip Odoo a ancho completo.
 
 ## Plan 8 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p8i1/claudex-065nh733/result.json.
+
 - P8-IR-001 (medium) en columnas estrechas (≈1000 px con barra lateral, 6 días) la pareja de duraciones no cabe y se recorta. ACEPTADO → recuento y duraciones en áreas de grid separadas; «→ imputable» unido y salta de línea alineado a la derecha; en contenedores ≤ 200 px el título ocupa todo el ancho y estado/chevron pasan junto al recuento; los títulos solo parten palabras que no caben. Verificado a 1000x800 (barra abierta, 6 días), 1280x720.
-Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
+  Pruebas re-ejecutadas: typecheck, lint, tests, build, prettier OK.
 
 ## Plan 8 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p8i2/claudex-m7117p45/result.json. Presupuesto de inspección agotado (2/2).
+
 - P8-IR2-001 (medium) rangos nocturnos («22:00–01:30 (+1)») desbordan columnas de ~105 px al desplegar. ACEPTADO y corregido: el rango puede partir línea (tras el guion, antes de «(+1)»). Verificado a 1000x800 con la tarjeta del sábado (21:00–00:30 (+1)) desplegada. SIN inspección independiente.
-Pruebas tras el arreglo: typecheck, lint, 159 tests, build, prettier OK. Sin commit ni push.
+  Pruebas tras el arreglo: typecheck, lint, 159 tests, build, prettier OK. Sin commit ni push.
 
 # Ronda de cambios 9 (PLAN-9.md) — Extensión de navegador
+
 - Fecha: 2026-11-05. Host/planificador y builder: Claude Code (Opus 5.5). Revisor del plan e inspector final: Codex (modelo por defecto de su CLI, sin override).
 - Petición: extensión integrada con Chambapp: importar tarea de Odoo, enviar partes a Odoo desde los botones de Parte semanal (sin API, automatizando el DOM), gestor de contraseñas estilo Bitwarden conectado a la bóveda de la app; analizar Extension_App antes de reutilizar; estética de la app; explicar cómo probarla. Implementación autorizada. Sin commit ni push.
 - Decisiones del usuario: U1 botones de Parte semanal; U2 email + OAuth; U3 contraseñas completo sin captura; U4 dominio Odoo configurable.
 - Base: main 9fd1999 (árbol limpio). Rondas máx.: 5. Fix rounds máx.: 2. Inspección: on.
 
 ## Plan 9 ronda 1 — Codex — REVISE
+
 Resultado: scratchpad/p9r1/claudex-dfpyo_du/result.json (plan sha d7ff6bca…). Modelo efectivo de Codex: gpt-6.1-sol (ultra).
+
 - P9-001 (high) coincidencia por «dominio base» une inquilinos de hostings compartidos (vercel.app). ACEPTADO → solo host exacto sin confirmación; subdominio con confirmación.
 - P9-002 (high) detección de guardado del ejemplo (firma visual/palabras) puede dar falso éxito. ACEPTADO → errores explícitos + recarga y recuento n0/n1.
 - P9-003 (high) sin revalidar partes antes de escribir en Odoo. ACEPTADO → revalidación en SW + bloqueo de edición en la pestaña.
@@ -241,20 +309,24 @@ Resultado: scratchpad/p9r1/claudex-dfpyo_du/result.json (plan sha d7ff6bca…). 
 - P9-005 (medium) minutos fraccionarios con intervalo 0. ACEPTADO → ceil al minuto.
 - P9-006 (medium) odoo_id no es único entre instancias. ACEPTADO → same/possible.
 - P9-007 (medium) importación no atómica. ACEPTADO → cerrojo + importaciones en curso; límite multi-navegador documentado.
-Plan revisado sha 8874b046….
+  Plan revisado sha 8874b046….
 
 ## Plan 9 ronda 2 — Codex — REVISE
+
 Resultado: scratchpad/p9r2/claudex-nhzqzipa/result.json (plan sha 8874b046…). Confirma resueltos P9-001…007.
+
 - P9-008 (high) fase informada de forma asíncrona → recuperación podía creer seguro reintentar tras un guardado. ACEPTADO → about-to-write / write-ack tras persistir may-have-written.
 - P9-009 (high) la recarga de verificación corta el puerto y dispararía la recuperación. ACEPTADO → fase reloading persistida y verificador por executeScript(func).
 - P9-010 (high) recuento de filas ignora la paginación del x2many. ACEPTADO → recorrido de todas las páginas; tras la frontera solo n0+1 es éxito, resto uncertain.
 - P9-011 (medium) faltaba bloquear cambios de la tarea/proyecto padre. ACEPTADO → bloqueo en TaskForm/TaskDetail/ProjectsPage y taskVersion revalidada antes de Odoo y de marcar.
-Plan revisado sha 782c1575….
+  Plan revisado sha 782c1575….
 
 ## Plan 9 ronda 3 — Codex — APPROVED
+
 Resultado: scratchpad/p9r3/claudex-leu9pdt9/result.json. Sin hallazgos. Aprobación ligada a PLAN-9.md sha 782c1575…; `check` OK.
 
 ## Plan 9 — Build (Claude)
+
 Base: 9fd1999 (rama feat/extension-navegador creada desde main, sin commits).
 Autoría: todo el código lo escribe Claude (host). Dependencia nueva: `@types/chrome` (dev).
 Hecho: `extension/` (MV3: service worker con sesión Supabase propia, bóveda en storage.session con autobloqueo, credenciales, autocompletar, cola de Odoo con frontera de escritura/verificación paginada/estados uncertain y sent-unmarked, importación serializada; content scripts app-bridge, odoo-detect, odoo-timesheet, autofill-page; popup y ajustes en React con tokens de la app; iconos generados de la marca; ID fijo bpaahhebkaiaihnkjhgnkojhagpaepoc), `src/features/extension/` (protocolo validado + ExtensionProvider), Parte semanal (envío, chips de cola, confirmación > 5 h), bloqueos en Registro/editor/TaskForm/TaskDetail/ProjectsPage, `rpcForAction` compartido, `openCredential`/`encryptCredential` movidos al modelo puro, `unlockVaultExtractable`/`exportRawKey`/`importRawKey`, docs/extension.md, tools/ext-smoke.
@@ -264,7 +336,9 @@ Sin probar: flujo completo con Supabase y Odoo reales (requiere cuenta del usuar
 Nota: `prettier --write src` reescribió saltos de línea (CRLF→LF) en ~100 archivos no relacionados; se restauraron con git checkout (contenido idéntico).
 
 ## Plan 9 — Inspección 1 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p9i1/claudex-sb4w7blw/result.json. 12 hallazgos, todos ACEPTADOS y corregidos (ronda de arreglos 1/2, autor: Claude):
+
 - P9-IR-001 (high) error inesperado → siempre `error`. → `failureStatus(fase)`: error solo antes de la frontera, `uncertain` después, `sent-unmarked` si ya estaba verificado; cancela el intento.
 - P9-IR-002 (high) autobloqueo no cerraba vistas ni caché. → `onLock` central: borra caché descifrada y emite `vault-locked`; el popup recarga el estado y desmonta las vistas con secretos.
 - P9-IR-003 (high) HTTP rellenaba antes de avisar. → toda página sin HTTPS y todo host no exacto pide confirmación ligada al origen completo; la función inyectada compara `location.origin`.
@@ -277,26 +351,30 @@ Resultado: scratchpad/p9i1/claudex-sb4w7blw/result.json. 12 hallazgos, todos ACE
 - P9-IR-010 (medium) cerrar sesión dejaba trabajo pendiente. → `clearSessionWork`: quita pendientes/errores, interrumpe intentos por la frontera.
 - P9-IR-011 (medium) mapa de detección con carreras. → una clave por pestaña.
 - P9-IR-012 (medium) minutos con precisión de ms. → microsegundos enteros (60,000001 s → 2 min).
-Plan actualizado (autocompletar HTTP, formato de fecha) → sha 7a9092a8…. docs/extension.md actualizado.
-Pruebas re-ejecutadas: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 17/17 (nuevo: fecha con día/mes cambiados). ui-smoke Parte semanal y Registro (5/5 bloqueadas): OK.
+  Plan actualizado (autocompletar HTTP, formato de fecha) → sha 7a9092a8…. docs/extension.md actualizado.
+  Pruebas re-ejecutadas: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 17/17 (nuevo: fecha con día/mes cambiados). ui-smoke Parte semanal y Registro (5/5 bloqueadas): OK.
 
 ## Plan 9 — Inspección 2 — Codex (sesión nueva) — REVISE
+
 Resultado: scratchpad/p9i2/claudex-2pvt3zvx/result.json. Presupuesto de inspección agotado (2/2). 6 hallazgos, todos ACEPTADOS y corregidos en la ronda de arreglos 2/2 (autor: Claude). **Estos arreglos NO tienen inspección independiente.**
+
 - P9-IR2-001 (high) una operación en vuelo podía reescribir la clave tras bloquear. → época de bloqueo: ninguna operación iniciada antes de un bloqueo guarda la clave, publica entradas descifradas ni devuelve secretos.
 - P9-IR2-002 (high) el intento solo comprobaba el origen, no la tarea. → `recordId` de la tarea en cada intento y en la verificación (URL + ficha cargada); el SW comprueba la URL de la pestaña. Test de navegador «otra tarea: no empieza ni cuenta».
 - P9-IR2-003 (medium) el popup tardaba en ocultar secretos tras bloquear. → paso inmediato a «bloqueada» y descarte de respuestas de estado antiguas.
 - P9-IR2-004 (medium) la bóveda restablecida en la app seguía sirviendo caché. → comprobación de generación antes de cada acceso a secretos; `BOVEDA_*` al guardar bloquea.
 - P9-IR2-005 (medium) reconciliar una creación podía sobrescribir cambios posteriores. → si la fila existe y difiere, conflicto (no se sobrescribe).
 - P9-IR2-006 (low) el borrado del portapapeles podía borrar otra copia. → solo borra si puede leer y confirmar que sigue el mismo valor; si no, no toca nada.
-Pruebas finales: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 18/18. Popup con sesión simulada: OK.
-Estado final: sin commit ni push. Hallazgos abiertos: ninguno conocido; los arreglos de la ronda 2 quedan sin revisión independiente.
+  Pruebas finales: typecheck, lint, 192 tests, build, ext:build, prettier (archivos tocados): OK. Navegador 18/18. Popup con sesión simulada: OK.
+  Estado final: sin commit ni push. Hallazgos abiertos: ninguno conocido; los arreglos de la ronda 2 quedan sin revisión independiente.
 
 # Cambio 10 — Descarga de la extensión, tutorial, indicador y landing (sin Claudex Loop)
+
 - Fecha: 2026-11-05. Petición directa del usuario; hecho por Claude sin revisión de Codex (no se pidió el loop).
 - Hecho: `npm run ext:pack` (zip sin dependencias en public/downloads, incluido en `npm run build`); botón «Descargar extensión» bajo la zona horaria; tutorial interactivo de 8 pasos con detección en vivo (descarga, carpeta, chrome/edge://extensions con copiar, modo desarrollador, cargar, sesión, Odoo, resumen) que recuerda el paso tras recargar; Ajustes → Extensión (estado, ver tutorial, descargar); el chip R{n} de la cabecera pasa a indicador verde/rojo de la extensión (latido cada 10 s); ExtensionProvider envuelve todo el layout; la extensión inyecta el puente en las pestañas de Chambapp ya abiertas al instalarse (sin recargar; guarda contra puentes muertos de versiones anteriores); sección «Nuevo · Extensión de navegador» en la landing con enlace en el menú.
 - Pruebas: typecheck, lint, 192 tests, build (con zip), prettier: OK. Navegador (Edge): sin extensión chip rojo, descarga real de chambapp-extension.zip, tutorial (pasos 1, 3 con Edge detectado, 5), móvil; con la extensión cargada chip verde y «¡Extensión detectada! Versión 0.1.0»; Ajustes con estado; landing escritorio y nav.
 
 # Cambio 11 — Extensión para Firefox (.xpi) (sin Claudex Loop)
+
 - Fecha: 2026-11-05. Petición directa del usuario; hecho por Claude sin revisión de Codex.
 - Hecho: build doble (`extension/dist` + `extension/dist-firefox` con background.scripts, gecko id `extension@chambapp-tracker.vercel.app`, strict_min_version 140, data_collection_permissions [authenticationInfo, personallyIdentifyingInfo, websiteContent], patrones sin puerto); `ext:pack` genera zip + xpi (firmado si existe extension/signed/chambapp-firefox-<versión>.xpi) + extension.json; `ext:sign:firefox` (web-ext sign, canal unlisted, credenciales AMO desde .env.local, sube código fuente e instrucciones); vercel.json sirve .xpi como application/x-xpinstall. Código: origen del remitente desde la URL si falta `sender.origin`; ventana de Odoo con reintento si no admite `focused:false`; rutas absolutas `/content/...` al inyectar; `originPattern` sin puerto (Firefox ignora los patrones con puerto) y filtro por origen exacto. Web: tutorial con selector Chrome/Edge/Firefox, pasos de Firefox (instalación firmada o complemento temporal), descarga del .xpi.
 - Fallos reales encontrados por la prueba en Firefox y corregidos: patrones con puerto no coincidían (bridge en dev, Odoo con puerto, tabs.query); rutas relativas de `scripting.executeScript` resueltas desde la página que llama.
@@ -312,28 +390,36 @@ Estado final: sin commit ni push. Hallazgos abiertos: ninguno conocido; los arre
 - Authorization: user asked to implement the improvements and regenerate the signed Firefox build.
 
 ## Round 1 — Codex (gpt-6-astra, effort high, read-only) — REVISE
+
 Result: scratchpad claudex/r1/claudex-kb5nx5wx/result.json (session 01a1b1eb-2cc0-7693-b22d-e04d02b282ee)
+
 - P10-01 (high): disconnect-in-finally races with async form-saved handling → interrupted instead of verified. ACCEPTED: worker owns disconnect; terminal flag set synchronously; listeners bound to attempt object; regression test.
 - P10-02 (medium): VERIFY_MS doesn't bound count()/pagination; focus loop would run through counting. ACCEPTED: absolute verification deadline + race; ready() API stops focus before counting; 75 s focus cap.
 
 ## Round 2 — Codex (resumed session) — APPROVED
+
 Result: scratchpad claudex/r2/claudex-gqwzi4r4/result.json. No findings. Limitations: static review; implementation files were being edited concurrently (detection + description helper already in progress); browser focus, real Odoo, TDZ and signing unverified.
 
 ## Build (Claude) — pre-build commit f9eaf5e
+
 - Deviations from PLAN-10: worker message handling moved to `extension/src/background/attemptMessages.ts` (no chrome.* calls) so the P10-01 race is unit-tested in `tests/extensionAttemptPort.test.ts`; the extra `terminal` flag was dropped (setting `expectDisconnect` synchronously is enough); a storage failure while saving the `form-saved` phase still settles `form-saved` (verification decides).
 - Proof: typecheck, lint OK; npm test 199/199; prettier OK on touched files (repo-wide format:check already failed at HEAD, CRLF); ext build OK; tools/ext-smoke/run.mjs 18/18 in Edge; scratchpad plan10.mjs 10/10 (display_project_id + [T…] title detection, late form start, second attempt same page, old port disconnect, ready()/bounded count(), form never appears).
 - Not tested: worker-level window focus loop (needs real extension + session), description dialog visually, real Odoo.
 
 ## Inspection 1 — fresh Codex session — REVISE
+
 Result: scratchpad claudex/i1/claudex-p9tclrcw/result.json
+
 - P10-IR-001 (high): signed 0.2.0 xpi missing. DEFERRED BY DESIGN: a version can be signed only once, so signing runs after code inspection passes; verified afterwards (signed file, ext:pack reports firmado, extension.json firefoxSigned true).
 - P10-IR-002 (medium): focus loop started before the "processing" update with no cleanup if it rejects. ACCEPTED: holdFocus now starts only after the update succeeds; on failure the new tab/window is closed; processQueue stops after an unexpected failure instead of retrying in a tight loop.
 - Rerun: typecheck, lint, 199/199 tests, build, ext-smoke 18/18.
 
 ## Inspection 2 — fresh Codex session — APPROVED
+
 Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitations: static; smoke scripts don't pass count()'s new deadline (defaults to unbounded); signing to verify after.
 
 ## Release
+
 - npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.2.0.xpi (AMO unlisted, META-INF signature present, manifest 0.2.0). 0.1.0 kept.
 - npm run ext:pack → public/downloads zip 0.2.0 + xpi firmado; extension.json {version 0.2.0, firefoxSigned true}.
 - Not committed (no commit authorization).
@@ -349,6 +435,7 @@ Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitat
 - USER OVERRIDE (2026-11-06 19:3x): "Seguir sin Codex" — build proceeds on the UNREVIEWED plan with host self-review and tests only; no independent plan review or code inspection. Never label this approved.
 
 ## Build (Claude only, UNREVIEWED by Codex — user override) — base 9fcd521
+
 - Proof: typecheck (app + extension), lint, prettier on touched files; npm test 230/230 (new: localEngine, localBackup, localStore, localRouter, extensionAppTabs, vault large-envelope, protocol/settings updates); db-tests 55/55 on embedded Postgres 17 (new local-storage.mjs: 4 groups); vite production build; extension build + tools/ext-smoke 18/18 in Edge; real-browser runtime smoke (scratchpad local.mjs, Edge, real IndexedDB) 13/13; ui-smoke screenshots of Ajustes → Datos (open/locked), Proyectos and banners, no console errors.
 - Bug found by the browser smoke and fixed: envelope regex overflowed V8's stack above ~20 MB, leaving stored data unreadable; now parsed without regex, and the store verifies decryptability before writing.
 - Perf: 20 000 entries (16 MB encrypted) ≈ 0.5 s/write after native base64 + revision cache (plan target 300 ms not met; documented).
@@ -356,6 +443,7 @@ Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitat
 - Not done (needs user decision): apply migration to hosted Supabase; sign Firefox 0.3.0; commit; Codex review when quota resets.
 
 ## Release 0.3.0
+
 - npm run ext:sign:firefox → extension/signed/chambapp-firefox-0.3.0.xpi (AMO unlisted, signature in META-INF, manifest 0.3.0). 0.1.0 and 0.2.0 kept.
 - npm run ext:pack → public/downloads zip 0.3.0 + signed xpi; extension.json {0.3.0, firefoxSigned: true}. Not committed.
 
@@ -369,24 +457,31 @@ Result: scratchpad claudex/i2/claudex-8xwnaslu/result.json. No findings. Limitat
 - Host-resolved routine choices (recorded in plan): port 47800, fixed user id, side panel in both editions, backup import = replace only.
 
 ## Review round 1 — Codex (gpt-6-astra, observed) — REVISE
+
 Result: scratchpad claudex/r1/claudex-0dmf7nri/result.json. Findings R12-01..05 (3 high, 2 medium): migration atomicity vs BEGIN/COMMIT wrappers; import graph integrity under replica mode; public/downloads untracked; extension identity across local installs; stale pending ops after restore. All accepted; plan revised (dispositions in PLAN-12.md).
 
 ## Review round 2 — Codex — REVISE
+
 Result: scratchpad claudex/r2/claudex-0o3jaeef/result.json. R12-06 (high) preserved dedup returns stale results after restore; R12-07 (high) in-flight stale-generation writes; R12-08 (medium) trigger-only invariants skipped on import; R12-09 (medium) queue transition contradicted state machine. All accepted; server-side generation check via PGRST_DB_PRE_REQUEST added.
 
 ## Review round 3 — Codex — REVISE
+
 Result: scratchpad claudex/r3/claudex-b907zegj/result.json. R12-10 (high) hook cannot see RPC args; R12-11 (medium) lock-upgrade deadlock; R12-12 (high) note links to soft-deleted records wrongly rejected. All accepted (split RPCs, exempt by path, exclusive lock first, three-class trigger classification).
 
 ## Review round 4 — Codex — APPROVED
+
 Result: scratchpad claudex/r4/claudex-ltc228vw/result.json. No findings. Limitations: plan-level only; runtime concurrency, HTTP protections, resources and browser compat are implementation-validation items.
 
 ## Build (Claude) — base 6e043af
+
 - Builder: Claude (host). Deviation recorded in PLAN-12 (PostgREST channel kept enabled for schema reload on upgrades); plan edited after approval for that line only.
 - Proof (host-run): typecheck app+extension OK; eslint OK; prettier on touched files OK (repo-wide format:check already fails on CRLF checkouts, pre-existing); npm test 243/243; db:test 55 groups + local-edition 11/11 (embedded PG 17); npm run build (cloud) OK, landing present, no local-only RPC in bundle; build:local with no landing/auth chunks; Docker images built (db, web with extension 0.4.0 packaged); tools/docker-smoke 7/7 (one port 127.0.0.1:47899, 403 foreign Origin/Host, PostgREST flows, export/import round trip, 409 stale generation, restart persistence, migrate idempotent, failing migration leaves nothing, idle RAM 52 MiB); ext-smoke Edge 18/18 (selector updated for the new options form); ext-smoke run-local 8/8 against real Docker; UI in built-in browser: no landing/login, 5-step onboarding, dashboard, Ajustes Datos/Seguridad, day panel in Nuevo parte / Editar / Iniciar a otra hora (overlap warning, toggle, mobile stacking, no console errors); actionlint OK; compose config OK.
 - Not verified: GitHub Actions run and GHCR publish (no push authorization, no gh); arm64 image build; backup download/import through the browser UI (covered at API level); Firefox local mode.
 
 ## Inspection 1 — fresh Codex session — REVISE
+
 Result: scratchpad claudex/i1/claudex-9hitji39/result.json. All 6 accepted and fixed (fix round 1):
+
 - I01 (high) command() now uses the checked session's own client and a connection epoch; reads that resolve a session use that client.
 - I02 (high) backend-set always runs the departure protocol (lock, caches, interrupt attempts); a local installation/generation change detected by the state probe triggers it too; the Odoo write-ack boundary re-checks the item's account and fails the attempt safely before writing.
 - I03 (medium) enqueue dedup/replacement only within the current account.
@@ -396,4 +491,5 @@ Result: scratchpad claudex/i1/claudex-9hitji39/result.json. All 6 accepted and f
 - Proof rerun: typecheck, lint, npm test 246/246, ext:build, Docker images, docker-smoke 7/7 (54 MiB), ext-smoke run-local 8/8, ext-smoke 18/18.
 
 ## Inspection 2 — fresh Codex session — FAILED (operational)
+
 Codex usage limit reached (resets 2026-11-10 00:41). Not a verdict. Fix-round-1 edits (I01–I06) are therefore NOT independently inspected yet; host proof checks rerun and pass.

@@ -17,10 +17,12 @@ Base: rama `feat/agrupar-partes-generar-imputaciones`, árbol de trabajo con el 
 ## Diseño
 
 ### D1. Flujo de página en lugar de alturas fijas
+
 - `.timesheet` pasa a altura automática; ninguna de las dos cuadrículas tiene scroll interno (`.timesheet__items` sin `overflow`). Cada columna crece con su contenido y la página hace un único scroll natural. Se elimina la regla de 45 % y el `min-height` de la cuadrícula.
 - Razón: un solo eje de scroll es la práctica recomendada; las áreas de scroll anidadas ocultan contenido y obligan a desplazar varias zonas. Con las tarjetas de grupo plegadas (compactas) la timeline queda inmediatamente debajo.
 
 ### D2. Dos secciones con la misma cuadrícula de días
+
 - Cada sección tiene una cabecera ligera (título + dato secundario):
   - «Partes por tarea» · dato secundario según estado (P8-001): «N pendientes» si hay partes terminados sin imputar; si además hay partes en curso, «· N en curso»; «Todo imputado» **solo** si hay partes y todos los grupos están en estado imputado; con partes en curso y nada pendiente, «N en curso»; semana sin partes, «Sin partes esta semana».
   - «Timeline» · «N partes».
@@ -29,11 +31,13 @@ Base: rama `feat/agrupar-partes-generar-imputaciones`, árbol de trabajo con el 
 - Día sin grupos: «—» como hoy en la timeline.
 
 ### D3. Tarjeta de grupo (plegada)
+
 - Misma caja que `.timesheet__item`: fondo `--surface`, borde sutil, borde izquierdo de color por estado (pendiente `--warning`, parcial `--accent-soft`, imputado `--success`), radio 4 px, mismo padding y `gap` entre tarjetas (6 px), tipografía 12 px.
 - Contenido: título completo (con salto de línea como la timeline) + chip `odoo_id`; línea meta: «N partes» · real → **imputable** (mono); icono de estado a la derecha (mismo lenguaje que la timeline: `clock` pendiente, `minus` parcial, `check` imputado, `timer` en curso), con `aria-label`/`title`.
 - Toda la cabecera de la tarjeta es un `<button aria-expanded aria-controls>` (objetivo de clic grande, accesible por teclado). Chevron que rota al desplegar. Hover/focus visibles como el resto de la app. El enlace a Odoo no va dentro del botón (no anidar interactivos): se muestra en el detalle como «Abrir en Odoo».
 
 ### D4. Tarjeta desplegada (columna estrecha)
+
 - Detalle dentro de la misma tarjeta, separado por una línea sutil, apilado verticalmente para caber en columnas de ~150 px:
   - Partes pendientes/en curso: casilla + rango (mono) a la izquierda, duración real a la derecha; descripción debajo en `dim` si existe (truncada a 2 líneas con `title`).
   - Imputaciones: bloque verde compacto «✓ Imputado · N partes», rangos, «real → imputable», botón «Deshacer» pequeño.
@@ -43,14 +47,17 @@ Base: rama `feat/agrupar-partes-generar-imputaciones`, árbol de trabajo con el 
 - En columnas anchas (contenedor ≥ 260 px, p. ej. ≤ 900 px de viewport con una columna) los botones se colocan en 2 por fila mediante container query.
 
 ### D5. Responsive
+
 - ≤ 900 px: ambas cuadrículas pasan a una columna (como ya hace la timeline); cada sección sigue su orden de días.
 - Se mantienen las container queries existentes de la timeline para columnas estrechas.
 
 ## No cambia
+
 - Lógica (`timesheet.model.ts`), comandos, caché, validaciones, base de datos y textos de los avisos.
 - Comportamiento de los botones (enviar deshabilitado; marcar/deshacer operativos).
 
 ## Verificación
+
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npx prettier --check --end-of-line auto src tests tools/*.mjs package.json README.md docs/base-de-datos.md`.
 - Arnés `tools/ui-smoke` (`npx vite tools/ui-smoke --config tools/ui-smoke/vite.config.ts`), `/parte-semanal`:
   - 1280×720 y 1440×900 con 6 columnas: ninguna columna tiene scroll interno; todos los partes de la timeline visibles con el scroll de página; columnas alineadas entre secciones; sin desbordes horizontales.

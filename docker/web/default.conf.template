@@ -4,7 +4,9 @@
 # There are no users or logins, so the API trusts whoever reaches it. Two checks keep
 # web pages open in the browser out (CSRF and DNS rebinding):
 #  - Host must be 127.0.0.1:<port> or localhost:<port>.
-#  - On /rest/, Origin must be empty, this app, or a browser extension.
+#  - On /rest/, Origin must be empty, this app, or the Chambapp extension: in Chrome/Edge
+#    its fixed id (from "key" in extension/manifest.json); Firefox gives every install a
+#    random id, so any moz-extension origin is accepted there.
 
 map $http_host $chambapp_host_ok {
     default 0;
@@ -17,7 +19,7 @@ map $http_origin $chambapp_origin_ok {
     "" 1;
     "http://127.0.0.1:${CHAMBAPP_PORT}" 1;
     "http://localhost:${CHAMBAPP_PORT}" 1;
-    "~^chrome-extension://[a-p]{32}$" 1;
+    "~^chrome-extension://bpaahhebkaiaihnkjhgnkojhagpaepoc$" 1;
     "~^moz-extension://[0-9a-f-]{36}$" 1;
 }
 

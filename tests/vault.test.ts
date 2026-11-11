@@ -157,3 +157,14 @@ test('large envelopes (local data of tens of MB) are parsed without a regular ex
   assert.equal(isEnvelope(`${envelope}.x`), false);
   assert.equal(isEnvelope(`v2${envelope.slice(2)}`), false);
 });
+
+test('password keys reject round counts outside the accepted range', async () => {
+  const { derivePasswordKey, newSalt, UnreadableEnvelopeError } =
+    await import('../src/lib/crypto/vault.ts');
+  const salt = newSalt();
+  await assert.rejects(derivePasswordKey('x'.repeat(12), salt, 99_999), UnreadableEnvelopeError);
+  await assert.rejects(
+    derivePasswordKey('x'.repeat(12), salt, 1_000_000_000),
+    UnreadableEnvelopeError,
+  );
+});

@@ -6,19 +6,19 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 
 ## Decisiones del usuario (2026-11-06)
 
-| Tema | Decisión |
-|---|---|
-| Coexistencia | Se ven siempre los datos locales y los de la nube juntos, con etiqueta Local/Nube. El modo solo decide **dónde se crean los proyectos nuevos**. Las tareas y partes van donde está su proyecto. |
-| Almacén | IndexedDB del navegador, con `navigator.storage.persist()`. |
-| Enlaces | Notas y credenciales (nube) pueden enlazar proyectos y tareas locales guardando solo su UUID. Migración de Supabase. |
-| Extensión | Para datos locales habla con una pestaña abierta de Chambapp. Sin pestaña, avisa. |
-| Copia | JSON; al descargar, opción «Cifrar con contraseña» (PBKDF2 + AES-GCM). |
-| Importar | Vista previa con conteos y choques; «Combinar» (gana la versión más reciente) o «Reemplazar todo» (descarga antes una copia automática). |
-| Extras | Mover proyecto Local↔Nube; aviso de copia pendiente (7 días, configurable); borrar datos locales; cifrado en reposo con la clave de la bóveda. |
-| Sesión | Los datos locales se conservan por cuenta; otra cuenta en el mismo navegador no los ve. |
-| Bloqueo | Basta desbloquear la bóveda una vez por pestaña: los datos locales siguen abiertos aunque la bóveda se bloquee por inactividad. Se cierran al cerrar la pestaña, cerrar sesión o pulsar «Bloquear todo». |
-| Restablecer bóveda | Aviso claro de que se pierden los datos locales de este navegador. Después se pueden recuperar importando una copia (las copias no dependen de la bóveda). |
-| Sin bóveda | Elegir «Local» pide crear la clave maestra en ese mismo paso. Sin bóveda no se activa el modo local. |
+| Tema               | Decisión                                                                                                                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Coexistencia       | Se ven siempre los datos locales y los de la nube juntos, con etiqueta Local/Nube. El modo solo decide **dónde se crean los proyectos nuevos**. Las tareas y partes van donde está su proyecto.          |
+| Almacén            | IndexedDB del navegador, con `navigator.storage.persist()`.                                                                                                                                              |
+| Enlaces            | Notas y credenciales (nube) pueden enlazar proyectos y tareas locales guardando solo su UUID. Migración de Supabase.                                                                                     |
+| Extensión          | Para datos locales habla con una pestaña abierta de Chambapp. Sin pestaña, avisa.                                                                                                                        |
+| Copia              | JSON; al descargar, opción «Cifrar con contraseña» (PBKDF2 + AES-GCM).                                                                                                                                   |
+| Importar           | Vista previa con conteos y choques; «Combinar» (gana la versión más reciente) o «Reemplazar todo» (descarga antes una copia automática).                                                                 |
+| Extras             | Mover proyecto Local↔Nube; aviso de copia pendiente (7 días, configurable); borrar datos locales; cifrado en reposo con la clave de la bóveda.                                                           |
+| Sesión             | Los datos locales se conservan por cuenta; otra cuenta en el mismo navegador no los ve.                                                                                                                  |
+| Bloqueo            | Basta desbloquear la bóveda una vez por pestaña: los datos locales siguen abiertos aunque la bóveda se bloquee por inactividad. Se cierran al cerrar la pestaña, cerrar sesión o pulsar «Bloquear todo». |
+| Restablecer bóveda | Aviso claro de que se pierden los datos locales de este navegador. Después se pueden recuperar importando una copia (las copias no dependen de la bóveda).                                               |
+| Sin bóveda         | Elegir «Local» pide crear la clave maestra en ese mismo paso. Sin bóveda no se activa el modo local.                                                                                                     |
 
 ## Supuestos y decisiones técnicas (con fuente)
 
@@ -34,11 +34,13 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 ## Diseño
 
 ### 1. Modelo y preferencia
+
 - `Project`, `Task` y `TimeEntry` ganan `origen: 'nube' | 'local'`. Se añade en el cliente al cargar (las filas de Supabase no cambian). `assertProject/Task/Entry` siguen validando las filas de la nube; las locales se validan con los validadores del motor local.
 - Preferencia en `perfiles.preferencias.almacenamiento`: `'nube' | 'local'` (por defecto `'nube'`), más `preferencias.aviso_copia_dias` (por defecto 7; 0 lo desactiva). Se guardan con `editar_perfil`, ya existente. Es por cuenta, no por navegador.
 - `WorkspaceData` gana `local: { estado: 'sin-datos' | 'bloqueado' | 'abierto' | 'error' | 'no-disponible'; resumen?: { proyectos; tareas; partes; actualizadoEn; ultimaCopiaEn | null; cambiosDesdeCopia: boolean; persistente: boolean | null } }`.
 
 ### 2. Motor local (puro, sin navegador) — `src/lib/local/engine.ts`
+
 - `LocalSnapshot` versión 1: `{ esquema: 1, usuario_id, proyectos[], tareas[], partes[], imputaciones[], jornadas_locales: Record<fecha, { id, zona_horaria }>, operaciones: Record<operacion_id, { tipo, parametros, parte_id, resultado, creado_en }>, traspasos: Traspaso[], meta: { revision, actualizado_en, ultima_copia_en, cambios_desde_copia } }`. Las filas siguen exactamente las columnas de `proyectos`, `tareas` y `partes_horas`/`partes_detalle` e `imputaciones_odoo`.
 - `runLocalCommand(snapshot, action, payload, context) → { snapshot, result }`. Es una función pura: no modifica la entrada y devuelve una copia nueva. `context = { userId, now: Date, profile, cloudJornadas, cloudEntries, cloudActiveTimer }`.
 - Acciones: `crear_proyecto`, `editar_proyecto`, `eliminar_proyecto`, `crear_tarea`, `editar_tarea`, `eliminar_tarea`, `crear_parte`, `editar_parte`, `eliminar_parte`, `iniciar`, `detener`, `consultar_operacion`, `consultar_cronometro`, `imputar_partes`, `deshacer_imputacion`. Respuestas con la **misma forma** que las de la nube; un test pasa cada respuesta por `isValidCommandResponse` (`src/lib/supabase/commandValidation.ts`).
@@ -58,6 +60,7 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - Fecha de un parte local: zona = la de la jornada de la nube de esa fecha si existe, o si no la del perfil; fecha = día de `inicio_en` en esa zona.
 
 ### 3. Persistencia cifrada — `src/lib/local/store.ts`
+
 - IndexedDB `chambapp-local` v1, almacén `instantaneas` con clave `usuario_id`: `{ usuario_id, generacion_boveda, revision, sobre, actualizado_en }`. `sobre = encryptJson(dataKey, localAad(userId), snapshot)`, con `localAad = chambapp:local:v1:<userId>` (añadido en `src/lib/crypto/vault.ts`).
 - Escritura atómica por compare-and-swap: en una sola transacción `readwrite` se comprueba que `revision` sigue igual y se escribe `revision + 1`. Si otra pestaña escribió antes, se relee, se **vuelve a ejecutar el comando** sobre la instantánea nueva y se reintenta (hasta 3 veces); si no, error `DATOS_LOCALES_OCUPADOS`. Los comandos locales se serializan en la pestaña con una cola.
 - `BroadcastChannel('chambapp-local')` avisa a las demás pestañas para invalidar `['workspace', userId]`.
@@ -66,6 +69,7 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - Sin IndexedDB (navegación privada de algunos navegadores) → estado `no-disponible`, y el modo local queda deshabilitado con explicación.
 
 ### 4. Proveedor y enrutado — `src/features/local/LocalDataProvider.tsx`, `src/lib/local/router.ts`
+
 - `LocalDataProvider` (entre `VaultProvider` y `WorkspaceProvider`) guarda en memoria la clave de datos en cuanto la bóveda se desbloquea en esa pestaña. **No** la borra con el bloqueo por inactividad de la bóveda. La borra al cerrar sesión, al cambiar de cuenta, con un cambio de generación de la bóveda y con «Bloquear todo» (nuevo botón junto al bloqueo de la bóveda, que bloquea ambas). `VaultProvider` expone un aviso `onUnlock(key, generation)` para que el proveedor capture la clave.
 - `loadWorkspace` (combinado): carga la nube como hoy y, si hay clave, la instantánea local. Junta proyectos, tareas y partes marcando `origen`. Si un mismo id está en los dos almacenes (traspaso a medias), se muestra el del lado indicado por `traspasos` (ver §7). Calcula `local.estado` y `local.resumen`.
 - `executeCommand(action, payload)` se envuelve en `routeCommand`:
@@ -81,6 +85,7 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - Los selectores de proyecto y tarea (tareas, notas, credenciales, parte nuevo, cronómetro) muestran una etiqueta «Local». En Proyectos y Tareas se añaden la etiqueta y un filtro Todos/Nube/Local.
 
 ### 5. Supabase (migración nueva `supabase/migrations/20261107000000_local_storage_links.sql`)
+
 - **Notas**: hoy los enlaces viven en `nota_proyectos` y `nota_tareas`, con claves foráneas `(proyecto_id|tarea_id, usuario_id) → proyectos|tareas` y `on delete cascade` (`20261027144005_markdown_notes.sql`). La vista `notas_detalle` los lee (`20261104120000_…sql`), y `chambapp_private.notas` comprueba al final que la instantánea coincide (`PROYECTO_NO_DISPONIBLE`/`TAREA_NO_DISPONIBLE`). La migración:
   - elimina esas dos claves foráneas (se mantienen la de `nota_id` y la clave primaria);
   - redefine `notas_detalle` para que un enlace aparezca si apunta a un proyecto o tarea **vivo del usuario en la nube** o a un id **que no existe en la nube** (local); un enlace a un proyecto o tarea de la nube eliminado sigue sin aparecer, como hoy;
@@ -94,6 +99,7 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - `database.types.ts` actualizado.
 
 ### 6. Configuración y configuración inicial
+
 - Nueva sección **Datos** en Configuración (`src/features/settings/components/StorageSettings.tsx`):
   - Selector Nube/Local con explicación. Elegir Local sin bóveda muestra `VaultUnlockCard` en modo crear; con bóveda bloqueada, en modo desbloquear. Se guarda con `editar_perfil`.
   - Estado local: número de proyectos, tareas y partes; última modificación; última copia; si el almacenamiento es persistente.
@@ -106,12 +112,14 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - **Avisos globales** en `WorkspaceLayout`: (a) datos locales bloqueados («Desbloquea para ver tus proyectos locales»); (b) copia pendiente (hay `cambios_desde_copia` y la última copia tiene más de N días, o nunca se hizo), con botón «Descargar copia»; (c) modo Local sin datos en este navegador («Importa una copia si vienes de otro dispositivo»); (d) error de generación de la bóveda. Se pueden cerrar durante la sesión.
 
 ### 7. Mover proyecto Local↔Nube (en el detalle del proyecto)
+
 - Bloqueado si el proyecto tiene un parte abierto, o si los datos locales están bloqueados.
 - **Nube → Local**: se leen de la nube el proyecto, sus tareas y partes vivos (sin tombstones) y las imputaciones de esos partes. Se escribe en local con el mismo id y `traspasos.push({ proyecto_id, direccion: 'a-local', estado: 'copiado' })`. Luego `purgar_proyecto` y se marca el traspaso como `hecho`. Mientras está `copiado` (fallo de red), el proyecto se ve desde local, se oculta la copia de la nube y hay un aviso con «Reintentar borrado en la nube».
 - **Local → Nube**: `importar_proyecto` con `traspaso_id`. Luego se borran físicamente esos registros locales y se marca `hecho`. Mientras la nube tiene la copia y el local aún no se ha borrado, se muestra la de la nube y se reintenta el borrado local.
 - El diálogo explica que la nube puede conservar copias de seguridad propias de Supabase durante su periodo de retención.
 
 ### 8. Copia de seguridad — `src/lib/local/backup.ts`
+
 - Formato plano: `{ formato: 'chambapp-local', version: 1, exportado_en, usuario_id, datos: { proyectos, tareas, partes, imputaciones, jornadas_locales } }`. No incluye operaciones ni traspasos.
 - Formato cifrado: `{ formato: 'chambapp-local-cifrado', version: 1, kdf: { nombre: 'PBKDF2-SHA256', sal, iteraciones: VAULT_ITERATIONS }, sobre }`, con la clave derivada de la contraseña y AAD `chambapp:copia-local:v1:<usuario_id>`. Reutiliza las primitivas de `vault.ts`.
 - Validación al importar: formato y versión conocidos, `usuario_id` igual al de la sesión (si no, `COPIA_OTRA_CUENTA`), cada fila con los validadores del motor, integridad referencial (tareas → proyectos, partes → tareas, imputaciones → partes del mismo grupo), ids UUID y tamaño máximo de 50 MB.
@@ -119,6 +127,7 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - Un id que ya existe en la nube → se omite y se avisa en la vista previa (no se permite que un registro esté en los dos lados).
 
 ### 9. Extensión (protocolo app↔extensión)
+
 - `OdooRequest` gana `origen: 'nube' | 'local'` (opcional en la validación, `'nube'` por defecto, para no romper versiones anteriores).
 - Nuevos mensajes worker→página y página→worker, validados en `src/features/extension/protocol.ts`:
   - worker → página: `local-request` `{ requestId, userId, op }`, con `op` ∈ `listar` (proyectos y tareas locales vivos), `crear-tarea` (importar), `cargar-partes` (`{ partIds, taskId }`, para revalidar) e `imputar` (`{ partes }`).
@@ -129,18 +138,21 @@ Que proyectos, tareas y partes de horas (con sus imputaciones de Odoo) se puedan
 - Versión de la extensión 0.3.0. Al final se pregunta al usuario si firmar y publicar Firefox 0.3.0.
 
 ## No objetivos
+
 - Sincronizar automáticamente los datos locales entre dispositivos (se hace con la copia).
 - Llevar a local la bóveda, notas, credenciales, jornadas, fichajes o ausencias.
 - Funcionar sin conexión a Supabase (la sesión, el perfil y las jornadas siguen en la nube).
 - Garantizar la eliminación de las copias internas de Supabase al mover un proyecto a local (se avisa).
 
 ## Riesgos
+
 - La regla de un solo cronómetro entre almacenes es «comprobar y luego escribir» desde el cliente: dos pestañas pueden ganar la carrera a la vez. Se mitiga con la cola local, el aviso entre pestañas y la comprobación al cargar, que muestra un aviso si hay dos abiertos y deja detener cualquiera.
 - El reloj del dispositivo manda en local (`INTERVALO_REAL_FUTURO`, `detener`).
 - Re-cifrar toda la instantánea en cada escritura: aceptable hasta unas decenas de miles de partes. Se mide con 20 000 partes (objetivo < 300 ms por escritura en un portátil normal).
 - Perder la bóveda o el navegador sin copia → datos perdidos; los avisos lo explican.
 
 ## Verificación
+
 1. `npm run typecheck`, `npm run lint`, `npx prettier --check` sobre los ficheros tocados.
 2. `npm test` con tests nuevos:
    - `tests/localEngine.test.ts`: cada acción y cada código de error de §2; respuestas validadas con `isValidCommandResponse`; **comparación con la nube**: un conjunto de escenarios (crear, editar, cambiar de fecha, borrar en cascada, iniciar/detener idempotente, imputar/deshacer, redondeos 0/5/15/60) cuyo resultado se compara con el de las mismas acciones contra Supabase local en `tools/db-tests` (mismos campos de salida, ignorando ids, marcas de tiempo y versión cuando corresponda).
