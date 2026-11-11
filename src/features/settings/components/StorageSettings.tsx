@@ -15,6 +15,8 @@ import { useFeedback } from '../../../shared/feedback/FeedbackContext';
 import { useAuth } from '../../auth/useAuth';
 import { useVault } from '../../vault/useVault';
 import { VaultKeyDialog } from '../../local/VaultKeyDialog';
+import { LocalModeDialog } from '../../local/LocalModeDialog';
+import type { Profile } from '../../../domain/models';
 import {
   clearLocal,
   downloadBackup,
@@ -37,11 +39,14 @@ export function StorageSettings({
   onChange,
   data,
   disabled = false,
+  onLocalSaved,
 }: {
   value: StorageDraft;
   onChange: (next: StorageDraft) => void;
   data: WorkspaceData;
   disabled?: boolean;
+  /** The local mode was activated (and saved) from its own dialog. */
+  onLocalSaved?: (profile: Profile) => void;
 }) {
   const vault = useVault();
   const { user } = useAuth();
@@ -50,6 +55,7 @@ export function StorageSettings({
   const open = local?.estado === 'abierto' || local?.estado === 'sin-datos';
   const zone = data.profile.zona_horaria;
   const [keyDialog, setKeyDialog] = useState(false);
+  const [localDialog, setLocalDialog] = useState(false);
   const [encrypt, setEncrypt] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -83,8 +89,10 @@ export function StorageSettings({
   };
 
   function chooseLocal() {
-    if (open) onChange({ ...value, almacenamiento: 'local' });
-    else setKeyDialog(true);
+    // Already saved as local: nothing to activate (maybe only switching back from a draft).
+    if (open && data.profile.preferencias.almacenamiento === 'local')
+      onChange({ ...value, almacenamiento: 'local' });
+    else setLocalDialog(true);
   }
 
   function download() {
@@ -287,7 +295,7 @@ export function StorageSettings({
               variant="ghost"
               icon="lock"
               onClick={() => {
-                closeLocalData();
+                closeLocalData(true);
                 vault.lock();
               }}
             >
@@ -448,12 +456,18 @@ export function StorageSettings({
           {error}
         </p>
       ) : null}
-      <VaultKeyDialog
-        open={keyDialog}
-        onClose={() => setKeyDialog(false)}
-        // "En este navegador" chosen before the key was here: applied once it is.
-        onUnlocked={() => onChange({ ...value, almacenamiento: 'local' })}
-      />
+      <VaultKeyDialog open={keyDialog} onClose={() => setKeyDialog(false)} />
+      {localDialog ? (
+        <LocalModeDialog
+          open
+          data={data}
+          onClose={() => setLocalDialog(false)}
+          onSaved={(profile) => {
+            onChange({ ...value, almacenamiento: 'local' });
+            onLocalSaved?.(profile);
+          }}
+        />
+      ) : null}
       {clearOpen
         ? createPortal(
             <div onSubmit={(event) => event.stopPropagation()}>

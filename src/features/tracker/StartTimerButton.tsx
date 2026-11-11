@@ -10,6 +10,7 @@ import { useWorkspace } from '../workspace/useWorkspace';
 import { useTracker } from './useTracker';
 import { readableError } from '../../lib/supabase/errors';
 import { DayContextPanel, DayContextToggle } from '../day-context/DayContextPanel';
+import { dayContextSummary } from '../day-context/dayContextSummary';
 import { useDayContextVisibility } from '../day-context/useDayContextVisibility';
 
 type When = 'now' | 'other';
@@ -136,7 +137,16 @@ function StartTimerForm({
         ) : null
       }
     >
-      <DayContextToggle visible={dayPanel.visible} onToggle={dayPanel.toggle} controls={panelId} />
+      <DayContextToggle
+        visible={dayPanel.visible}
+        onToggle={dayPanel.toggle}
+        controls={panelId}
+        summary={
+          dayPanel.visible
+            ? null
+            : dayContextSummary(data!, when === 'other' ? date : now.toISODate()!, zone)
+        }
+      />
       <form className="page-stack" onSubmit={submit}>
         <SelectField
           label="Tarea"

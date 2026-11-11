@@ -80,7 +80,6 @@ const BACKUP_TABLES = [
   'public.nota_proyectos',
   'public.nota_tareas',
   'public.credenciales',
-  'chambapp_private.odoo_credenciales',
 ];
 const CLEARED_TABLES = [
   'chambapp_private.operaciones_cronometro',
@@ -323,10 +322,6 @@ try {
     id: doomedSecret.id,
     version: doomedSecret.version,
   });
-  await request(main, "select public.chambapp_configurar_odoo('clave-odoo', true) r", [], {
-    path: '/rpc/chambapp_configurar_odoo',
-    gen: generation,
-  });
   assert.ok(absence.id && linked.id);
 
   const backup = await exportar();
@@ -335,8 +330,8 @@ try {
   assert.deepEqual(Object.keys(backup.tablas).sort(), [...BACKUP_TABLES].sort());
   const links = backup.tablas['public.nota_proyectos'];
   assert.ok(links.some((row) => row.proyecto_id === p2.id));
-  assert.equal(backup.tablas['chambapp_private.odoo_credenciales'].length, 1);
-  ok('export contains every table, including links to deleted records and the Odoo key');
+  assert.equal(backup.tablas['chambapp_private.odoo_credenciales'], undefined);
+  ok('export contains every table, including links to deleted records (and no Odoo key)');
 
   // ---- round trip
   await op('crear_proyecto', { nombre: 'Después de la copia' });

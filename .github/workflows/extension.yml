@@ -1,0 +1,60 @@
+# Builds the browser extension (Chrome/Edge zip and Firefox xpi) on every push to main
+# and publishes it in the rolling GitHub release "extension-latest". The web app falls
+# back to that release when the server it runs on has no packaged copy.
+#
+# Optional repository variables (Settings → Secrets and variables → Actions → Variables),
+# public values that let the extension also use the cloud:
+#   VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
+# Without them the extension is built for Chambapp local only.
+name: Extensión de navegador
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Empaquetar la extensión
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run ext:pack:local
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chambapp-extension
+          path: public/downloads/
+          if-no-files-found: error
+      - name: Publicar en la release extension-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./public/downloads/extension.json').version")
+          notes="Extensión de Chambapp ${version} (commit ${GITHUB_SHA::7}). Chrome/Edge: chambapp-extension.zip (descomprimir y «Cargar descomprimida»). Firefox: chambapp-extension-firefox.xpi."
+          if gh release view extension-latest >/dev/null 2>&1; then
+            gh release edit extension-latest --title "Extensión de navegador ${version}" --notes "$notes"
+          else
+            gh release create extension-latest --target "$GITHUB_SHA" --latest=false \
+              --title "Extensión de navegador ${version}" --notes "$notes"
+          fi
+          gh release upload extension-latest --clobber \
+            public/downloads/chambapp-extension.zip \
+            public/downloads/chambapp-extension-firefox.xpi \
+            public/downloads/extension.json

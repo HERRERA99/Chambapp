@@ -105,7 +105,7 @@ Los tests `tests/extension*.test.ts` cubren el protocolo app↔extensión, la co
 
 ### Prueba en navegador con un Odoo falso
 
-`tools/ext-smoke/odoo-task.html` imita la ficha de una tarea de Odoo (modos normal, lento, rechazado, campo inválido y paginado). `tools/ext-smoke/run.mjs` carga la extensión en Edge, ejecuta el envío contra cada modo, compara los clics con el ejemplo `Extension_App`, comprueba la detección, el recuento paginado y el autocompletado:
+`tools/ext-smoke/odoo-task.html` imita la ficha de una tarea de Odoo (modos normal, lento, rechazado, campo inválido y paginado). `tools/ext-smoke/run.mjs` carga la extensión en Edge, ejecuta el envío contra cada modo, compara los clics con la extensión de referencia (`tools/ext-smoke/reference-extension`), comprueba la detección, el recuento paginado y el autocompletado:
 
 ```bash
 npm i --no-save playwright-core
@@ -155,4 +155,4 @@ Con proyectos locales (ver [datos-locales.md](datos-locales.md)) la extensión p
 - El bloqueo de edición durante un envío solo afecta a las pestañas de Chambapp de este navegador. Importar la misma tarea a la vez desde dos navegadores podría duplicarla.
 - Los tiempos con segundos (redondeo 0) se envían a Odoo redondeados al minuto superior.
 - No hay captura automática de contraseñas al iniciar sesión en webs ni menú dentro de los campos.
-- `Extension_App/` se conserva como referencia; sus archivos tienen los nombres cambiados (por ejemplo, `popup.css` contiene el manifest) y no carga tal cual.
+- `tools/ext-smoke/reference-extension/` (antes `Extension_App/`) se conserva como referencia; sus archivos tienen los nombres cambiados (por ejemplo, `popup.css` contiene el manifest) y no carga tal cual.

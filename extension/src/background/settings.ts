@@ -5,6 +5,7 @@ import { DATE_FORMATS } from '../shared/automation';
 import { DEFAULT_LOCAL_ORIGIN, normalizeLocalOrigin } from '../shared/backend';
 import type { Backend } from '../shared/backend';
 import type { DateFormat } from '../shared/automation';
+import { cloudAvailable, defaultBackend } from '../shared/cloud';
 
 const SETTINGS_KEY = 'chambapp_settings_v1';
 const DETECTOR_ID = 'chambapp-odoo-detect';
@@ -25,7 +26,13 @@ export async function getSettings(): Promise<Settings> {
     ? (stored!.autoLockMinutes as AutoLock)
     : 15;
   return {
-    backend: stored?.backend === 'local' ? 'local' : 'nube',
+    // A build without the cloud only talks to a local installation.
+    backend:
+      stored?.backend === 'local' || !cloudAvailable
+        ? 'local'
+        : stored?.backend === 'nube'
+          ? 'nube'
+          : defaultBackend,
     localOrigin: storedLocalOrigin(stored?.localOrigin),
     odooOrigin: typeof stored?.odooOrigin === 'string' ? stored.odooOrigin : null,
     odooDateFormat: DATE_FORMATS.includes(stored?.odooDateFormat as DateFormat)
@@ -117,6 +124,8 @@ export async function hasLocalPermission(origin: string) {
  */
 export async function setBackend(backend: Backend, localOriginValue: string) {
   if (backend !== 'nube' && backend !== 'local') throw new Error('Modo de conexión no válido.');
+  if (backend === 'nube' && !cloudAvailable)
+    throw new Error('Esta copia de la extensión solo funciona con Chambapp local.');
   const settings = await getSettings();
   const localOrigin = normalizeLocalOrigin(localOriginValue || DEFAULT_LOCAL_ORIGIN);
   if (backend === 'local' && !(await hasLocalPermission(localOrigin)))

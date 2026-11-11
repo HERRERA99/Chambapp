@@ -731,7 +731,7 @@ try {
     await admin.query(`select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname in ('public','chambapp_private') and c.relkind='r'`)
   ).rows;
-  assert.equal(catalog.length, 19);
+  assert.equal(catalog.length, 18);
   assert.ok(catalog.every((x) => x.relrowsecurity));
   const unsafe = (
     await admin.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
@@ -760,7 +760,7 @@ try {
     false,
   );
   ok(
-    'all nineteen tables have RLS, weekly versions are immutable and public RPCs are security invoker',
+    'all eighteen tables have RLS, weekly versions are immutable and public RPCs are security invoker',
   );
   await admin.query(await readFile(join(root, 'supabase/verify.sql'), 'utf8'));
   console.log(

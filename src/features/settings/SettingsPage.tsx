@@ -360,6 +360,12 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
                 }}
                 data={data}
                 disabled={saving}
+                onLocalSaved={(saved) => {
+                  // Saved by the dialog itself: keep the rest of the draft, not this field.
+                  setVersion(saved.version);
+                  setBaseline((current) => ({ ...current, almacenamiento: 'local' }));
+                  setProfile((current) => ({ ...current, almacenamiento: 'local' }));
+                }}
               />
             )}
           </div>

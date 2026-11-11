@@ -7,11 +7,12 @@ import { ask } from '../shared/messages';
 import type { ExtensionState } from '../shared/messages';
 import { Button, ErrorText } from '../shared/ui';
 import { errorMessage } from '../shared/feedback';
+import { cloudAvailable, cloudKey, cloudUrl } from '../shared/cloud';
 
 async function loadProviders(): Promise<readonly OAuthProviderDefinition[]> {
-  const url = String(import.meta.env.VITE_SUPABASE_URL).replace(/\/+$/, '');
-  const response = await fetch(`${url}/auth/v1/settings`, {
-    headers: { apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) },
+  if (!cloudAvailable) return [];
+  const response = await fetch(`${cloudUrl}/auth/v1/settings`, {
+    headers: { apikey: cloudKey },
   });
   if (!response.ok) return [];
   return enabledOAuthProviders(parseAuthSettings(await response.json()));

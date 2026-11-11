@@ -18,6 +18,8 @@ import {
 } from './extensionDownload';
 import type { BrowserKind, DownloadState, PackageInfo } from './extensionDownload';
 import './extension.css';
+import { isLocalEdition } from '../../lib/edition';
+import { DEFAULT_LOCAL_ORIGIN } from '../../lib/localUser';
 
 type StepId =
   | 'download'
@@ -366,8 +368,18 @@ function StepBody({
             {firefox
               ? 'Pulsa el icono de la pieza de puzle de la barra, abre el engranaje de Chambapp y elige «Fijar a la barra de herramientas».'
               : 'Pulsa el icono de la pieza de puzle de la barra del navegador y fija Chambapp con la chincheta.'}{' '}
-            Después abre la extensión e inicia sesión con <strong>la misma cuenta</strong> que usas
-            aquí.
+            {isLocalEdition ? (
+              <>
+                Después abre la extensión: se conecta sola con Chambapp local en{' '}
+                <code className="mono">{DEFAULT_LOCAL_ORIGIN}</code>. Si usas otro puerto, cámbialo
+                en <strong>⋯ → Ajustes → Conexión</strong>.
+              </>
+            ) : (
+              <>
+                Después abre la extensión e inicia sesión con <strong>la misma cuenta</strong> que
+                usas aquí.
+              </>
+            )}
           </p>
           <Mock label="Icono de Chambapp fijado en la barra y pantalla de acceso">
             <div className="ext-pin">
@@ -388,10 +400,12 @@ function StepBody({
           </Mock>
           <Live
             ok={extension.connected}
-            okText="Conectada con tu cuenta."
+            okText={isLocalEdition ? 'Conectada con Chambapp local.' : 'Conectada con tu cuenta.'}
             waitText={
               extension.available
-                ? 'Instalada. Falta iniciar sesión en la extensión con esta cuenta.'
+                ? isLocalEdition
+                  ? 'Instalada. Abre la extensión y comprueba en Ajustes → Conexión que apunta a esta dirección.'
+                  : 'Instalada. Falta iniciar sesión en la extensión con esta cuenta.'
                 : 'Primero instala la extensión (paso anterior).'
             }
           />

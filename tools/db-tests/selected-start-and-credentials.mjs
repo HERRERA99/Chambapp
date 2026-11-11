@@ -76,31 +76,14 @@ export async function verifySelectedStartAndCredentials({
     'selected timer start preserves exact last end, historical date and retries; overlaps/future/offsetless starts rejected; current start unchanged',
   );
 
-  const credential = async (connection, key = null, save = false) =>
-    (
-      await connection.query('select public.chambapp_configurar_odoo($1,$2) configured', [
-        key,
-        save,
-      ])
-    ).rows[0].configured;
-  assert.equal(await credential(ca), false);
-  assert.equal(await credential(ca, ' example-private-key ', true), true);
-  assert.equal(await credential(ca), true);
-  assert.equal(await credential(cb), false);
-  assert.equal(await credential(cb, 'other-key', true), true);
+  // The Odoo API key was removed (20261111000000_remove_odoo_api_key.sql).
   await expectError(
-    () => ca.query('select * from chambapp_private.odoo_credenciales'),
-    /permission denied/,
+    () => ca.query('select public.chambapp_configurar_odoo($1,$2)', [null, false]),
+    /does not exist/,
   );
-  await expectError(() => credential(anonymous), /permission denied/);
-  await expectError(() => credential(noSession), /SESION_REQUERIDA/);
-  await expectError(() => credential(ca, 'x'.repeat(4097), true), /API_KEY_ODOO_INVALIDA/);
-  assert.equal(await credential(ca), true);
-  assert.equal(await credential(ca, 'replacement-key', true), true);
-  assert.equal(await credential(ca, '', true), false);
-  assert.equal(await credential(cb), true);
-  assert.equal(await credential(cb, '', true), false);
-  ok(
-    'Odoo keys can be saved/replaced/deleted; status is account scoped; secrets and anonymous writes are inaccessible',
+  assert.equal(
+    (await admin.query("select to_regclass('chambapp_private.odoo_credenciales') t")).rows[0].t,
+    null,
   );
+  ok('the Odoo API key RPC and table no longer exist');
 }

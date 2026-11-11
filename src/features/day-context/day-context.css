@@ -140,3 +140,17 @@
     gap: 2px;
   }
 }
+
+.day-context-toggle {
+  flex-wrap: wrap;
+}
+.day-context-toggle__summary {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.day-context-toggle__summary::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--dim);
+}

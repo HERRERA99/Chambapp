@@ -8,3 +8,4 @@ supabase/.temp/
 tsconfig.tsbuildinfo
 public/downloads/
 extension/dist-firefox/
+extension/.build-info.json

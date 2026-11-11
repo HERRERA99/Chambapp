@@ -12,10 +12,13 @@ export function DayContextToggle({
   visible,
   onToggle,
   controls,
+  summary,
 }: {
   visible: boolean;
   onToggle: () => void;
   controls: string;
+  /** One line about the day (entrada, partes), shown while the panel is hidden. */
+  summary?: string | null;
 }) {
   return (
     <button
@@ -27,6 +30,7 @@ export function DayContextToggle({
     >
       <Icon name="calendar" size={15} />
       {visible ? 'Ocultar contexto del día' : 'Contexto del día'}
+      {!visible && summary ? <span className="day-context-toggle__summary">{summary}</span> : null}
     </button>
   );
 }

@@ -12,8 +12,7 @@ import { GENERATION_HEADER, LOCAL_USER_ID } from '../../../src/lib/localUser';
 import { accountKey, sameAccount } from '../shared/backend';
 import { getSettings } from './settings';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+import { cloudAvailable, cloudKey as key, cloudUrl as url } from '../shared/cloud';
 
 /** Session kept by the extension itself (never the web app's: refresh tokens rotate). */
 const storage = {
@@ -164,6 +163,7 @@ export async function currentSession(): Promise<ExtSession | null> {
       }),
     };
   }
+  if (!cloudAvailable) return null;
   const { data, error } = await cloud.auth.getSession();
   if (error || !data.session) return null;
   return {
