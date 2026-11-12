@@ -4,10 +4,14 @@
 name: chambapp-local
 
 x-db-image: &db-image ${CHAMBAPP_IMAGE_PREFIX:-ghcr.io/herrera99}/chambapp-local-db:${CHAMBAPP_TAG:-latest}
+# `up` looks for a newer `latest` at most once a day (without it, an image downloaded once
+# is kept forever: e.g. a web image from before the extension was included in it).
+x-pull-policy: &pull-policy ${CHAMBAPP_PULL_POLICY:-daily}
 
 services:
   db:
     image: *db-image
+    pull_policy: *pull-policy
     restart: unless-stopped
     environment:
       POSTGRES_DB: chambapp
@@ -47,6 +51,7 @@ services:
   # Applies new migrations, then exits (uses no resources afterwards).
   migrate:
     image: *db-image
+    pull_policy: *pull-policy
     restart: 'no'
     entrypoint: ['chambapp-migrate']
     environment:
@@ -86,6 +91,7 @@ services:
 
   web:
     image: ${CHAMBAPP_IMAGE_PREFIX:-ghcr.io/herrera99}/chambapp-local-web:${CHAMBAPP_TAG:-latest}
+    pull_policy: *pull-policy
     restart: unless-stopped
     ports:
       # The only published port, and only on this PC.

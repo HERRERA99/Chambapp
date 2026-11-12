@@ -41,6 +41,8 @@ Si cambias el puerto, actualiza también la dirección en la extensión (Opcione
 
 ## Actualizar
 
+`up` busca imágenes nuevas como mucho una vez al día (`CHAMBAPP_PULL_POLICY`, ver `.env.example`). Para actualizar ya:
+
 ```bash
 docker compose -f docker-compose.yml pull
 ```
@@ -74,7 +76,7 @@ docker compose -f docker-compose.yml exec -T db pg_dump -U postgres -d chambapp 
 
 ## Extensión del navegador
 
-La misma extensión sirve para la nube y para la versión local. Descárgala desde la app (botón «Descargar extensión»): la copia que trae la imagen ya viene conectada a `http://127.0.0.1:47800`, sin configurar nada. Si usas otro puerto, cámbialo en **Opciones de la extensión → Conexión** (el navegador pedirá permiso para esa dirección). También está en la [release `extension-latest`](https://github.com/HERRERA99/Chambapp/releases/tag/extension-latest) del repositorio, o se compila con `npm run ext:pack:local`. En modo local no hay inicio de sesión. Al cambiar de conexión se bloquea la bóveda de la extensión y los envíos a Odoo de la otra conexión quedan apartados hasta volver a ella.
+La misma extensión sirve para la nube y para la versión local. Descárgala desde la app (botón «Descargar extensión»): la copia que trae la imagen ya viene conectada a `http://127.0.0.1:47800`, sin configurar nada. Si usas otro puerto, cámbialo en **Opciones de la extensión → Conexión** (el navegador pedirá permiso para esa dirección). Si la app dice que la descarga «no está disponible en este entorno», tu imagen es anterior a la que incluye la extensión: actualízala (sección anterior). También está en la [release `extension-latest`](https://github.com/HERRERA99/Chambapp/releases/tag/extension-latest) del repositorio, o se compila con `npm run ext:pack:local`. En modo local no hay inicio de sesión. Al cambiar de conexión se bloquea la bóveda de la extensión y los envíos a Odoo de la otra conexión quedan apartados hasta volver a ella.
 
 ## Construir las imágenes desde el repositorio
 

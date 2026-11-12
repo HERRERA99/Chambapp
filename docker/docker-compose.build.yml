@@ -1,11 +1,16 @@
 # Builds the images from this repository instead of downloading them:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 services:
+  # Built here: never replaced by the published image.
   db:
+    pull_policy: build
     build:
       context: ..
       dockerfile: docker/db/Dockerfile
+  migrate:
+    pull_policy: build
   web:
+    pull_policy: build
     build:
       context: ..
       dockerfile: docker/web/Dockerfile
