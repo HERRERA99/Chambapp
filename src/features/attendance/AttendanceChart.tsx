@@ -10,12 +10,21 @@ const series: readonly BarSeries[] = [
   { key: 'imputed', label: 'Imputado', tone: 'accent' },
 ];
 
+type ChartDay = Pick<
+  AttendanceDay,
+  'date' | 'workedSeconds' | 'imputedSeconds' | 'provisionalSeconds'
+> & {
+  tone?: 'success' | 'warning' | 'danger' | null;
+};
+
 export function AttendanceChart({
   days,
   today,
+  compact = false,
 }: {
-  days: readonly AttendanceDay[];
+  days: readonly ChartDay[];
   today?: string;
+  compact?: boolean;
 }) {
   const description = days
     .map(
@@ -28,17 +37,18 @@ export function AttendanceChart({
       series={series}
       ariaLabel={`Horas fichadas e imputadas por día. ${description}`}
       showProvisionalLegend={days.some((day) => day.provisionalSeconds > 0)}
-      minColumnWidth={92}
-      height={170}
+      minColumnWidth={compact ? 36 : 92}
+      height={compact ? 112 : 170}
       columns={days.map((day) => ({
         key: day.date,
         label: DateTime.fromISO(day.date, { zone: 'UTC' }).setLocale('es').toFormat('ccc dd'),
         values: { worked: day.workedSeconds, imputed: day.imputedSeconds },
+        colors: day.tone ? { imputed: `var(--${day.tone})` } : undefined,
         provisional: { worked: day.provisionalSeconds },
         active: day.date === today,
         badge: day.date === today ? 'Hoy' : undefined,
         title: `${day.date}: fichado exacto ${formatAttendanceDuration(day.workedSeconds)}, imputado ${formatAttendanceDuration(day.imputedSeconds)}${day.provisionalSeconds ? `; fichaje provisional ${formatAttendanceDuration(day.provisionalSeconds)}` : ''}`,
-        header: (
+        header: compact ? undefined : (
           <>
             <span className="attendance-chart__value--worked" title="Fichado exacto">
               F {formatAttendanceDuration(day.workedSeconds)}

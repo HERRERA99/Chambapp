@@ -11,16 +11,7 @@ export type NavigationEntry = NavigationTab & {
 
 export const navigationItems: readonly NavigationEntry[] = [
   { to: paths.dashboard, label: 'Hoy', icon: 'dashboard' },
-  {
-    to: paths.week,
-    label: 'Semana',
-    icon: 'calendarRange',
-    alias: paths.weekOverview,
-    tabs: [
-      { to: paths.week, label: 'Mi semana' },
-      { to: paths.timesheet, label: 'Partes por tarea' },
-    ],
-  },
+  { to: paths.weekOverview, label: 'Semana', icon: 'calendarRange' },
   {
     to: paths.entries,
     label: 'Registros',
@@ -63,9 +54,15 @@ export const settingsItem: NavigationEntry = {
   icon: 'settings',
 };
 
-export const navigationRedirects = navigationItems.flatMap(({ alias, to }) =>
-  alias ? [{ from: alias, to }] : [],
-);
+export const weekRedirects = [paths.week, paths.timesheet, paths.board].map((from) => ({
+  from,
+  to: paths.weekOverview,
+}));
+
+export const navigationRedirects = [
+  ...weekRedirects,
+  ...navigationItems.flatMap(({ alias, to }) => (alias ? [{ from: alias, to }] : [])),
+];
 
 const allItems = [...navigationItems, settingsItem];
 

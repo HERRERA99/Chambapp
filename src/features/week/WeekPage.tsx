@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
 import type { TimeEntry } from '../../domain/models';
 import { formatClock, formatDuration, mondayForDate } from '../../domain/time';
-import { downloadCsv } from '../../lib/export';
+import { exportWeekCsv } from './exportWeekCsv';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { StatGrid } from '../../shared/ui/StatGrid';
@@ -48,45 +48,6 @@ export default function WeekPage() {
   function moveWeek(weeks: number) {
     setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
   }
-  function exportWeek() {
-    if (!week) return;
-    downloadCsv(
-      `chambapp-semana-${monday}.csv`,
-      [
-        'Fecha',
-        'Proyecto',
-        'Cliente',
-        'Tarea',
-        'ID Odoo',
-        'Enlace Odoo',
-        'Inicio exacto',
-        'Fin exacto',
-        'Zona horaria',
-        'Real (s)',
-        'Imputado (s)',
-        'Redondeo (min)',
-        'Descripción',
-        'Estado',
-      ],
-      week.entries.map(({ entry, project, task }) => [
-        entry.fecha,
-        project?.nombre ?? '',
-        project?.cliente ?? null,
-        task?.titulo ?? '',
-        task?.odoo_id ?? null,
-        task?.odoo_url ?? null,
-        entry.inicio_en,
-        entry.fin_en,
-        entry.zona_horaria,
-        entry.duracion_real_segundos,
-        entry.duracion_imputada_segundos,
-        entry.intervalo_redondeo_minutos,
-        entry.descripcion,
-        entry.fin_en ? 'Finalizado' : 'En curso',
-      ]),
-    );
-  }
-
   if (isLoading && !data)
     return (
       <div className="empty-state" role="status">
@@ -276,7 +237,7 @@ export default function WeekPage() {
             icon="file"
             variant="ghost"
             className="full-width"
-            onClick={exportWeek}
+            onClick={() => exportWeekCsv(monday, week.entries)}
             disabled={!week.entries.length}
           >
             Descargar CSV

@@ -114,7 +114,7 @@ export default function CalendarPage() {
       {syncOpen ? <HolidaySync key={month.year} year={month.year} /> : null}
       <Panel
         title="Días libres de este mes"
-        action={<ButtonLink to="/mi-semana">Ver semana laboral</ButtonLink>}
+        action={<ButtonLink to="/semana">Ver semana laboral</ButtonLink>}
       >
         {visible.length ? (
           <div className="absence-list">

@@ -9,8 +9,6 @@ test('preserves supported workspace destinations, filters, and section anchors',
     '/resumen',
     '/proyectos',
     '/tareas',
-    '/tablero',
-    '/parte-semanal',
     '/notas',
     '/contrasenas',
     '/calendario',
@@ -18,7 +16,6 @@ test('preserves supported workspace destinations, filters, and section anchors',
     '/partes-de-horas',
     '/fichajes?fecha=2026-10-02',
     '/semana',
-    '/mi-semana',
     '/herramientas',
     '/porcentajes',
     '/calculadora-de-horas',
@@ -27,6 +24,15 @@ test('preserves supported workspace destinations, filters, and section anchors',
     '/ajustes?returnTo=%2Fproyectos#regional',
   ]) {
     assert.equal(safeReturnTo(destination, origin), destination);
+  }
+});
+
+test('normalizes old week routes to Semana, preserving query and anchor', () => {
+  for (const destination of ['/tablero', '/parte-semanal', '/mi-semana']) {
+    assert.equal(
+      safeReturnTo(`${destination}?origen=ajustes#detalle`, origin),
+      '/semana?origen=ajustes#detalle',
+    );
   }
 });
 

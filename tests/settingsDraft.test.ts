@@ -144,6 +144,7 @@ test('profile drafts retain valid saved preferences and safely default incompati
     intervaloRedondeo: 15,
     almacenamiento: 'nube',
     avisoCopiaDias: 7,
+    imputationThresholds: { verdeDesde: 90, ambarDesde: 85, maximo: 100 },
   });
   data.profile.preferencias = { workspace: { nested: true }, especialidad: 42 };
   assert.equal(profileDraft(data).workspace, 'Mi Workspace');

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDuration } from '../../domain/time';
+import { validImputationThresholds } from '../../domain/imputationThresholds';
 import { Icon } from '../../shared/ui/Icon';
 import type { IconName } from '../../shared/ui/Icon';
 import { PageHeader } from '../../shared/ui/PageHeader';
@@ -52,6 +53,8 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const profileDirty = JSON.stringify(profile) !== JSON.stringify(baseline);
+  const thresholdsDirty =
+    JSON.stringify(profile.imputationThresholds) !== JSON.stringify(baseline.imputationThresholds);
   const dirty = profileDirty || scheduleDirty;
   const changedElsewhere = data.profile.version !== version;
   const minimumDate = minimumScheduleMonday(data);
@@ -88,7 +91,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
       label: 'Jornada semanal',
       icon: 'calendar',
       summary: `${formatDuration(weeklyMinutesDraft * 60)} por semana`,
-      dirty: scheduleDirty,
+      dirty: scheduleDirty || thresholdsDirty,
     },
     {
       id: 'redondeo',
@@ -144,6 +147,10 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     if (saving || !dirty) return;
     setError(null);
     setMessage(null);
+    if (!validImputationThresholds(profile.imputationThresholds)) {
+      setError('Los umbrales deben cumplir 0 < ámbar < verde ≤ máximo ≤ 200.');
+      return;
+    }
     if (!profile.nombre.trim() || !profile.workspace.trim()) {
       setError('Completa tu nombre y el nombre del Workspace.');
       return;
@@ -206,6 +213,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
             especialidad: profile.especialidad.trim(),
             almacenamiento: profile.almacenamiento,
             aviso_copia_dias: profile.avisoCopiaDias,
+            umbrales_imputacion: profile.imputationThresholds,
           },
         });
         const saved = {
@@ -314,13 +322,18 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           <div hidden={active !== 'jornada'}>
             <WorkdaySettings
               value={schedule}
+              thresholds={profile.imputationThresholds}
+              onThresholdsChange={(imputationThresholds) => {
+                setProfile((current) => ({ ...current, imputationThresholds }));
+                setMessage(null);
+              }}
               onChange={(next) => {
                 setSchedule(next);
                 setScheduleDirty(true);
                 setMessage(null);
               }}
               minimumDate={minimumDate}
-              dirty={scheduleDirty}
+              dirty={scheduleDirty || thresholdsDirty}
               disabled={saving}
               data={data}
             />

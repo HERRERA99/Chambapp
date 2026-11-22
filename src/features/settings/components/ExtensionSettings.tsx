@@ -19,8 +19,8 @@ export function ExtensionSettings() {
     <section id="extension">
       <Panel title="Extensión de navegador" icon="zap">
         <p className="muted">
-          Importa tareas de Odoo, envía los partes de Parte semanal a Odoo y rellena tus contraseñas
-          desde Chrome, Edge o Firefox.
+          Importa tareas de Odoo, envía partes desde Semana y rellena tus contraseñas desde Chrome,
+          Edge o Firefox.
         </p>
         <div className="ext-settings__checks" role="status" aria-live="polite">
           <Check

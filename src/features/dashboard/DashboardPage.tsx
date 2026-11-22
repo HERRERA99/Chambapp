@@ -128,7 +128,7 @@ export default function DashboardPage() {
       {missingDays ? (
         <p className="muted">
           Hay jornadas pendientes de generar esta semana.{' '}
-          <Link className="text-link" to="/mi-semana">
+          <Link className="text-link" to="/semana">
             Abrir calendario
           </Link>
         </p>

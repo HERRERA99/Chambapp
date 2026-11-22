@@ -17,6 +17,7 @@ export type BarChartColumn = {
   values: Readonly<Record<string, number>>;
   /** Part of a series value shown striped (for example, time still in progress). */
   provisional?: Readonly<Record<string, number>>;
+  colors?: Readonly<Record<string, string>>;
   active?: boolean;
   badge?: string;
   title?: string;
@@ -94,7 +95,10 @@ export function BarChart({
                       <m.span
                         key={item.key}
                         className={`bar-chart__bar bar-chart__bar--${item.tone}`}
-                        style={{ height: `${(value / maximum) * 100}%` }}
+                        style={{
+                          height: `${(value / maximum) * 100}%`,
+                          background: column.colors?.[item.key],
+                        }}
                         initial={{ scaleY: 0 }}
                         whileInView={{ scaleY: 1 }}
                         viewport={{ once: true }}

@@ -1,0 +1,170 @@
+.week-overview__header,
+.week-overview__actions,
+.week-overview__summary,
+.week-overview__detail-header,
+.week-overview__day-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.week-overview__header h1 {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+}
+
+.week-overview__actions {
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.week-overview__tools {
+  margin-left: auto;
+}
+
+.week-overview__menu {
+  position: relative;
+}
+
+.week-overview__menu summary {
+  display: grid;
+  place-items: center;
+  list-style: none;
+  cursor: pointer;
+}
+
+.week-overview__menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.week-overview__menu-items {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.week-overview__menu-items .button {
+  justify-content: flex-start;
+}
+
+.week-overview__summary {
+  flex-wrap: wrap;
+}
+
+.week-overview__summary strong {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1;
+}
+
+.week-overview__summary > span {
+  font-size: 0.85rem;
+}
+
+.week-overview [data-tone='success'] {
+  color: var(--success);
+}
+
+.week-overview [data-tone='warning'] {
+  color: var(--warning);
+}
+
+.week-overview [data-tone='danger'] {
+  color: var(--danger);
+}
+
+.week-overview__days .data-table {
+  min-width: 0;
+}
+
+.week-overview__day {
+  cursor: pointer;
+}
+
+.week-overview__day--today td {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.week-overview__day td > small {
+  display: block;
+}
+
+.week-overview__day-label {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.week-overview__day-label button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+
+.week-overview__day-label button[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+.week-overview__days .week-overview__detail > td {
+  background: var(--surface-low);
+  white-space: normal;
+}
+
+.week-overview__detail td > * + * {
+  margin-top: 16px;
+}
+
+.week-overview__detail-header {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.week-overview__detail-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.week-overview__attendance {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week-overview__attendance li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+@media (max-width: 760px) {
+  .week-overview__header {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .week-overview__tools {
+    margin-left: 0;
+  }
+
+  .week-overview__days .data-table td,
+  .week-overview__days .data-table th {
+    padding-inline: 5px;
+  }
+}
+
+@media print {
+  .week-overview .week-overview__actions,
+  .week-overview .week-overview__chart,
+  .week-overview .week-overview__days,
+  .week-overview .timesheet__batch-progress {
+    display: none;
+  }
+}

@@ -60,8 +60,9 @@ function summary(days: TimesheetDay[]) {
 export function TimesheetGroups({
   days,
   today,
+  embedded = false,
   ...actions
-}: { days: TimesheetDay[]; today: string } & Actions) {
+}: { days: TimesheetDay[]; today: string; embedded?: boolean } & Actions) {
   const titleId = useId();
   return (
     <section className="timesheet__section" aria-labelledby={titleId}>
@@ -74,14 +75,16 @@ export function TimesheetGroups({
           <section
             key={day.date}
             className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
-            aria-labelledby={`timesheet-groups-${day.date}`}
+            aria-labelledby={embedded ? titleId : `timesheet-groups-${day.date}`}
           >
-            <TimesheetDayHeader
-              id={`timesheet-groups-${day.date}`}
-              date={day.date}
-              seconds={day.loggedSeconds}
-              totalLabel="Total imputable del día"
-            />
+            {!embedded ? (
+              <TimesheetDayHeader
+                id={`timesheet-groups-${day.date}`}
+                date={day.date}
+                seconds={day.loggedSeconds}
+                totalLabel="Total imputable del día"
+              />
+            ) : null}
             <ul className="timesheet__items">
               {day.groups.length ? (
                 day.groups.map((group) => <GroupCard key={group.key} group={group} {...actions} />)

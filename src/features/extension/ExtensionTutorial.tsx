@@ -445,7 +445,7 @@ function StepBody({
               {
                 icon: 'send' as const,
                 title: 'Envía partes',
-                text: 'En Parte semanal, «Enviar a Odoo» crea la línea y la marca como imputada.',
+                text: 'En Semana, «Enviar a Odoo» crea la línea y la marca como imputada.',
               },
               {
                 icon: 'key' as const,
@@ -461,8 +461,8 @@ function StepBody({
             ))}
           </div>
           <div className="actions">
-            <Link className="button button--secondary" to={paths.timesheet} onClick={onClose}>
-              <Icon name="grid" size={14} /> Ir a Parte semanal
+            <Link className="button button--secondary" to={paths.weekOverview} onClick={onClose}>
+              <Icon name="grid" size={14} /> Ir a Semana
             </Link>
             <Link className="button button--secondary" to={paths.passwords} onClick={onClose}>
               <Icon name="key" size={14} /> Ir a Contraseñas

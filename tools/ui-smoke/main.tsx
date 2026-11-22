@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter, Navigate, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext } from '../../src/features/auth/AuthContext';
 import { WorkspaceContext } from '../../src/features/workspace/useWorkspace';
@@ -11,6 +11,7 @@ import type { OdooRequest, QueueSummaryItem } from '../../src/features/extension
 import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
 import { navigationRedirects } from '../../src/app/navigation';
+import { NavigationRedirect } from '../../src/app/NavigationRedirect';
 import { paths } from '../../src/app/paths';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
 import DashboardPage from '../../src/features/dashboard/DashboardPage';
@@ -33,9 +34,8 @@ const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
 const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
 const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
 const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
-const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const AttendancePage = lazy(() => import('../../src/features/attendance/AttendancePage'));
-const WeekPage = lazy(() => import('../../src/features/week/WeekPage'));
+const WeekOverviewPage = lazy(() => import('../../src/features/week/WeekOverviewPage'));
 /**
  * `?ext=hera`: a connected extension with Hera change requests for the fixture
  * attendance day (2026-10-02): one granted and one pending.
@@ -79,7 +79,7 @@ function AttendanceWithExtension() {
  * request through pending → processing → success (one at a time, 1.5 s each).
  * `?ext=odoo&rechazar=1` rejects every second request. Sent requests: window.__sent.
  */
-function TimesheetWithExtension() {
+function WeekWithExtension() {
   const base = useExtension();
   const params = new URLSearchParams(window.location.search);
   const [queue, setQueue] = useState<QueueSummaryItem[]>([]);
@@ -100,7 +100,13 @@ function TimesheetWithExtension() {
     }, 1500);
     return () => clearInterval(timer);
   }, []);
-  if (params.get('ext') !== 'odoo') return <TimesheetPage />;
+  if (params.get('ext') !== 'odoo') {
+    return (
+      <ExtensionContext.Provider value={{ ...base, ...extensionStatus }}>
+        <WeekOverviewPage />
+      </ExtensionContext.Provider>
+    );
+  }
   const sent = ((window as unknown as { __sent?: OdooRequest[] }).__sent ??= []);
   const status = {
     ...base,
@@ -127,7 +133,7 @@ function TimesheetWithExtension() {
   };
   return (
     <ExtensionContext.Provider value={status}>
-      <TimesheetPage />
+      <WeekOverviewPage />
     </ExtensionContext.Provider>
   );
 }
@@ -295,9 +301,9 @@ function Smoke() {
                     <Routes>
                       <Route element={<WorkspaceLayout />}>
                         {navigationRedirects.map(({ from, to }) => (
-                          <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                          <Route key={from} path={from} element={<NavigationRedirect to={to} />} />
                         ))}
-                        <Route path={paths.week} element={<WeekPage />} />
+                        <Route path={paths.weekOverview} element={<WeekWithExtension />} />
                         <Route path="/partes-de-horas" element={<EntriesPage />} />
                         <Route path="/resumen" element={<DashboardPage />} />
                         <Route path="/porcentajes" element={<PercentagesPage />} />
@@ -308,7 +314,6 @@ function Smoke() {
                         <Route path="/proyectos" element={<ProjectsPage />} />
                         <Route path="/ajustes" element={<SettingsPage />} />
                         <Route path="/tareas" element={<TasksPage />} />
-                        <Route path="/parte-semanal" element={<TimesheetWithExtension />} />
                         <Route path="/fichajes" element={<AttendanceWithExtension />} />
                       </Route>
                     </Routes>
