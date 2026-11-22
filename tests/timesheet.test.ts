@@ -128,16 +128,10 @@ test('lists one item per entry, sorted, excluding deleted entries and other week
     ['early', 'late', 'orphan', 'open'],
   );
   assert.equal(first.items[0]!.title, 'Tarea a');
-  assert.equal(first.items[0]!.odooId, 'T1');
-  assert.equal(first.items[0]!.odooUrl, 'https://odoo.example/tasks/1');
-  // Unsafe links are never exposed.
-  assert.equal(first.items[2]!.odooUrl, null);
-  assert.equal(first.items[1]!.odooUrl, 'https://odoo.example/tasks/1');
   assert.equal(first.items[2]!.title, 'Tarea no disponible');
-  assert.equal(first.items[2]!.odooId, 'T9');
-  assert.equal(first.items[3]!.realSeconds, null);
-  assert.equal(first.items[1]!.realSeconds, 1200);
-  assert.equal(first.items[3]!.range, '16:00–en curso');
+  assert.equal(first.groups[0]!.odooUrl, 'https://odoo.example/tasks/1');
+  // Unsafe links are never exposed.
+  assert.equal(first.groups[1]!.odooUrl, null);
   // Totals round each task/day group on its summed real time; open entries do not count.
   // Task a: 60 + 20 min -> 80 -> 90 min (R15). Orphan task b: 60 min.
   assert.equal(first.loggedSeconds, 5400 + 3600);

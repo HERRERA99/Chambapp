@@ -3,7 +3,7 @@ import type { TimeEntry } from '../../domain/models';
 import { formatDuration, formatTime } from '../../domain/time';
 import { downloadCsv } from '../../lib/export';
 import { PageHeader } from '../../shared/ui/PageHeader';
-import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Button } from '../../shared/ui/Button';
 import { StatGrid } from '../../shared/ui/StatGrid';
 import { Panel, Notice } from '../../shared/ui/Panel';
 import { InputField, SelectField } from '../../shared/ui/FormField';
@@ -16,7 +16,6 @@ import { useTracker } from '../tracker/useTracker';
 import { EntryModal } from './components/EntryModal';
 import { EntriesTable } from './components/EntriesTable';
 import { useExtension } from '../extension/useExtension';
-import { RoundingPreview } from './components/RoundingPreview';
 import { entryTotals } from './entryTotals';
 
 type StatusFilter = 'all' | 'live' | 'finished';
@@ -45,7 +44,6 @@ export default function EntriesPage() {
   const [odooStatus, setOdooStatus] = useState<OdooFilter>('all');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [simulationInterval, setSimulationInterval] = useState<string | null>(null);
   const [modal, setModal] = useState<TimeEntry | 'new' | null>(null);
   const [deleting, setDeleting] = useState<TimeEntry | null>(null);
   const [actionError, setActionError] = useState('');
@@ -106,7 +104,6 @@ export default function EntriesPage() {
     (task) =>
       !task.archivado_en && !projects.find((item) => item.id === task.proyecto_id)?.archivado_en,
   );
-  const interval = simulationInterval ?? String(data?.profile.intervalo_redondeo_minutos ?? 15);
 
   async function stop() {
     setActionError('');
@@ -197,9 +194,6 @@ export default function EntriesPage() {
             <Button icon="download" onClick={exportEntries} disabled={!visible.length}>
               Exportar CSV
             </Button>
-            <ButtonLink to="/ajustes#redondeo" icon="settings">
-              Reglas de redondeo
-            </ButtonLink>
             <Button
               variant="primary"
               icon="plus"
@@ -394,27 +388,6 @@ export default function EntriesPage() {
             </Button>
           </div>
         </div>
-      </Panel>
-      <Panel
-        title="Redondeo de la duración total"
-        icon="settings"
-        action={
-          <SegmentedControl
-            label="Intervalo de simulación"
-            value={interval}
-            onChange={setSimulationInterval}
-            options={[
-              { value: '0', label: 'Exacto' },
-              { value: '5', label: '5 min' },
-              { value: '10', label: '10 min' },
-              { value: '15', label: '15 min' },
-              { value: '30', label: '30 min' },
-              { value: '60', label: '60 min' },
-            ]}
-          />
-        }
-      >
-        <RoundingPreview interval={interval} />
       </Panel>
       {modal ? (
         <EntryModal

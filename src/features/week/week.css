@@ -2,12 +2,6 @@
   display: none;
 }
 
-@media (max-width: 650px) {
-  .week-navigation {
-    flex-wrap: wrap;
-  }
-}
-
 @media print {
   body:has(.week-page) {
     --text: #111;
@@ -27,8 +21,6 @@
   body:has(.week-page) .workspace-header,
   body:has(.week-page) .workspace-footer,
   .week-page .page-actions,
-  .week-page .week-navigation,
-  .week-page .week-insights,
   .week-page .notice,
   .week-page button,
   .week-page .button,

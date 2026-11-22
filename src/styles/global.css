@@ -232,9 +232,6 @@ hr {
   gap: 24px;
   align-items: start;
 }
-.two-columns--wide {
-  grid-template-columns: 1.6fr 1fr;
-}
 .section-intro {
   margin-bottom: 22px;
   max-width: 850px;
@@ -306,8 +303,7 @@ hr {
   max-width: 700px;
 }
 @media (max-width: 900px) {
-  .two-columns,
-  .two-columns--wide {
+  .two-columns {
     grid-template-columns: 1fr;
   }
 }

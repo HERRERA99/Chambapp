@@ -1,5 +1,8 @@
+import { DateTime } from 'luxon';
+import { validHolidayCountry } from '../../../domain/holidayPreference';
 import { Panel, Badge } from '../../../shared/ui/Panel';
 import { InputField, SelectField } from '../../../shared/ui/FormField';
+import { holidayRegionName, usePublicHolidays } from '../../calendar/usePublicHolidays';
 import type { ProfileDraft } from '../settingsDraft';
 
 const zones = [
@@ -15,19 +18,25 @@ const zones = [
 ];
 
 export function RegionalSettings({
+  active,
   value,
   onChange,
   disabled,
 }: {
+  active: boolean;
   value: ProfileDraft;
   onChange: (value: ProfileDraft) => void;
   disabled: boolean;
 }) {
   const options = zones.includes(value.zonaHoraria) ? zones : [value.zonaHoraria, ...zones];
+  const { pais, region } = value.holidays;
+  const year = DateTime.now().setZone(value.zonaHoraria).year;
+  const { holidays, regions } = usePublicHolidays(year, pais, active);
+  const missingRegion = region && !regions.includes(region);
   return (
     <Panel
       id="perfil"
-      title="Perfil & Zona Horaria"
+      title="Perfil y zona horaria"
       icon="globe"
       action={<Badge>{value.zonaHoraria.replaceAll('_', ' ')}</Badge>}
     >
@@ -66,6 +75,35 @@ export function RegionalSettings({
           {options.map((zone) => (
             <option key={zone} value={zone}>
               {zone.replaceAll('_', ' ')}
+            </option>
+          ))}
+        </SelectField>
+        <InputField
+          label="País de los festivos"
+          hint="Código ISO de dos letras, p. ej. ES."
+          value={pais}
+          maxLength={2}
+          aria-invalid={pais !== '' && !validHolidayCountry(pais)}
+          onChange={(event) => {
+            const country = event.target.value.trim().toUpperCase();
+            if (country !== pais) onChange({ ...value, holidays: { pais: country, region: '' } });
+          }}
+          disabled={disabled}
+        />
+        <SelectField
+          label="Región"
+          hint={holidays.isFetching ? 'Consultando regiones…' : holidays.error?.message}
+          value={region}
+          onChange={(event) =>
+            onChange({ ...value, holidays: { pais, region: event.target.value } })
+          }
+          disabled={disabled || !validHolidayCountry(pais) || holidays.isFetching}
+        >
+          <option value="">Solo nacionales</option>
+          {missingRegion ? <option value={region}>{holidayRegionName(region)}</option> : null}
+          {regions.map((code) => (
+            <option key={code} value={code}>
+              {holidayRegionName(code)}
             </option>
           ))}
         </SelectField>

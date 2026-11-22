@@ -8,6 +8,8 @@ import { WorkspaceProvider } from '../features/workspace/WorkspaceProvider';
 import { TrackerProvider } from '../features/tracker/TrackerProvider';
 import { AttendanceProvider } from '../features/attendance/AttendanceProvider';
 import { RequireAuth } from './RequireAuth';
+import { navigationRedirects } from './navigation';
+import { NavigationRedirect } from './NavigationRedirect';
 import { paths } from './paths';
 
 // Cloud edition only (the local edition has no landing page or accounts).
@@ -29,12 +31,11 @@ const OnboardingPage = lazy(() => import('../features/onboarding/OnboardingPage'
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const ProjectsPage = lazy(() => import('../features/projects/ProjectsPage'));
 const TasksPage = lazy(() => import('../features/tasks/TasksPage'));
-const TimesheetPage = lazy(() => import('../features/timesheet/TimesheetPage'));
 const NotesPage = lazy(() => import('../features/notes/NotesPage'));
 const PasswordsPage = lazy(() => import('../features/passwords/PasswordsPage'));
 const EntriesPage = lazy(() => import('../features/time-entries/EntriesPage'));
 const AttendancePage = lazy(() => import('../features/attendance/AttendancePage'));
-const WeekPage = lazy(() => import('../features/week/WeekPage'));
+const WeekOverviewPage = lazy(() => import('../features/week/WeekOverviewPage'));
 const CalendarPage = lazy(() => import('../features/calendar/CalendarPage'));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
 const PercentagesPage = lazy(() => import('../features/calculators/PercentagesPage'));
@@ -53,13 +54,12 @@ const routeTitles: Record<string, string> = {
   '/resumen': 'Resumen',
   '/proyectos': 'Proyectos y clientes',
   '/tareas': 'Tareas',
-  '/parte-semanal': 'Parte semanal',
   '/notas': 'Notas Markdown',
   '/contrasenas': 'Contraseñas',
   '/calendario': 'Festivos y vacaciones',
   '/partes-de-horas': 'Partes de horas',
   '/fichajes': 'Entradas y salidas',
-  '/mi-semana': 'Mi semana',
+  '/semana': 'Semana',
   '/porcentajes': 'Porcentajes',
   '/calculadora-de-horas': 'Calculadora de horas',
   '/datos-ficticios': 'Datos ficticios',
@@ -130,20 +130,18 @@ export function App() {
                     </Route>
                     <Route element={<RequireAuth />}>
                       <Route element={<WorkspaceLayout />}>
+                        {navigationRedirects.map(({ from, to }) => (
+                          <Route key={from} path={from} element={<NavigationRedirect to={to} />} />
+                        ))}
                         <Route path={paths.dashboard} element={<DashboardPage />} />
                         <Route path={paths.projects} element={<ProjectsPage />} />
                         <Route path={paths.tasks} element={<TasksPage />} />
-                        <Route path={paths.timesheet} element={<TimesheetPage />} />
-                        <Route
-                          path={paths.board}
-                          element={<Navigate to={paths.timesheet} replace />}
-                        />
                         <Route path={paths.notes} element={<NotesPage />} />
                         <Route path={paths.passwords} element={<PasswordsPage />} />
                         <Route path={paths.calendar} element={<CalendarPage />} />
                         <Route path={paths.entries} element={<EntriesPage />} />
                         <Route path={paths.attendance} element={<AttendancePage />} />
-                        <Route path={paths.week} element={<WeekPage />} />
+                        <Route path={paths.weekOverview} element={<WeekOverviewPage />} />
                         <Route path={paths.percentages} element={<PercentagesPage />} />
                         <Route path={paths.timeCalculator} element={<TimeCalculatorPage />} />
                         <Route path={paths.fakeData} element={<FakeDataPage />} />

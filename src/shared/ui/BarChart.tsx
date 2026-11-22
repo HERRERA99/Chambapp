@@ -17,11 +17,10 @@ export type BarChartColumn = {
   values: Readonly<Record<string, number>>;
   /** Part of a series value shown striped (for example, time still in progress). */
   provisional?: Readonly<Record<string, number>>;
+  colors?: Readonly<Record<string, string>>;
   active?: boolean;
   badge?: string;
   title?: string;
-  header?: ReactNode;
-  footer?: ReactNode;
 };
 
 /**
@@ -32,7 +31,6 @@ export function BarChart({
   series,
   columns,
   ariaLabel,
-  legendAside,
   showProvisionalLegend = false,
   minColumnWidth = 0,
   height = 200,
@@ -40,7 +38,6 @@ export function BarChart({
   series: readonly BarSeries[];
   columns: readonly BarChartColumn[];
   ariaLabel: string;
-  legendAside?: ReactNode;
   showProvisionalLegend?: boolean;
   minColumnWidth?: number;
   height?: number;
@@ -64,7 +61,6 @@ export function BarChart({
                 <i className="bar-chart__swatch bar-chart__swatch--provisional" /> En curso
               </span>
             ) : null}
-            {legendAside ? <small>{legendAside}</small> : null}
           </div>
           <div
             className="bar-chart__plot"
@@ -85,7 +81,6 @@ export function BarChart({
                 title={column.title}
               >
                 {column.badge ? <span className="bar-chart__badge">{column.badge}</span> : null}
-                {column.header ? <div className="bar-chart__header">{column.header}</div> : null}
                 <span className="bar-chart__columns" aria-hidden="true">
                   {series.map((item, seriesIndex) => {
                     const value = column.values[item.key] ?? 0;
@@ -94,7 +89,10 @@ export function BarChart({
                       <m.span
                         key={item.key}
                         className={`bar-chart__bar bar-chart__bar--${item.tone}`}
-                        style={{ height: `${(value / maximum) * 100}%` }}
+                        style={{
+                          height: `${(value / maximum) * 100}%`,
+                          background: column.colors?.[item.key],
+                        }}
                         initial={{ scaleY: 0 }}
                         whileInView={{ scaleY: 1 }}
                         viewport={{ once: true }}
@@ -114,7 +112,6 @@ export function BarChart({
                   })}
                 </span>
                 <span className="bar-chart__label">{column.label}</span>
-                {column.footer ? <div className="bar-chart__footer">{column.footer}</div> : null}
               </div>
             ))}
           </div>

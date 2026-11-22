@@ -1,55 +1,42 @@
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
-import { DateTime } from 'luxon';
 import type { TimeEntry, WorkspaceData } from '../../domain/models';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/useAuth';
-import { formatDuration, mondayForDate, todayInZone } from '../../domain/time';
-import { Button, IconButton } from '../../shared/ui/Button';
-import { Icon } from '../../shared/ui/Icon';
-import { Notice } from '../../shared/ui/Panel';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
-import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
 import {
   applyImputationResult,
   buildOdooRequest,
-  buildTimesheetWeek,
   odooDescriptionChoices,
   planWeekOdooSend,
 } from './timesheet.model';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useExtension } from '../extension/useExtension';
-import { formatHoursMinutes, lockedIds, LONG_ODOO_MINUTES } from '../extension/protocol';
+import { lockedIds, LONG_ODOO_MINUTES } from '../extension/protocol';
 import type { OdooRequest, QueueAction } from '../extension/protocol';
 import type {
   ImputationResultEntry,
+  TimesheetDay,
   TimesheetGroup,
-  TimesheetItem,
   WeekOdooSendRow,
 } from './timesheet.model';
-import { TimesheetGroups } from './components/TimesheetGroups';
-import { TimesheetDayHeader } from './components/TimesheetDayHeader';
 import { OdooDescriptionDialog } from './components/OdooDescriptionDialog';
 import { WeekOdooSendDialog } from './components/WeekOdooSendDialog';
 import type { WeekOdooSendSelection } from './components/WeekOdooSendDialog';
-import './timesheet.css';
 
-function weekLabel(monday: string, lastDay: string) {
-  const start = DateTime.fromISO(monday, { zone: 'UTC' }).setLocale('es');
-  const end = DateTime.fromISO(lastDay, { zone: 'UTC' }).setLocale('es');
-  return `Semana del ${start.toFormat(start.month === end.month ? 'd' : 'd LLL')} – ${end.toFormat('d LLL yyyy')}`;
-}
-
-export default function TimesheetPage() {
-  const { data, isLoading, error, reload } = useWorkspace();
+export function useTimesheetOdoo(
+  data: WorkspaceData | null,
+  days: TimesheetDay[],
+  weekLabel: string,
+) {
   const { run, pending } = useCommand();
   const tracker = useTracker();
   const notify = useFeedback();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
+  const extension = useExtension();
+  const busy = pending || tracker.busy || tracker.pending;
   const [actionError, setActionError] = useState('');
   const [longSend, setLongSend] = useState<{ group: TimesheetGroup; request: OdooRequest } | null>(
     null,
@@ -64,22 +51,9 @@ export default function TimesheetPage() {
   const [weekSendRows, setWeekSendRows] = useState<WeekOdooSendRow[] | null>(null);
   const [sendingWeek, setSendingWeek] = useState(false);
   const [weekBatchIds, setWeekBatchIds] = useState<string[]>([]);
-  const extension = useExtension();
-  const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
-  const today = todayInZone(zone);
-  const currentMonday = mondayForDate(today);
-  const monday = selectedMonday ?? currentMonday;
-  const week = buildTimesheetWeek({
-    entries: data?.entries ?? [],
-    tasks: data?.tasks ?? [],
-    monday,
-  });
-  const busy = pending || tracker.busy || tracker.pending;
-  const lastDay = week.days.at(-1)?.date ?? monday;
-  const timelineCount = week.days.reduce((total, day) => total + day.items.length, 0);
   const locked = lockedIds(extension.queue);
   const weekPlan = planWeekOdooSend({
-    days: week.days,
+    days,
     tasks: data?.tasks ?? [],
     userId: user?.id ?? '',
     locked,
@@ -109,10 +83,6 @@ export default function TimesheetPage() {
               ? 'No hay partes enviables esta semana (revisa el estado de cada grupo).'
               : 'No hay partes pendientes esta semana.'
             : null;
-
-  function moveWeek(weeks: number) {
-    setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
-  }
 
   /** Keeps the confirmed result even if the follow-up refresh fails (newer versions win). */
   function applyResult(partes: ImputationResultEntry[]) {
@@ -290,12 +260,12 @@ export default function TimesheetPage() {
     }
   }
 
-  return (
-    <div className="timesheet">
+  const dialogs = (
+    <>
       {weekSendRows ? (
         <WeekOdooSendDialog
           open
-          weekLabel={weekLabel(monday, lastDay)}
+          weekLabel={weekLabel}
           rows={weekSendRows}
           onClose={() => setWeekSendRows(null)}
           onConfirm={sendWeek}
@@ -345,155 +315,22 @@ export default function TimesheetPage() {
           if (!ok) throw new Error('No se pudo enviar a Odoo.');
         }}
       />
-      <header className="timesheet__toolbar">
-        <div>
-          <p className="eyebrow">Parte semanal</p>
-          <h1 className="timesheet__title">{weekLabel(monday, lastDay)}</h1>
-        </div>
-        <span className="timesheet__total mono" aria-label="Total imputable de la semana">
-          {formatDuration(week.loggedSeconds)}
-        </span>
-        {weekBatchIds.length > 0 && batchInFlight > 0 ? (
-          <span className="timesheet__batch-progress" role="status" aria-live="polite">
-            <Icon name="refresh" size={13} />
-            Enviando a Odoo {batchDone}/{weekBatchIds.length}…
-          </span>
-        ) : null}
-        <Button
-          id="timesheet-send-week"
-          className="timesheet__send-week"
-          icon="send"
-          disabled={weekSendDisabledReason !== null}
-          title={
-            weekSendDisabledReason ??
-            'Revisar y enviar todos los partes pendientes de la semana a Odoo'
-          }
-          onClick={() => setWeekSendRows(weekPlan)}
-        >
-          Enviar semana a Odoo ({formatHoursMinutes(sendableMinutes)})
-        </Button>
-        <div className="timesheet__nav">
-          <IconButton icon="left" label="Semana anterior" onClick={() => moveWeek(-1)} />
-          <Button
-            variant="ghost"
-            disabled={monday === currentMonday}
-            onClick={() => setSelectedMonday(null)}
-          >
-            Hoy
-          </Button>
-          <IconButton icon="right" label="Semana siguiente" onClick={() => moveWeek(1)} />
-        </div>
-      </header>
-      {error ? (
-        <Notice title="No se pudieron cargar los partes">
-          <p role="alert">{error.message}</p>
-          <Button onClick={() => void reload()}>Reintentar</Button>
-        </Notice>
-      ) : null}
-      {actionError ? (
-        <p role="alert" className="form-error">
-          {actionError}
-        </p>
-      ) : null}
-      {isLoading && !data ? (
-        <p role="status">Cargando partes…</p>
-      ) : (
-        <>
-          <TimesheetGroups
-            days={week.days}
-            today={today}
-            busy={busy}
-            onImpute={impute}
-            onUndo={undo}
-            onSend={send}
-            onQueueAction={queueAction}
-          />
-          <section className="timesheet__section" aria-labelledby="timesheet-timeline-title">
-            <header className="timesheet__section-header">
-              <h2 id="timesheet-timeline-title">Timeline</h2>
-              <span className="dim">
-                {timelineCount} {timelineCount === 1 ? 'parte' : 'partes'}
-              </span>
-            </header>
-            <div
-              className="timesheet__grid"
-              style={{ '--timesheet-days': week.days.length } as CSSProperties}
-            >
-              {week.days.map((day) => (
-                <section
-                  key={day.date}
-                  className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
-                  aria-labelledby={`timesheet-${day.date}`}
-                >
-                  <TimesheetDayHeader
-                    id={`timesheet-${day.date}`}
-                    date={day.date}
-                    seconds={day.items.reduce((total, item) => total + (item.realSeconds ?? 0), 0)}
-                    totalLabel="Tiempo real del día"
-                  />
-                  <ul className="timesheet__items">
-                    {day.items.length ? (
-                      day.items.map((item) => <TimesheetRow key={item.entry.id} item={item} />)
-                    ) : (
-                      <li className="timesheet__empty dim">—</li>
-                    )}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-    </div>
+    </>
   );
-}
 
-function TimesheetRow({ item }: { item: TimesheetItem }) {
-  const { entry } = item;
-  const imputed = entry.imputado_en_odoo;
-  const open = !entry.fin_en;
-  const status = open ? 'En curso' : imputed ? 'Imputado en Odoo' : 'Pendiente de imputar en Odoo';
-  return (
-    <li
-      className={`timesheet__item ${imputed ? 'timesheet__item--imputed' : ''} ${open ? 'timesheet__item--open' : ''}`}
-    >
-      <div className="timesheet__item-head">
-        {item.odooUrl ? (
-          <a
-            className="timesheet__item-title timesheet__item-title--link"
-            href={item.odooUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abrir en Odoo"
-          >
-            {item.title}
-            <Icon name="external" size={11} />
-          </a>
-        ) : (
-          <strong className="timesheet__item-title">{item.title}</strong>
-        )}
-        {item.odooId ? (
-          <span className="timesheet__odoo-id mono" title={item.odooId}>
-            {item.odooId}
-          </span>
-        ) : null}
-      </div>
-      <div className="timesheet__item-meta">
-        <span className="mono dim">{item.range}</span>
-        <strong className="mono timesheet__logged" title="Tiempo real">
-          {item.realSeconds === null ? '—' : formatDuration(item.realSeconds)}
-        </strong>
-      </div>
-      <div className="timesheet__item-actions">
-        <span
-          className={`timesheet__item-status ${imputed ? 'timesheet__item-status--imputed' : ''}`}
-          role="img"
-          aria-label={status}
-          title={status}
-        >
-          <Icon name={open ? 'timer' : imputed ? 'check' : 'clock'} size={13} />
-        </span>
-      </div>
-    </li>
-  );
+  return {
+    dialogs,
+    actionError,
+    groupActions: {
+      busy,
+      onImpute: impute,
+      onUndo: undo,
+      onSend: send,
+      onQueueAction: queueAction,
+    },
+    weekSendDisabledReason,
+    sendableMinutes,
+    openWeekSend: () => setWeekSendRows(weekPlan),
+    batchProgress: batchInFlight > 0 ? { done: batchDone, total: weekBatchIds.length } : null,
+  };
 }

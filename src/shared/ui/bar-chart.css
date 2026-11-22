@@ -15,12 +15,6 @@
   align-items: center;
   gap: 7px;
 }
-.bar-chart__legend > small {
-  margin-left: auto;
-  color: #8a7b8f;
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
 .bar-chart__swatch {
   display: inline-block;
   width: 7px;
@@ -99,14 +93,6 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-.bar-chart__header {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  white-space: nowrap;
-}
 .bar-chart__columns {
   display: flex;
   align-items: flex-end;
@@ -151,15 +137,6 @@
 .bar-chart__day--active .bar-chart__label {
   color: #f3d3e2;
 }
-.bar-chart__footer {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: -4px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  white-space: nowrap;
-}
 @media (max-width: 650px) {
   .bar-chart__plot {
     gap: 4px;
@@ -174,11 +151,7 @@
   .bar-chart__bar {
     width: 13px;
   }
-  .bar-chart__label,
-  .bar-chart__footer {
-    font-size: 8px;
-  }
-  .bar-chart__header {
+  .bar-chart__label {
     font-size: 8px;
   }
 }

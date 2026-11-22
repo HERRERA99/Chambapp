@@ -4,9 +4,11 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Brand } from '../../shared/brand/Brand';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import type { IconName } from '../../shared/ui/Icon';
 import { Badge, Notice } from '../../shared/ui/Panel';
 import { paths } from '../paths';
+import { navigationItems, resolveNavigation, settingsItem } from '../navigation';
+import type { NavigationEntry } from '../navigation';
+import { SectionTabs } from './SectionTabs';
 import { TimerDisplay } from '../../features/tracker/TimerDisplay';
 import { useWorkspace } from '../../features/workspace/useWorkspace';
 import { useTracker } from '../../features/tracker/useTracker';
@@ -23,52 +25,7 @@ import { ExtensionProvider } from '../../features/extension/ExtensionProvider';
 import { ExtensionDownloadButton } from '../../features/extension/ExtensionDownloadButton';
 import { ExtensionStatusChip } from '../../features/extension/ExtensionStatusChip';
 
-type NavItem = { to: string; label: string; icon: IconName };
-type NavSection = { id: string; label: string; items: readonly NavItem[] };
-
-const overview: NavItem = { to: paths.dashboard, label: 'Resumen', icon: 'dashboard' };
-const settingsItem: NavItem = { to: paths.settings, label: 'Ajustes', icon: 'settings' };
-const sections: readonly NavSection[] = [
-  {
-    id: 'work',
-    label: 'Trabajo',
-    items: [
-      { to: paths.projects, label: 'Proyectos & clientes', icon: 'folder' },
-      { to: paths.tasks, label: 'Tareas', icon: 'tasks' },
-      { to: paths.timesheet, label: 'Parte semanal', icon: 'grid' },
-      { to: paths.notes, label: 'Notas', icon: 'notebook' },
-      { to: paths.passwords, label: 'Contraseñas', icon: 'key' },
-    ],
-  },
-  {
-    id: 'time',
-    label: 'Tiempo',
-    items: [
-      { to: paths.week, label: 'Mi semana', icon: 'calendarRange' },
-      { to: paths.entries, label: 'Partes de horas', icon: 'clock' },
-      { to: paths.attendance, label: 'Entradas y salidas', icon: 'activity' },
-      { to: paths.calendar, label: 'Festivos & vacaciones', icon: 'calendarHeart' },
-    ],
-  },
-  {
-    id: 'tools',
-    label: 'Herramientas',
-    items: [
-      { to: paths.percentages, label: 'Porcentajes', icon: 'percent' },
-      { to: paths.timeCalculator, label: 'Calculadora de horas', icon: 'calculator' },
-      { to: paths.fakeData, label: 'Datos ficticios', icon: 'dice' },
-      { to: paths.developer, label: 'Utilidades de desarrollo', icon: 'code' },
-    ],
-  },
-];
-const allItems: readonly NavItem[] = [
-  overview,
-  ...sections.flatMap((section) => section.items),
-  settingsItem,
-];
-
 const collapsedKey = 'chambapp:sidebar-collapsed';
-const closedSectionsKey = 'chambapp:sidebar-closed-sections';
 
 function readStored<T>(key: string, fallback: T): T {
   try {
@@ -92,10 +49,6 @@ export function WorkspaceLayout() {
   const [collapsed, setCollapsed] = useState(
     () => readStored<unknown>(collapsedKey, false) === true,
   );
-  const [closedSections, setClosedSections] = useState<readonly string[]>(() => {
-    const stored = readStored<unknown>(closedSectionsKey, []);
-    return Array.isArray(stored) ? stored.filter((id) => typeof id === 'string') : [];
-  });
   const [signingOut, setSigningOut] = useState(false);
   const { pathname } = useLocation();
   const { data, error, reload } = useWorkspace();
@@ -103,7 +56,7 @@ export function WorkspaceLayout() {
   const tracker = useTracker();
   const attendance = useAttendance();
   const notify = useFeedback();
-  const title = allItems.find((item) => item.to === pathname)?.label ?? 'Mi espacio';
+  const { entry, tabs, title } = resolveNavigation(pathname);
   const profile = data?.profile;
   const initials = (profile?.nombre ?? 'Usuario')
     .split(' ')
@@ -119,21 +72,16 @@ export function WorkspaceLayout() {
     setCollapsed(next);
     writeStored(collapsedKey, next);
   }
-  function toggleSection(id: string) {
-    const next = closedSections.includes(id)
-      ? closedSections.filter((item) => item !== id)
-      : [...closedSections, id];
-    setClosedSections(next);
-    writeStored(closedSectionsKey, next);
-  }
-  function renderItem(item: NavItem): ReactNode {
+  function renderItem(item: NavigationEntry): ReactNode {
+    const isActive = entry === item;
     return (
-      <NavLink
+      <Link
         key={item.to}
         to={item.to}
         title={collapsed ? item.label : undefined}
+        aria-current={isActive ? 'location' : undefined}
         onClick={() => setMenuOpen(false)}
-        className={({ isActive }) => `nav-item ${isActive ? 'nav-item--active' : ''}`}
+        className={`nav-item${isActive ? ' nav-item--active' : ''}`}
       >
         <Icon name={item.icon} />
         <span className="nav-item__label">{item.label}</span>
@@ -143,7 +91,7 @@ export function WorkspaceLayout() {
             <span className="sr-only"> pendientes</span>
           </span>
         ) : null}
-      </NavLink>
+      </Link>
     );
   }
   async function signOut() {
@@ -177,8 +125,8 @@ export function WorkspaceLayout() {
           aria-label="Panel de navegación"
         >
           <div className="sidebar__brand">
-            <Brand compact to={paths.dashboard} label="Chambapp · Resumen" />
-            <Link to={paths.dashboard} className="sidebar__mark" aria-label="Chambapp · Resumen">
+            <Brand compact to={paths.dashboard} label="Chambapp · Hoy" />
+            <Link to={paths.dashboard} className="sidebar__mark" aria-label="Chambapp · Hoy">
               <img src="/brand/favicon.svg" alt="" width="34" height="34" />
             </Link>
             <IconButton
@@ -201,33 +149,7 @@ export function WorkspaceLayout() {
               <span className="mono dim">0.1</span>
             </div>
           </div>
-          <nav aria-label="Navegación principal">
-            {renderItem(overview)}
-            {sections.map((section) => {
-              const open = !closedSections.includes(section.id);
-              const hasActive = section.items.some((item) => item.to === pathname);
-              return (
-                <div key={section.id} className={`nav-section ${open ? 'nav-section--open' : ''}`}>
-                  <button
-                    type="button"
-                    className="nav-section__toggle"
-                    aria-expanded={open}
-                    aria-controls={`nav-section-${section.id}`}
-                    onClick={() => toggleSection(section.id)}
-                  >
-                    <span>{section.label}</span>
-                    {!open && hasActive ? (
-                      <i className="nav-section__dot" title="Contiene la página actual" />
-                    ) : null}
-                    <Icon name="chevron" size={14} />
-                  </button>
-                  <div className="nav-section__items" id={`nav-section-${section.id}`}>
-                    <div>{section.items.map(renderItem)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </nav>
+          <nav aria-label="Navegación principal">{navigationItems.map(renderItem)}</nav>
           <div className="sidebar__bottom">
             <div className="sidebar__settings">{renderItem(settingsItem)}</div>
             <div className="preview-note">
@@ -318,6 +240,7 @@ export function WorkspaceLayout() {
             {/* Keyed by account: switching users drops any key held in memory. */}
             <VaultProvider key={user?.id}>
               {isLocalEdition ? null : <LocalBanners />}
+              {entry && tabs.length > 0 ? <SectionTabs label={entry.label} tabs={tabs} /> : null}
               <Outlet />
             </VaultProvider>
           </main>

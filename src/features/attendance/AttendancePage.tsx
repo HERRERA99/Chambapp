@@ -2,27 +2,21 @@ import { useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
 import { useSearchParams } from 'react-router-dom';
 import type { Attendance } from '../../domain/models';
-import { attendanceDays, attendanceInPeriod, attendanceTotal } from '../../domain/attendance';
-import { formatDate, formatDuration, mondayForDate, weekDates } from '../../domain/time';
-import { downloadCsv } from '../../lib/export';
+import { attendanceInPeriod } from '../../domain/attendance';
+import { formatDate, mondayForDate, weekDates } from '../../domain/time';
 import { readableError } from '../../lib/supabase/errors';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Button, IconButton } from '../../shared/ui/Button';
 import { InputField } from '../../shared/ui/FormField';
-import { StatGrid } from '../../shared/ui/StatGrid';
 import { Badge, Notice, Panel } from '../../shared/ui/Panel';
 import { DataTable } from '../../shared/ui/DataTable';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
-import { useExtension } from '../extension/useExtension';
-import type { HeraChangeRequest } from '../extension/heraRequests';
 import { useAttendance } from './useAttendance';
 import { AttendanceControls } from './AttendanceControls';
 import { AttendanceEditor } from './AttendanceEditor';
-import { AttendanceChart } from './AttendanceChart';
-import { HeraDayBadge, HeraDayDetails } from './AttendanceHeraRequests';
-import { formatAttendanceDuration, formatImputedPercent } from './attendanceLabels';
+import { formatAttendanceDuration } from './attendanceLabels';
 import './attendance.css';
 
 function validDate(value: string | null): string | null {
@@ -34,10 +28,11 @@ function validDate(value: string | null): string | null {
 export default function AttendancePage() {
   const { data, isLoading, error, reload } = useWorkspace();
   const attendance = useAttendance();
-  const { connected, heraRequests } = useExtension();
   const notify = useFeedback();
   const [search, setSearch] = useSearchParams();
-  const [period, setPeriod] = useState<'day' | 'week'>('week');
+  const [period, setPeriod] = useState<'day' | 'week'>(() =>
+    validDate(search.get('fecha')) ? 'day' : 'week',
+  );
   const [editor, setEditor] = useState<Attendance | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Attendance | null>(null);
   const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
@@ -48,25 +43,10 @@ export default function AttendancePage() {
     () => (period === 'day' ? [selectedDate] : weekDates(monday)),
     [period, selectedDate, monday],
   );
-  const days = useMemo(
-    () => (data ? attendanceDays(data.fichajes, data.entries, dates, zone, attendance.now) : []),
-    [data, dates, zone, attendance.now],
-  );
   const records = useMemo(
     () => (data ? attendanceInPeriod(data.fichajes, dates, zone, attendance.now) : []),
     [data, dates, zone, attendance.now],
   );
-  const requestsByDate = useMemo(() => {
-    const byDate = new Map<string, HeraChangeRequest[]>();
-    for (const item of heraRequests?.items ?? []) {
-      const day = byDate.get(item.date);
-      if (day) day.push(item);
-      else byDate.set(item.date, [item]);
-    }
-    return byDate;
-  }, [heraRequests]);
-  const selectedDay = days.find((day) => day.date === selectedDate);
-  const total = attendanceTotal(days);
   const blocked = attendance.busy || attendance.pending || !!error;
 
   function selectDate(value: string) {
@@ -81,29 +61,6 @@ export default function AttendancePage() {
   }
   function timestamp(value: string) {
     return DateTime.fromISO(value, { zone }).setLocale('es').toFormat('dd LLL yyyy · HH:mm:ss');
-  }
-  function exportBalance() {
-    downloadCsv(
-      `chambapp-fichajes-${selectedDate}.csv`,
-      [
-        'Fecha',
-        'Zona horaria',
-        'Fichado cerrado (s)',
-        'En curso provisional (s)',
-        'Fichado total (s)',
-        'Imputado finalizado (s)',
-        '% imputado',
-      ],
-      days.map((day) => [
-        day.date,
-        zone,
-        day.closedSeconds,
-        day.provisionalSeconds,
-        day.workedSeconds,
-        day.imputedSeconds,
-        day.imputedPercent,
-      ]),
-    );
   }
   async function remove() {
     if (!deleting) return;
@@ -128,12 +85,16 @@ export default function AttendancePage() {
       </Notice>
     );
 
+  const periodLabel =
+    period === 'day' ? formatDate(selectedDate, zone) : `Semana del ${monday}`;
+  const sessionCount = `${records.length} ${records.length === 1 ? 'sesión' : 'sesiones'}`;
+
   return (
     <div className="page-stack attendance-page">
       <PageHeader
         eyebrow="Control de jornada"
-        title="Entradas, salidas y balance de horas"
-        description="Ficha ahora o registra las horas manualmente. Compara tu jornada con los partes imputados a tareas."
+        title="Entradas y salidas"
+        description="Ficha ahora, registra tramos manuales y consulta o corrige tu historial de fichajes."
         actions={
           <Button icon="plus" variant="primary" disabled={blocked} onClick={() => setEditor('new')}>
             Registrar tramo completo
@@ -144,7 +105,8 @@ export default function AttendancePage() {
         <AttendanceControls />
       </Panel>
       <Panel
-        title={period === 'day' ? formatDate(selectedDate, zone) : `Semana del ${monday}`}
+        title="Historial de entradas y salidas"
+        eyebrow={`${periodLabel} · ${sessionCount} · ${zone}`}
         icon="calendar"
         action={
           <div className="actions attendance-navigation">
@@ -163,7 +125,7 @@ export default function AttendancePage() {
         }
       >
         <div className="attendance-period-controls">
-          <div className="actions" role="group" aria-label="Periodo del balance">
+          <div className="actions" role="group" aria-label="Periodo del historial">
             <Button
               variant={period === 'day' ? 'primary' : 'secondary'}
               aria-pressed={period === 'day'}
@@ -181,110 +143,11 @@ export default function AttendancePage() {
           </div>
           <InputField
             type="date"
-            label="Fecha del balance"
+            label="Fecha"
             value={selectedDate}
             onChange={(event) => selectDate(event.target.value)}
           />
-          <Button
-            icon="download"
-            disabled={!records.length && !total.imputedSeconds}
-            onClick={exportBalance}
-          >
-            Descargar balance CSV
-          </Button>
         </div>
-        <StatGrid
-          stats={[
-            {
-              label: 'Horas fichadas',
-              value: formatAttendanceDuration(total.workedSeconds),
-              icon: 'clock',
-              detail: total.provisionalSeconds
-                ? `Incluye ${formatAttendanceDuration(total.provisionalSeconds)} en curso`
-                : 'Duración exacta entre entrada y salida',
-            },
-            {
-              label: 'Horas imputadas',
-              value: formatDuration(total.imputedSeconds),
-              icon: 'tasks',
-              detail: 'Partes finalizados, con su redondeo',
-              accent: true,
-            },
-            {
-              label: '% de horas imputadas',
-              value: formatImputedPercent(total.imputedPercent),
-              icon: 'gauge',
-              detail: 'Imputado ÷ fichado · puede superar el 100%',
-            },
-            {
-              label:
-                total.imputedSeconds > total.workedSeconds
-                  ? 'Imputado por encima del fichaje'
-                  : 'Horas sin imputar',
-              value: formatAttendanceDuration(Math.abs(total.workedSeconds - total.imputedSeconds)),
-              icon: 'activity',
-              detail: total.workedSeconds
-                ? 'Diferencia entre jornada y partes'
-                : 'Registra fichajes para comparar',
-            },
-          ]}
-        />
-        <AttendanceChart days={days} today={today} />
-        <DataTable
-          caption="Balance de horas por fecha"
-          headers={['Fecha', 'Fichado', 'En curso', 'Imputado', '% imputado']}
-        >
-          {days.map((day) => (
-            <tr key={day.date}>
-              <td>
-                <div className="attendance-day-date">
-                  <button
-                    className="text-link attendance-day-link"
-                    onClick={() => {
-                      selectDate(day.date);
-                      setPeriod('day');
-                    }}
-                  >
-                    {day.date}
-                  </button>
-                  <HeraDayBadge items={requestsByDate.get(day.date) ?? []} />
-                </div>
-              </td>
-              <td className="mono">{formatAttendanceDuration(day.workedSeconds)}</td>
-              <td className="mono">
-                {day.provisionalSeconds ? formatAttendanceDuration(day.provisionalSeconds) : '—'}
-              </td>
-              <td className="mono">{formatDuration(day.imputedSeconds)}</td>
-              <td>{formatImputedPercent(day.imputedPercent)}</td>
-            </tr>
-          ))}
-        </DataTable>
-        <p className="field__hint attendance-comparison__hint">
-          Los fichajes abiertos cuentan como provisionales y los cronómetros de tareas abiertos se
-          incorporan al imputado al detenerlos. Si un intervalo cruza medianoche se reparte por el
-          tiempo transcurrido en cada día de {zone}; el redondeo de los partes se distribuye
-          proporcionalmente.
-        </p>
-        {connected ? (
-          <>
-            {selectedDay ? (
-              <HeraDayDetails
-                items={requestsByDate.get(selectedDay.date) ?? []}
-                workedSeconds={selectedDay.workedSeconds}
-              />
-            ) : null}
-            <p className="field__hint attendance-comparison__hint">
-              {heraRequests?.readAt
-                ? `Solicitudes leídas de Hera el ${DateTime.fromMillis(heraRequests.readAt, { zone }).toFormat('dd/MM HH:mm')}`
-                : 'Abre la extensión → Fichaje para leer las solicitudes'}
-            </p>
-          </>
-        ) : null}
-      </Panel>
-      <Panel
-        title="Historial de entradas y salidas"
-        eyebrow={`${records.length} sesiones que coinciden con el periodo · ${zone}`}
-      >
         {records.length ? (
           <DataTable
             caption="Fichajes con entrada y salida exactas"
@@ -337,9 +200,8 @@ export default function AttendancePage() {
         )}
         {records.length ? (
           <p className="field__hint attendance-comparison__hint">
-            El historial muestra cada sesión completa, aunque cruce el periodo. El balance superior
-            solo suma el tramo dentro de las fechas seleccionadas. Cierra una entrada abierta antes
-            de eliminarla.
+            El historial muestra cada sesión completa, aunque cruce el periodo. Cierra una entrada
+            abierta antes de eliminarla.
           </p>
         ) : null}
       </Panel>
@@ -355,7 +217,7 @@ export default function AttendancePage() {
       <ConfirmDialog
         open={!!deleting}
         title="Eliminar fichaje"
-        description="Se eliminarán esta entrada y salida del balance de jornada. Los partes de tareas se conservan."
+        description="Se eliminará este fichaje de tu historial de jornada. Los partes de tareas se conservan."
         confirmLabel="Eliminar fichaje"
         danger
         busy={attendance.busy}

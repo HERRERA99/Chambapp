@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { TimeEntry } from '../../../domain/models';
-import { formatDuration } from '../../../domain/time';
 import { Button } from '../../../shared/ui/Button';
 import { Icon } from '../../../shared/ui/Icon';
 import type { IconName } from '../../../shared/ui/Icon';
@@ -9,6 +8,7 @@ import { OdooSendButton } from '../../time-entries/components/OdooSendButton';
 import { useExtension } from '../../extension/useExtension';
 import { formatHoursMinutes, odooMinutes, sameOrigin } from '../../extension/protocol';
 import type { QueueAction, QueueSummaryItem } from '../../extension/protocol';
+import { formatReadableDuration as fmt } from '../../week/components/dayTimeline.model';
 import {
   formatRange,
   groupRounding,
@@ -16,7 +16,6 @@ import {
   reconcileSelection,
 } from '../timesheet.model';
 import type { TimesheetDay, TimesheetGroup } from '../timesheet.model';
-import { TimesheetDayHeader } from './TimesheetDayHeader';
 
 type Actions = {
   busy: boolean;
@@ -45,54 +44,24 @@ const status: Record<TimesheetGroup['status'], { label: string; icon: IconName }
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** Secondary header text: pending and running are told apart; "all done" only when it is. */
-function summary(days: TimesheetDay[]) {
-  const groups = days.flatMap((day) => day.groups);
-  const pending = groups.reduce((total, group) => total + group.pending.length, 0);
-  const running = groups.reduce((total, group) => total + group.running.length, 0);
-  if (!groups.length) return 'Sin partes esta semana';
-  if (pending)
-    return `${plural(pending, 'parte pendiente', 'partes pendientes')}${running ? ` · ${running} en curso` : ''}`;
-  if (running) return `${running} en curso`;
-  return groups.every((group) => group.status === 'imputed') ? 'Todo imputado' : '';
-}
-
-export function TimesheetGroups({
-  days,
-  today,
-  ...actions
-}: { days: TimesheetDay[]; today: string } & Actions) {
-  const titleId = useId();
+export function TimesheetGroups({ days, ...actions }: { days: TimesheetDay[] } & Actions) {
   return (
-    <section className="timesheet__section" aria-labelledby={titleId}>
-      <header className="timesheet__section-header">
-        <h2 id={titleId}>Partes por tarea</h2>
-        <span className="dim">{summary(days)}</span>
-      </header>
-      <div className="timesheet__grid" style={{ '--timesheet-days': days.length } as CSSProperties}>
-        {days.map((day) => (
-          <section
-            key={day.date}
-            className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
-            aria-labelledby={`timesheet-groups-${day.date}`}
-          >
-            <TimesheetDayHeader
-              id={`timesheet-groups-${day.date}`}
-              date={day.date}
-              seconds={day.loggedSeconds}
-              totalLabel="Total imputable del día"
-            />
-            <ul className="timesheet__items">
-              {day.groups.length ? (
-                day.groups.map((group) => <GroupCard key={group.key} group={group} {...actions} />)
-              ) : (
-                <li className="timesheet__empty dim">—</li>
-              )}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </section>
+    <div
+      className="timesheet__grid timesheet__grid--embedded"
+      style={{ '--timesheet-days': days.length } as CSSProperties}
+    >
+      {days.map((day) => (
+        <section key={day.date} className="timesheet__day">
+          <ul className="timesheet__items">
+            {day.groups.length ? (
+              day.groups.map((group) => <GroupCard key={group.key} group={group} {...actions} />)
+            ) : (
+              <li className="timesheet__empty dim">—</li>
+            )}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -205,14 +174,12 @@ function GroupCard({
         <span className="timesheet-group__count dim">{plural(count, 'parte', 'partes')}</span>
         <span className="timesheet-group__times">
           <span className="mono dim" title="Tiempo real">
-            {formatDuration(group.realSeconds)}
+            Real {fmt(group.realSeconds)}
           </span>
           <span className="timesheet-group__logged">
-            <span className="dim" aria-hidden="true">
-              →
-            </span>{' '}
             <strong className="mono" title="Tiempo imputable (redondeado sobre la suma)">
-              {formatDuration(group.loggedSeconds)}
+              <span className="dim">Imputable </span>
+              {fmt(group.loggedSeconds)}
             </strong>
           </span>
         </span>
@@ -262,7 +229,7 @@ function GroupCard({
                       />
                       <span className="mono">{range}</span>
                       <span className="mono dim">
-                        {running ? 'en curso' : formatDuration(entry.duracion_real_segundos ?? 0)}
+                        {running ? 'en curso' : fmt(entry.duracion_real_segundos ?? 0)}
                       </span>
                     </label>
                     {entry.descripcion ? (
@@ -286,8 +253,8 @@ function GroupCard({
               </span>
               <span className="timesheet-group__imputation-row">
                 <span className="mono timesheet-group__pair">
-                  <span>{formatDuration(imputation.realSeconds)}</span> →{' '}
-                  <strong>{formatDuration(imputation.loggedSeconds)}</strong>
+                  <span className="dim">Real {fmt(imputation.realSeconds)} ·</span>{' '}
+                  <strong>Imputado {fmt(imputation.loggedSeconds)}</strong>
                 </span>
                 <Button
                   variant="ghost"
@@ -363,15 +330,14 @@ function GroupCard({
                 {selection.length ? (
                   <>
                     {plural(selection.length, 'seleccionado', 'seleccionados')}:{' '}
-                    <span className="mono">{formatDuration(selectionRounding.realSeconds)}</span> →{' '}
+                    <span className="mono">real {fmt(selectionRounding.realSeconds)}</span> ·{' '}
                     <strong className="mono">
-                      {formatDuration(selectionRounding.loggedSeconds)}
+                      imputable {fmt(selectionRounding.loggedSeconds)}
                     </strong>
                   </>
                 ) : (
                   <>
-                    Pendiente:{' '}
-                    <strong className="mono">{formatDuration(group.pendingLoggedSeconds)}</strong>
+                    Pendiente: <strong className="mono">{fmt(group.pendingLoggedSeconds)}</strong>
                   </>
                 )}
               </p>
@@ -412,7 +378,9 @@ function GroupCard({
                       title={sendTitle(group.pending)}
                       onClick={() => void send(group.pending)}
                     >
-                      Enviar todos ({formatDuration(group.pendingLoggedSeconds)})
+                      Enviar todos (
+                      {formatHoursMinutes(odooMinutes(group.pendingLoggedSeconds))}
+                      )
                     </OdooSendButton>
                   </>
                 ) : null}

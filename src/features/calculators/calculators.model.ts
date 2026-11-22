@@ -87,7 +87,7 @@ export function todayWorkedSeconds(
     if (record.fin_en && Date.parse(record.fin_en) > nowMs) return { ...record, fin_en: nowIso };
     return record;
   });
-  return attendanceDays(clippedAttendance, [], [date], zone, nowIso)[0]!.workedSeconds;
+  return attendanceDays(clippedAttendance, [date], zone, nowIso)[0]!.workedSeconds;
 }
 
 export const MAX_SUBTRACTIONS = 20;

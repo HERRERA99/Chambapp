@@ -1,6 +1,6 @@
 # Chambapp
 
-Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. Hay dos ediciones en el mismo código: **la nube** (Vercel + Supabase, con cuentas) y **Chambapp local** (Docker en tu PC, sin cuentas, los datos no salen del equipo; ver [Chambapp local](#chambapp-local-docker)). Incluye autenticación, configuración inicial, proyectos, tareas con referencias opcionales a Odoo, notas Markdown, cronómetro, partes de horas, fichajes de entrada y salida, calendario semanal y ajustes. La página pública utiliza ejemplos visuales; las pantallas de la cuenta leen y guardan datos reales.
+Aplicación de control de tiempo con React, TypeScript, Vite y Supabase. La edición **en la nube** usa Vercel y Supabase y admite cuentas. **Chambapp local** se ejecuta en Docker, sin cuentas y con los datos en tu equipo. En la app puedes fichar, registrar el tiempo por tarea y revisar la semana antes de enviar los partes a Odoo. [Chambapp local](#chambapp-local-docker)
 
 ## Arrancar en local
 
@@ -61,7 +61,23 @@ El entorno Supabase local configura las redirecciones del puerto 5173 en `supaba
 
 Los providers de Auth, Workspace y Tracker coordinan la sesión, la caché de consultas y el cronómetro. Los componentes presentan datos y envían comandos a través de esa capa; los cálculos se mantienen en utilidades y selectores verificables.
 
-Dentro del espacio de trabajo, el logo de Chambapp abre **Resumen** y mantiene al usuario en la aplicación.
+## Páginas de la app
+
+El menú lateral muestra estos accesos. El logo de Chambapp abre **Hoy** y **Ajustes** aparece al pie, junto al perfil.
+
+| Menú             | Página                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Hoy**          | `/resumen` muestra el cronómetro, el balance del día y los avisos de la semana.                            |
+| **Semana**       | `/semana` reúne fichajes, imputación por tarea y día, envío a Odoo, exportación CSV e informe imprimible.  |
+| **Registros**    | Pestañas **Partes** (`/partes-de-horas`) y **Fichajes** (`/fichajes`).                                     |
+| **Tareas**       | Pestañas **Tareas** (`/tareas`) y **Proyectos y clientes** (`/proyectos`).                                 |
+| **Calendario**   | `/calendario` muestra festivos y vacaciones.                                                               |
+| **Notas**        | `/notas` abre la biblioteca de notas Markdown.                                                             |
+| **Contraseñas**  | `/contrasenas` abre la bóveda de credenciales.                                                             |
+| **Herramientas** | Pestañas **Porcentajes**, **Calculadora de horas**, **Datos ficticios** y **Utilidades de desarrollo**.    |
+| **Ajustes**      | `/ajustes` incluye el reparto de jornada, los umbrales de imputación, el redondeo y la región de festivos. |
+
+`/mi-semana`, `/parte-semanal` y `/tablero` redirigen a Semana. `/registros` abre Partes y `/herramientas` abre Porcentajes.
 
 ## Notas Markdown
 
@@ -81,7 +97,7 @@ En **Fichajes** (`/fichajes`) puedes registrar entrada y salida con la hora del 
 
 **Entrada manual** abre directamente un formulario de fecha y hora y guarda el fichaje con salida pendiente. Puedes salir de la página y volver más tarde: **Salida manual** cierra esa misma entrada con la hora que introduzcas. **Registrar tramo completo** permite añadir una sesión pasada con ambas horas. El balance y el historial muestran la duración de los fichajes con segundos, sin aplicar el redondeo de los partes.
 
-El resumen, la semana y Fichajes comparan horas fichadas e imputadas. El porcentaje es `horas imputadas de partes finalizados / horas fichadas × 100`; sin horas fichadas aparece **Sin fichajes** y el redondeo puede producir valores superiores al 100 %. Las entradas abiertas aportan tiempo provisional claramente indicado. La comparativa reparte los tramos entre días según la zona horaria del perfil, respetando los cambios de horario; distribuye el tiempo imputado proporcionalmente a la duración real de cada parte. Los informes originales de partes mantienen su atribución a la jornada de inicio.
+Hoy y Semana comparan el tiempo fichado con el imputable. Semana agrupa el tiempo por tarea y día para aplicar el redondeo de Odoo. El porcentaje divide ese tiempo imputable entre el fichado y puede superar el 100 %. Los fichajes abiertos aportan tiempo provisional. Los tramos fichados se reparten entre días según la zona horaria del perfil, incluidos los cambios de hora.
 
 El provider de fichajes conserva las operaciones pendientes por usuario en el navegador y coordina pestañas con Web Locks. **Reintentar fichaje** reutiliza los parámetros originales; el servidor devuelve el mismo resultado para evitar duplicados, también después de una edición o eliminación. El usuario de la RPC queda fijado a la sesión que inició la operación.
 
@@ -113,7 +129,7 @@ La extensión funciona con las dos ediciones: en sus opciones, **Conexión → N
 
 **Jornada (Ajustes → Jornada semanal):** además de los modelos de 35, 37,5 y 40 horas, puedes indicar tus **horas semanales** (en horas y minutos) y los días que trabajas para repartirlas por igual, o definir **día a día** las horas y minutos de cada día.
 
-La carpeta `extension/` contiene la extensión de Chrome, Edge y Firefox: importa tareas de Odoo, envía los partes de Parte semanal a Odoo sin usar su API y rellena contraseñas de la bóveda. Se compila con `npm run ext:build` (`extension/dist` y `extension/dist-firefox`), se empaqueta para la web con `npm run ext:pack` y la versión de Firefox se firma con `npm run ext:sign:firefox`. Instalación, configuración y pruebas en [docs/extension.md](docs/extension.md).
+La extensión de Chrome, Edge y Firefox está en `extension/`. Importa tareas de Odoo, envía los partes desde Semana y rellena contraseñas de la bóveda. Se compila con `npm run ext:build` (`extension/dist` y `extension/dist-firefox`), se empaqueta para la web con `npm run ext:pack` y la versión de Firefox se firma con `npm run ext:sign:firefox`. [Instalación, configuración y pruebas](docs/extension.md)
 
 ## Contexto del día
 

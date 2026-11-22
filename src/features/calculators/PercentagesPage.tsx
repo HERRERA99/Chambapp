@@ -62,7 +62,7 @@ export default function PercentagesPage() {
         <span>
           <Icon name="zap" size={15} /> Resultados al instante
         </span>
-        <span className="mono">HORAS + MINUTOS → PORCENTAJE</span>
+        <span className="mono">De horas y minutos a porcentaje</span>
       </div>
 
       <section className="percentage-workbench panel" aria-label="Calculadora de porcentajes">

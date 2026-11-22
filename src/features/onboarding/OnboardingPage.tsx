@@ -428,7 +428,7 @@ function OnboardingForm({ data }: { data: WorkspaceData }) {
               <Panel eyebrow="Bloque 04" title="Proyectos, tareas y partes de horas">
                 <p className="muted">
                   Elige dónde se guardan. Si no estás seguro, deja «En la nube»: podrás cambiarlo en
-                  Ajustes → Datos con un clic.
+                  Ajustes, apartado Datos, con un clic.
                 </p>
                 <fieldset className="choice-fieldset" disabled={saving}>
                   <legend>Guardar los proyectos nuevos</legend>
