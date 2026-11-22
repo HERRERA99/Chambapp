@@ -8,6 +8,7 @@ import { WorkspaceProvider } from '../features/workspace/WorkspaceProvider';
 import { TrackerProvider } from '../features/tracker/TrackerProvider';
 import { AttendanceProvider } from '../features/attendance/AttendanceProvider';
 import { RequireAuth } from './RequireAuth';
+import { navigationRedirects } from './navigation';
 import { paths } from './paths';
 
 // Cloud edition only (the local edition has no landing page or accounts).
@@ -130,6 +131,9 @@ export function App() {
                     </Route>
                     <Route element={<RequireAuth />}>
                       <Route element={<WorkspaceLayout />}>
+                        {navigationRedirects.map(({ from, to }) => (
+                          <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                        ))}
                         <Route path={paths.dashboard} element={<DashboardPage />} />
                         <Route path={paths.projects} element={<ProjectsPage />} />
                         <Route path={paths.tasks} element={<TasksPage />} />

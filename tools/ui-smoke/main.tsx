@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext } from '../../src/features/auth/AuthContext';
 import { WorkspaceContext } from '../../src/features/workspace/useWorkspace';
@@ -10,6 +10,8 @@ import { ExtensionContext, useExtension } from '../../src/features/extension/use
 import type { OdooRequest, QueueSummaryItem } from '../../src/features/extension/protocol';
 import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
+import { navigationRedirects } from '../../src/app/navigation';
+import { paths } from '../../src/app/paths';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
 import DashboardPage from '../../src/features/dashboard/DashboardPage';
 import { data as current, operations, uid, now, bumpProfileElsewhere } from './repository';
@@ -33,6 +35,7 @@ const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage
 const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
 const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
 const AttendancePage = lazy(() => import('../../src/features/attendance/AttendancePage'));
+const WeekPage = lazy(() => import('../../src/features/week/WeekPage'));
 /**
  * `?ext=hera`: a connected extension with Hera change requests for the fixture
  * attendance day (2026-10-02): one granted and one pending.
@@ -291,6 +294,10 @@ function Smoke() {
                   <Suspense fallback={<p>Cargando vista de prueba…</p>}>
                     <Routes>
                       <Route element={<WorkspaceLayout />}>
+                        {navigationRedirects.map(({ from, to }) => (
+                          <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                        ))}
+                        <Route path={paths.week} element={<WeekPage />} />
                         <Route path="/partes-de-horas" element={<EntriesPage />} />
                         <Route path="/resumen" element={<DashboardPage />} />
                         <Route path="/porcentajes" element={<PercentagesPage />} />
