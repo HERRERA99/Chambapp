@@ -12,10 +12,18 @@ let localAppOrigin: string | null = null;
 export function setLocalAppOrigin(origin: string | null) {
   localAppOrigin = origin;
 }
+/** Reads the configured local origin again (the worker may have restarted since). */
+let loadLocalAppOrigin: (() => Promise<string | null>) | null = null;
+export function onLoadLocalAppOrigin(load: () => Promise<string | null>) {
+  loadLocalAppOrigin = load;
+}
 /** Origins of the Chambapp web app the extension talks to now. */
 export const appOrigins = () => (localAppOrigin ? [...APP_ORIGINS, localAppOrigin] : APP_ORIGINS);
 
 export async function appTabs() {
+  // The worker may have restarted since the settings were applied: the module value is
+  // then empty, and the local installation's tabs would never hear from the extension.
+  if (loadLocalAppOrigin) setLocalAppOrigin(await loadLocalAppOrigin().catch(() => localAppOrigin));
   const origins = appOrigins();
   // Patterns without ports (Firefox ignores ported ones); the exact origin is checked here.
   const tabs = await chrome.tabs.query({ url: origins.map(originPattern) });

@@ -248,6 +248,14 @@ async function readRequestsInPage(pageUrl: string) {
   }
 }
 
+function heraOrigin(url: string) {
+  try {
+    return new URL(url).origin === HERA_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 async function withHeraWeekTab<T>(read: (tabId: number) => Promise<T>): Promise<T> {
   const pattern = originPattern(HERA_ORIGIN);
   if (!(await chrome.permissions.contains({ origins: [pattern] })))
@@ -263,17 +271,21 @@ async function withHeraWeekTab<T>(read: (tabId: number) => Promise<T>): Promise<
   const tabId = tab.id;
   try {
     const deadline = Date.now() + READ_TIMEOUT;
+    let lastUrl = '';
     while (Date.now() < deadline) {
       const current = await chrome.tabs.get(tabId).catch(() => null);
       if (!current) throw new Error('Se cerró la pestaña de Hera.');
-      if (current.status === 'complete' && current.url) {
-        if (new URL(current.url).origin !== HERA_ORIGIN)
-          throw new Error('Inicia sesión en Hera y vuelve a intentarlo.');
-        return await read(tabId);
-      }
+      lastUrl = current.url ?? '';
+      // A new tab first reports a "complete" about:blank before Hera starts loading, and a
+      // login may go through other addresses: only a loaded Hera page is read.
+      if (current.status === 'complete' && heraOrigin(lastUrl)) return await read(tabId);
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    throw new Error('Hera está tardando demasiado en cargar. Vuelve a intentarlo.');
+    throw new Error(
+      /^https?:/.test(lastUrl) && !heraOrigin(lastUrl)
+        ? 'Inicia sesión en Hera y vuelve a intentarlo.'
+        : 'Hera está tardando demasiado en cargar. Vuelve a intentarlo.',
+    );
   } finally {
     if (!open) await chrome.tabs.remove(tabId).catch(() => undefined);
   }

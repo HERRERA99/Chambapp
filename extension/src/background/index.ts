@@ -51,7 +51,14 @@ import {
   onLocalAccountChanged,
   resetLocalClient,
 } from './supabase';
-import { appOrigins, appTabs, onLocalReply, setLocalAppOrigin, toApp } from './appTabs';
+import {
+  appOrigins,
+  appTabs,
+  onLoadLocalAppOrigin,
+  onLocalReply,
+  setLocalAppOrigin,
+  toApp,
+} from './appTabs';
 import { applyAutoLock, lock, lockIfExpired, onLock, unlock, vaultStatus } from './vault';
 
 // Every lock drops decrypted entries and closes secret views in open extension pages.
@@ -98,6 +105,11 @@ async function leaveAccount(account: string | null) {
 
 // A restore or another installation at the local address: leave the previous account.
 onLocalAccountChanged((account) => void leaveAccount(account));
+
+onLoadLocalAppOrigin(async () => {
+  const settings = await getSettings();
+  return settings.backend === 'local' ? settings.localOrigin : null;
+});
 
 /** Keeps the app origins in line with the settings (the worker may have restarted). */
 async function applyBackend() {
