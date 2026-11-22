@@ -528,3 +528,13 @@ select:disabled {
 .options .panel {
   padding: 22px;
 }
+
+/* Week preview: keep "Aplicar" in sight while the days scroll. */
+.hera-week__actions {
+  position: sticky;
+  bottom: -14px;
+  margin: 0 -14px -14px;
+  padding: 10px 14px 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+}

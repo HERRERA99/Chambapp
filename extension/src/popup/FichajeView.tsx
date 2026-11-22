@@ -56,7 +56,7 @@ function WeekPreview({
           </p>
         );
       })}
-      <div className="row row--wrap">
+      <div className="row row--wrap hera-week__actions">
         <Button variant="primary" disabled={syncing || applying || count === 0} onClick={onApply}>
           {applying ? 'Aplicando…' : `Aplicar ${count} ${count === 1 ? 'cambio' : 'cambios'}`}
         </Button>
