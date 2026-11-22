@@ -1,109 +1,83 @@
-// Pure vertical timeline model for the "Contexto del día" side panel.
+// Pure block-list model for the "Contexto del día" side panel.
 // Reuses duration and clock formatting from the week timeline without duplicating logic.
 import { DateTime } from 'luxon';
 import type { DayContext } from '../../domain/dayContext.ts';
 import { formatReadableDuration, formatTimeShort } from '../week/components/dayTimeline.model.ts';
 
-export const DAY_TIMELINE_MIN_HOURS = 4;
-export const DAY_TIMELINE_PX_PER_HOUR = 56;
+export const DAY_BLOCK_ITEM_MIN_HEIGHT_PX = 28;
+export const DAY_BLOCK_ITEM_MAX_HEIGHT_PX = 120;
+export const DAY_BLOCK_PX_PER_HOUR = 36;
+export const MIN_GAP_SECONDS = 60;
 
-const HOUR_MS = 3_600_000;
+export type DayContextBlockKind = 'attendance' | 'outside';
+export type DayContextItemKind = 'entry' | 'gap' | 'draft';
 
-export type VerticalTick = {
-  ms: number;
-  topPercent: number;
-  label: string;
-};
-
-export type VerticalAttendanceBlock = {
+export type DayContextBlockItem = {
   id: string;
+  kind: DayContextItemKind;
   startMs: number;
   endMs: number;
-  topPercent: number;
-  heightPercent: number;
-  startLabel: string;
-  endLabel: string | null;
-  seconds: number;
-  open: boolean;
-  title: string;
-};
-
-export type VerticalEntryBlock = {
-  id: string;
-  task: string;
-  project: string;
-  startMs: number;
-  endMs: number;
-  topPercent: number;
-  heightPercent: number;
-  startLabel: string;
-  endLabel: string;
-  seconds: number;
-  durationLabel: string;
-  running: boolean;
-  overlapsDraft: boolean;
-  lane: number;
-  laneCount: number;
-  title: string;
-};
-
-export type VerticalGapBlock = {
-  startMs: number;
-  endMs: number;
-  topPercent: number;
-  heightPercent: number;
-  startLabel: string;
-  endLabel: string;
+  /** Exact HH:MM start time in the day's timezone. */
+  start: string;
+  /** Exact HH:MM end time in the day's timezone, or null while open/running. */
+  end: string | null;
   seconds: number;
   durationLabel: string;
   title: string;
-};
-
-export type VerticalDraftBlock = {
-  startMs: number;
-  endMs: number;
-  topPercent: number;
-  heightPercent: number;
-  startLabel: string;
-  endLabel: string | null;
-  seconds: number | null;
-  durationLabel: string | null;
-  open: boolean;
-  hasOverlap: boolean;
-  title: string;
-};
-
-export type VerticalOverlapBlock = {
-  startMs: number;
-  endMs: number;
-  topPercent: number;
-  heightPercent: number;
-  startLabel: string;
-  endLabel: string;
-  seconds: number;
-  durationLabel: string;
-  tasks: string[];
-  title: string;
-};
-
-export type DayContextTimelineModel = {
-  axisStartMs: number;
-  axisEndMs: number;
-  totalHours: number;
+  project?: string;
+  open?: boolean;
+  overlap?: boolean;
   heightPx: number;
-  ticks: VerticalTick[];
-  attendance: VerticalAttendanceBlock[];
-  gaps: VerticalGapBlock[];
-  entries: VerticalEntryBlock[];
-  draft: VerticalDraftBlock | null;
-  overlapSegments: VerticalOverlapBlock[];
-  attendanceSeconds: number;
-  entrySeconds: number;
-  unimputedSeconds: number;
+};
+
+export type DayContextBlock = {
+  id: string;
+  kind: DayContextBlockKind;
+  startMs: number;
+  endMs: number;
+  /** Exact HH:MM start time in the day's timezone. */
+  start: string;
+  /** Exact HH:MM end time in the day's timezone, or null while open. */
+  end: string | null;
+  open: boolean;
+  seconds: number;
+  durationLabel: string;
+  items: DayContextBlockItem[];
   ariaLabel: string;
 };
 
+export type DayContextPause = {
+  /** Index in `blocks` immediately preceding this pause. */
+  afterBlockIndex: number;
+  startMs: number;
+  endMs: number;
+  start: string;
+  end: string;
+  seconds: number;
+  durationLabel: string;
+};
+
+export type DayContextTimelineModel = {
+  blocks: DayContextBlock[];
+  pauses: DayContextPause[];
+  attendanceSeconds: number;
+  entrySeconds: number;
+  unimputedSeconds: number;
+};
+
 type Span = { startMs: number; endMs: number };
+
+const ITEM_KIND_ORDER: Record<DayContextItemKind, number> = {
+  entry: 0,
+  draft: 1,
+  gap: 2,
+};
+
+/** Computes a proportional row height clamped to a legible min/max range. */
+export function computeItemHeightPx(seconds: number): number {
+  const raw = Math.round((Math.max(0, seconds) / 3600) * DAY_BLOCK_PX_PER_HOUR);
+  return Math.max(DAY_BLOCK_ITEM_MIN_HEIGHT_PX, Math.min(DAY_BLOCK_ITEM_MAX_HEIGHT_PX, raw));
+}
 
 function mergeSpans(spans: readonly Span[]): Span[] {
   const valid = spans
@@ -122,92 +96,37 @@ function mergeSpans(spans: readonly Span[]): Span[] {
 }
 
 function subtractSpans(base: readonly Span[], covered: readonly Span[]): Span[] {
-  const gaps: Span[] = [];
+  const result: Span[] = [];
   for (const segment of base) {
     let cursor = segment.startMs;
     for (const cover of covered) {
       if (cover.endMs <= cursor) continue;
       if (cover.startMs >= segment.endMs) break;
       if (cover.startMs > cursor) {
-        gaps.push({ startMs: cursor, endMs: Math.min(cover.startMs, segment.endMs) });
+        result.push({ startMs: cursor, endMs: Math.min(cover.startMs, segment.endMs) });
       }
       cursor = Math.max(cursor, Math.min(cover.endMs, segment.endMs));
     }
     if (cursor < segment.endMs) {
-      gaps.push({ startMs: cursor, endMs: segment.endMs });
+      result.push({ startMs: cursor, endMs: segment.endMs });
     }
-  }
-  return gaps;
-}
-
-function mergeOverlapSpans(
-  spans: readonly { startMs: number; endMs: number; task: string }[],
-): { startMs: number; endMs: number; tasks: string[] }[] {
-  const valid = spans
-    .filter((span) => span.endMs > span.startMs)
-    .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
-  const merged: { startMs: number; endMs: number; tasks: string[] }[] = [];
-  for (const span of valid) {
-    const previous = merged.at(-1);
-    if (!previous || span.startMs > previous.endMs) {
-      merged.push({ startMs: span.startMs, endMs: span.endMs, tasks: [span.task] });
-    } else {
-      if (span.endMs > previous.endMs) {
-        previous.endMs = span.endMs;
-      }
-      if (!previous.tasks.includes(span.task)) {
-        previous.tasks.push(span.task);
-      }
-    }
-  }
-  return merged;
-}
-
-/** Assigns side-by-side lanes only to entries that actually overlap in time. */
-function assignLanes<T extends Span>(items: readonly T[]): { lane: number; laneCount: number }[] {
-  const result = items.map(() => ({ lane: 0, laneCount: 1 }));
-  let clusterStart = 0;
-  let clusterMaxEnd = -Infinity;
-
-  const layoutCluster = (from: number, to: number) => {
-    const laneEnds: number[] = [];
-    for (let i = from; i < to; i += 1) {
-      const item = items[i]!;
-      let lane = laneEnds.findIndex((end) => end <= item.startMs);
-      if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(item.endMs);
-      } else {
-        laneEnds[lane] = item.endMs;
-      }
-      result[i]!.lane = lane;
-    }
-    const count = Math.max(1, laneEnds.length);
-    for (let i = from; i < to; i += 1) {
-      result[i]!.laneCount = count;
-    }
-  };
-
-  for (let i = 0; i < items.length; i += 1) {
-    const item = items[i]!;
-    if (i > clusterStart && item.startMs >= clusterMaxEnd) {
-      layoutCluster(clusterStart, i);
-      clusterStart = i;
-      clusterMaxEnd = item.endMs;
-    } else {
-      clusterMaxEnd = Math.max(clusterMaxEnd, item.endMs);
-    }
-  }
-  if (clusterStart < items.length) {
-    layoutCluster(clusterStart, items.length);
   }
   return result;
 }
 
+function sortItems(items: DayContextBlockItem[]): DayContextBlockItem[] {
+  return items.sort(
+    (a, b) =>
+      a.startMs - b.startMs ||
+      a.endMs - b.endMs ||
+      ITEM_KIND_ORDER[a.kind] - ITEM_KIND_ORDER[b.kind],
+  );
+}
+
 /**
- * Computes the proportional vertical timeline for one day:
- * hourly ticks (`HH:00`), attendance backdrop, unimputed amber gaps,
- * entry blocks, edited draft block, and red overlap segments.
+ * Builds chronological attendance blocks (each containing its entries, draft, and unimputed
+ * gaps >= 1 min), pauses between consecutive attendance blocks, and an optional "Fuera de
+ * fichaje" block for entries or draft intervals falling outside attendance.
  * Returns null when the day has no attendance, entries, or visible draft.
  */
 export function buildDayContextTimeline(
@@ -216,9 +135,8 @@ export function buildDayContextTimeline(
 ): DayContextTimelineModel | null {
   const dayStart = DateTime.fromISO(context.date, { zone: context.zone }).startOf('day');
   if (!dayStart.isValid) return null;
-  const dayEnd = dayStart.plus({ days: 1 });
   const dayStartMs = dayStart.toMillis();
-  const dayEndMs = dayEnd.toMillis();
+  const dayEndMs = dayStart.plus({ days: 1 }).toMillis();
   const nowMs = Date.parse(now);
   const clamp = (ms: number) => Math.max(dayStartMs, Math.min(dayEndMs, ms));
 
@@ -234,8 +152,6 @@ export function buildDayContextTimeline(
         id: row.id,
         startMs,
         endMs,
-        startLabel: row.startLabel,
-        endLabel: row.endLabel,
         open: row.running,
       };
     })
@@ -256,26 +172,14 @@ export function buildDayContextTimeline(
         project: entry.project,
         startMs,
         endMs,
-        startLabel: entry.startLabel,
-        endLabel: entry.running
-          ? 'en curso'
-          : (entry.endLabel ?? formatTimeShort(endMs, context.zone)),
-        running: entry.running,
+        open: entry.running,
         overlapsDraft: entry.overlapsDraft,
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
 
-  let rawDraft: {
-    startMs: number;
-    endMs: number;
-    startLabel: string;
-    endLabel: string | null;
-    seconds: number | null;
-    open: boolean;
-  } | null = null;
-
+  let rawDraft: { startMs: number; endMs: number; open: boolean } | null = null;
   if (context.draft) {
     const rawStart = Date.parse(context.draft.start);
     const draftSeconds = context.draft.seconds;
@@ -291,210 +195,280 @@ export function buildDayContextTimeline(
     ) {
       const startMs = clamp(rawStart);
       const endMs = Math.max(startMs, clamp(rawEnd));
-      rawDraft = {
-        startMs,
-        endMs,
-        startLabel: context.draft.startLabel,
-        endLabel: context.draft.endLabel,
-        seconds: context.draft.seconds,
-        open,
-      };
+      rawDraft = { startMs, endMs, open };
     }
   }
 
   if (!rawAttendance.length && !rawEntries.length && !rawDraft) return null;
 
-  const starts = [
-    ...rawAttendance.map((item) => item.startMs),
-    ...rawEntries.map((item) => item.startMs),
-    ...(rawDraft ? [rawDraft.startMs] : []),
-  ];
-  const ends = [
-    ...rawAttendance.map((item) => item.endMs),
-    ...rawEntries.map((item) => item.endMs),
-    ...(rawDraft ? [rawDraft.endMs] : []),
-  ];
-  const minMs = Math.min(...starts);
-  const maxMs = Math.max(...ends);
-
-  let axisStart = DateTime.fromMillis(minMs, { zone: context.zone }).startOf('hour');
-  const endFloor = DateTime.fromMillis(maxMs, { zone: context.zone }).startOf('hour');
-  let axisEnd = endFloor.toMillis() < maxMs ? endFloor.plus({ hours: 1 }) : endFloor;
-
-  if (axisEnd.toMillis() - axisStart.toMillis() < DAY_TIMELINE_MIN_HOURS * HOUR_MS) {
-    axisEnd = axisStart.plus({ hours: DAY_TIMELINE_MIN_HOURS });
-    if (axisEnd.toMillis() > dayEndMs) {
-      axisEnd = dayEnd;
-      const shiftedStartMs = Math.max(dayStartMs, dayEndMs - DAY_TIMELINE_MIN_HOURS * HOUR_MS);
-      axisStart = DateTime.fromMillis(shiftedStartMs, { zone: context.zone });
+  const entrySegmentOverlapsDraft = (
+    entry: (typeof rawEntries)[number],
+    segStartMs: number,
+    segEndMs: number,
+  ): boolean => {
+    if (!rawDraft || !entry.overlapsDraft) return false;
+    if (rawDraft.open) {
+      return entry.open || segEndMs > rawDraft.startMs;
     }
-  }
+    if (segStartMs === segEndMs) {
+      return segStartMs >= rawDraft.startMs && segStartMs < rawDraft.endMs;
+    }
+    return segStartMs < rawDraft.endMs && segEndMs > rawDraft.startMs;
+  };
 
-  const axisStartMs = axisStart.toMillis();
-  const axisEndMs = axisEnd.toMillis();
-  const spanMs = axisEndMs - axisStartMs;
-  const toPercent = (value: number) => (value / spanMs) * 100;
-  const totalHours = Math.max(DAY_TIMELINE_MIN_HOURS, Math.round(spanMs / HOUR_MS));
-  const heightPx = totalHours * DAY_TIMELINE_PX_PER_HOUR;
+  const draftSegmentOverlapsEntry = (
+    segStartMs: number,
+    segEndMs: number,
+    isOpenSegment: boolean,
+  ): boolean => {
+    if (!context.overlaps.length) return false;
+    if (isOpenSegment) return true;
+    if (segStartMs === segEndMs) {
+      return rawEntries.some(
+        (entry) =>
+          entry.overlapsDraft &&
+          (entry.open || (entry.startMs <= segStartMs && entry.endMs > segStartMs)),
+      );
+    }
+    return rawEntries.some(
+      (entry) => entry.overlapsDraft && entry.startMs < segEndMs && entry.endMs > segStartMs,
+    );
+  };
 
-  const ticks: VerticalTick[] = [];
-  for (let cursor = axisStart; cursor.toMillis() <= axisEndMs; cursor = cursor.plus({ hours: 1 })) {
-    const ms = cursor.toMillis();
-    ticks.push({
-      ms,
-      topPercent: toPercent(ms - axisStartMs),
-      label: formatTimeShort(ms, context.zone),
+  const makeEntryItem = (
+    id: string,
+    entry: (typeof rawEntries)[number],
+    segStartMs: number,
+    segEndMs: number,
+  ): DayContextBlockItem => {
+    const isOpenSegment = entry.open && segEndMs === entry.endMs;
+    const seconds = (segEndMs - segStartMs) / 1000;
+    const overlap = entrySegmentOverlapsDraft(entry, segStartMs, segEndMs);
+    return {
+      id,
+      kind: 'entry',
+      startMs: segStartMs,
+      endMs: segEndMs,
+      start: formatTimeShort(segStartMs, context.zone),
+      end: isOpenSegment ? null : formatTimeShort(segEndMs, context.zone),
+      seconds,
+      durationLabel: formatReadableDuration(seconds),
+      title: entry.task,
+      ...(entry.project ? { project: entry.project } : {}),
+      ...(isOpenSegment ? { open: true } : {}),
+      ...(overlap ? { overlap: true } : {}),
+      heightPx: computeItemHeightPx(seconds),
+    };
+  };
+
+  const makeDraftItem = (
+    id: string,
+    draft: NonNullable<typeof rawDraft>,
+    segStartMs: number,
+    segEndMs: number,
+  ): DayContextBlockItem => {
+    const isOpenSegment = draft.open && segEndMs === draft.endMs;
+    const seconds = (segEndMs - segStartMs) / 1000;
+    const overlap = draftSegmentOverlapsEntry(segStartMs, segEndMs, isOpenSegment);
+    return {
+      id,
+      kind: 'draft',
+      startMs: segStartMs,
+      endMs: segEndMs,
+      start: formatTimeShort(segStartMs, context.zone),
+      end: isOpenSegment ? null : formatTimeShort(segEndMs, context.zone),
+      seconds,
+      durationLabel: formatReadableDuration(seconds),
+      title: 'Este parte',
+      ...(isOpenSegment ? { open: true } : {}),
+      ...(overlap ? { overlap: true } : {}),
+      heightPx: computeItemHeightPx(seconds),
+    };
+  };
+
+  const placedPointEntryIds = new Set<string>();
+  let placedPointDraft = false;
+
+  const attendanceBlocks: DayContextBlock[] = rawAttendance.map((att) => {
+    const items: DayContextBlockItem[] = [];
+
+    for (const entry of rawEntries) {
+      if (entry.startMs === entry.endMs) {
+        if (
+          !placedPointEntryIds.has(entry.id) &&
+          att.startMs <= entry.startMs &&
+          entry.startMs <= att.endMs
+        ) {
+          placedPointEntryIds.add(entry.id);
+          items.push(
+            makeEntryItem(`${att.id}:entry:${entry.id}`, entry, entry.startMs, entry.endMs),
+          );
+        }
+        continue;
+      }
+      const segStart = Math.max(att.startMs, entry.startMs);
+      const segEnd = Math.min(att.endMs, entry.endMs);
+      if (segEnd > segStart) {
+        items.push(makeEntryItem(`${att.id}:entry:${entry.id}`, entry, segStart, segEnd));
+      }
+    }
+
+    if (rawDraft) {
+      if (rawDraft.startMs === rawDraft.endMs) {
+        if (!placedPointDraft && att.startMs <= rawDraft.startMs && rawDraft.startMs <= att.endMs) {
+          placedPointDraft = true;
+          items.push(makeDraftItem(`${att.id}:draft`, rawDraft, rawDraft.startMs, rawDraft.endMs));
+        }
+      } else {
+        const segStart = Math.max(att.startMs, rawDraft.startMs);
+        const segEnd = Math.min(att.endMs, rawDraft.endMs);
+        if (segEnd > segStart) {
+          items.push(makeDraftItem(`${att.id}:draft`, rawDraft, segStart, segEnd));
+        }
+      }
+    }
+
+    const covered = mergeSpans(items.map((item) => ({ startMs: item.startMs, endMs: item.endMs })));
+    const gaps = subtractSpans([{ startMs: att.startMs, endMs: att.endMs }], covered);
+    for (const gap of gaps) {
+      const seconds = (gap.endMs - gap.startMs) / 1000;
+      if (seconds < MIN_GAP_SECONDS) continue;
+      items.push({
+        id: `${att.id}:gap:${gap.startMs}-${gap.endMs}`,
+        kind: 'gap',
+        startMs: gap.startMs,
+        endMs: gap.endMs,
+        start: formatTimeShort(gap.startMs, context.zone),
+        end: formatTimeShort(gap.endMs, context.zone),
+        seconds,
+        durationLabel: formatReadableDuration(seconds),
+        title: 'Sin imputar',
+        heightPx: computeItemHeightPx(seconds),
+      });
+    }
+
+    sortItems(items);
+
+    const seconds = (att.endMs - att.startMs) / 1000;
+    const durationLabel = formatReadableDuration(seconds);
+    const start = formatTimeShort(att.startMs, context.zone);
+    const end = att.open ? null : formatTimeShort(att.endMs, context.zone);
+
+    return {
+      id: att.id,
+      kind: 'attendance',
+      startMs: att.startMs,
+      endMs: att.endMs,
+      start,
+      end,
+      open: att.open,
+      seconds,
+      durationLabel,
+      items,
+      ariaLabel: `Fichaje ${start}–${end ?? 'en curso'}, ${durationLabel}`,
+    };
+  });
+
+  const pauses: DayContextPause[] = [];
+  for (let i = 0; i < attendanceBlocks.length - 1; i += 1) {
+    const current = attendanceBlocks[i]!;
+    const next = attendanceBlocks[i + 1]!;
+    const seconds = (next.startMs - current.endMs) / 1000;
+    if (seconds < MIN_GAP_SECONDS) continue;
+    pauses.push({
+      afterBlockIndex: i,
+      startMs: current.endMs,
+      endMs: next.startMs,
+      start: current.end ?? formatTimeShort(current.endMs, context.zone),
+      end: next.start,
+      seconds,
+      durationLabel: formatReadableDuration(seconds),
     });
   }
 
-  const attendance: VerticalAttendanceBlock[] = rawAttendance.map((item) => {
-    const seconds = (item.endMs - item.startMs) / 1000;
-    return {
-      ...item,
-      topPercent: toPercent(item.startMs - axisStartMs),
-      heightPercent: toPercent(item.endMs - item.startMs),
-      seconds,
-      title: `Fichado · ${item.startLabel}–${item.endLabel ?? 'en curso'} · ${formatReadableDuration(seconds)}`,
-    };
-  });
-
-  const lanes = assignLanes(rawEntries);
-  const entries: VerticalEntryBlock[] = rawEntries.map((item, index) => {
-    const seconds = (item.endMs - item.startMs) / 1000;
-    const durationLabel = formatReadableDuration(seconds);
-    const { lane, laneCount } = lanes[index]!;
-    return {
-      ...item,
-      topPercent: toPercent(item.startMs - axisStartMs),
-      heightPercent: toPercent(item.endMs - item.startMs),
-      seconds,
-      durationLabel,
-      lane,
-      laneCount,
-      title: `${item.task}${item.project ? ` (${item.project})` : ''} · ${item.startLabel}–${item.endLabel} · ${durationLabel}`,
-    };
-  });
-
   const mergedAttendance = mergeSpans(rawAttendance);
-  const mergedEntries = mergeSpans(rawEntries);
-  const gaps: VerticalGapBlock[] = subtractSpans(mergedAttendance, mergedEntries).map((gap) => {
-    const startLabel = formatTimeShort(gap.startMs, context.zone);
-    const endLabel = formatTimeShort(gap.endMs, context.zone);
-    const seconds = (gap.endMs - gap.startMs) / 1000;
-    const durationLabel = formatReadableDuration(seconds);
-    return {
-      ...gap,
-      topPercent: toPercent(gap.startMs - axisStartMs),
-      heightPercent: toPercent(gap.endMs - gap.startMs),
-      startLabel,
-      endLabel,
-      seconds,
-      durationLabel,
-      title: `Sin imputar · ${startLabel}–${endLabel} · ${durationLabel}`,
-    };
-  });
+  const outsideItems: DayContextBlockItem[] = [];
 
-  const draft: VerticalDraftBlock | null = rawDraft
-    ? (() => {
-        const displaySeconds =
-          rawDraft.seconds !== null
-            ? rawDraft.seconds
-            : rawDraft.endMs > rawDraft.startMs
-              ? (rawDraft.endMs - rawDraft.startMs) / 1000
-              : null;
-        const durationLabel =
-          displaySeconds !== null ? formatReadableDuration(displaySeconds) : null;
-        return {
-          ...rawDraft,
-          topPercent: toPercent(rawDraft.startMs - axisStartMs),
-          heightPercent: toPercent(rawDraft.endMs - rawDraft.startMs),
-          durationLabel,
-          hasOverlap: context.overlaps.length > 0,
-          title: `Este parte · ${rawDraft.startLabel}–${rawDraft.endLabel ?? 'en curso'}${durationLabel ? ` · ${durationLabel}` : ''}`,
-        };
-      })()
-    : null;
+  for (const entry of rawEntries) {
+    if (entry.startMs === entry.endMs) {
+      if (!placedPointEntryIds.has(entry.id)) {
+        outsideItems.push(
+          makeEntryItem(`outside:entry:${entry.id}`, entry, entry.startMs, entry.endMs),
+        );
+      }
+      continue;
+    }
+    const segments = subtractSpans(
+      [{ startMs: entry.startMs, endMs: entry.endMs }],
+      mergedAttendance,
+    );
+    for (const seg of segments) {
+      outsideItems.push(
+        makeEntryItem(`outside:entry:${entry.id}:${seg.startMs}`, entry, seg.startMs, seg.endMs),
+      );
+    }
+  }
 
-  const rawOverlapSegments: { startMs: number; endMs: number; task: string }[] = [];
   if (rawDraft) {
-    for (const entry of rawEntries) {
-      if (!entry.overlapsDraft) continue;
-      const startMs = Math.max(rawDraft.startMs, entry.startMs);
-      const endMs = rawDraft.open ? entry.endMs : Math.min(rawDraft.endMs, entry.endMs);
-      if (endMs > startMs) {
-        rawOverlapSegments.push({ startMs, endMs, task: entry.task });
+    if (rawDraft.startMs === rawDraft.endMs) {
+      if (!placedPointDraft) {
+        outsideItems.push(
+          makeDraftItem('outside:draft', rawDraft, rawDraft.startMs, rawDraft.endMs),
+        );
+      }
+    } else {
+      const segments = subtractSpans(
+        [{ startMs: rawDraft.startMs, endMs: rawDraft.endMs }],
+        mergedAttendance,
+      );
+      for (const seg of segments) {
+        outsideItems.push(
+          makeDraftItem(`outside:draft:${seg.startMs}`, rawDraft, seg.startMs, seg.endMs),
+        );
       }
     }
   }
-  const overlapSegments: VerticalOverlapBlock[] = mergeOverlapSpans(rawOverlapSegments).map(
-    (segment) => {
-      const startLabel = formatTimeShort(segment.startMs, context.zone);
-      const endLabel = formatTimeShort(segment.endMs, context.zone);
-      const seconds = (segment.endMs - segment.startMs) / 1000;
-      const durationLabel = formatReadableDuration(seconds);
-      return {
-        ...segment,
-        topPercent: toPercent(segment.startMs - axisStartMs),
-        heightPercent: toPercent(segment.endMs - segment.startMs),
-        startLabel,
-        endLabel,
-        seconds,
-        durationLabel,
-        title: `Solape con ${segment.tasks.join(', ')} · ${startLabel}–${endLabel} · ${durationLabel}`,
-      };
-    },
-  );
 
-  const attendanceSeconds = context.attendanceSeconds;
-  const entrySeconds = context.entrySeconds;
-  const unimputedSeconds = gaps.reduce((sum, gap) => sum + gap.seconds, 0);
+  const blocks: DayContextBlock[] = [...attendanceBlocks];
+  if (outsideItems.length) {
+    sortItems(outsideItems);
+    const startMs = Math.min(...outsideItems.map((item) => item.startMs));
+    const endMs = Math.max(...outsideItems.map((item) => item.endMs));
+    const open = outsideItems.some((item) => Boolean(item.open) && item.endMs === endMs);
+    const seconds = outsideItems.reduce((sum, item) => sum + item.seconds, 0);
+    const durationLabel = formatReadableDuration(seconds);
+    const start = formatTimeShort(startMs, context.zone);
+    const end = open ? null : formatTimeShort(endMs, context.zone);
 
-  const summaryParts: string[] = [];
-  if (attendance.length) {
-    const ranges = attendance
-      .map((item) => `${item.startLabel}–${item.endLabel ?? 'en curso'}`)
-      .join(', ');
-    summaryParts.push(`Fichado ${ranges} (${formatReadableDuration(attendanceSeconds)})`);
-  } else {
-    summaryParts.push('Sin fichajes');
+    blocks.push({
+      id: 'outside',
+      kind: 'outside',
+      startMs,
+      endMs,
+      start,
+      end,
+      open,
+      seconds,
+      durationLabel,
+      items: outsideItems,
+      ariaLabel:
+        open && seconds < MIN_GAP_SECONDS
+          ? 'Fuera de fichaje'
+          : `Fuera de fichaje, ${durationLabel}`,
+    });
   }
-  summaryParts.push(
-    entries.length
-      ? `${entries.length} ${entries.length === 1 ? 'parte' : 'partes'} (${formatReadableDuration(entrySeconds)})`
-      : 'sin partes',
+
+  const mergedEntries = mergeSpans(rawEntries);
+  const unimputedSeconds = subtractSpans(mergedAttendance, mergedEntries).reduce(
+    (sum, gap) => sum + (gap.endMs - gap.startMs) / 1000,
+    0,
   );
-  if (attendance.length) {
-    summaryParts.push(
-      unimputedSeconds >= 60
-        ? `sin imputar ${formatReadableDuration(unimputedSeconds)}`
-        : 'todo imputado',
-    );
-  }
-  if (draft) {
-    summaryParts.push(
-      `este parte ${draft.startLabel}–${draft.endLabel ?? 'en curso'}${draft.durationLabel ? ` (${draft.durationLabel})` : ''}`,
-    );
-  }
-  if (context.overlaps.length) {
-    summaryParts.push(
-      `se solapa con ${context.overlaps.length === 1 ? 'otro parte' : `${context.overlaps.length} partes`}`,
-    );
-  }
 
   return {
-    axisStartMs,
-    axisEndMs,
-    totalHours,
-    heightPx,
-    ticks,
-    attendance,
-    gaps,
-    entries,
-    draft,
-    overlapSegments,
-    attendanceSeconds,
-    entrySeconds,
+    blocks,
+    pauses,
+    attendanceSeconds: context.attendanceSeconds,
+    entrySeconds: context.entrySeconds,
     unimputedSeconds,
-    ariaLabel: summaryParts.join('; '),
   };
 }

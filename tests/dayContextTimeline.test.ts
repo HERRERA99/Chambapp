@@ -3,16 +3,17 @@ import test from 'node:test';
 import { dayContext } from '../src/domain/dayContext.ts';
 import type { Attendance, TimeEntry } from '../src/domain/models.ts';
 import {
-  DAY_TIMELINE_MIN_HOURS,
-  DAY_TIMELINE_PX_PER_HOUR,
+  DAY_BLOCK_ITEM_MAX_HEIGHT_PX,
+  DAY_BLOCK_ITEM_MIN_HEIGHT_PX,
   buildDayContextTimeline,
+  computeItemHeightPx,
 } from '../src/features/day-context/dayContextTimeline.ts';
 
 const zone = 'Europe/Madrid';
 const base = {
   tasks: [
-    { id: 't1', titulo: 'Desarrollo', proyecto_id: 'p1' },
-    { id: 't2', titulo: 'Reunión', proyecto_id: 'p1' },
+    { id: 't1', titulo: 'Migrar ERP', proyecto_id: 'p1' },
+    { id: 't2', titulo: 'Revisar permisos', proyecto_id: 'p1' },
   ],
   projects: [{ id: 'p1', nombre: 'Cliente A' }],
 };
@@ -42,56 +43,145 @@ test('returns null on an empty day with no attendance, entries, or draft', () =>
   assert.equal(buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00'), null);
 });
 
-test('enforces a minimum 4-hour vertical range and stays within the day near midnight', () => {
-  const shortContext = dayContext(
+test('builds two attendance blocks with a pause between them and exact HH:MM items', () => {
+  const context = dayContext(
     {
       ...base,
-      fichajes: [attendance('f1', '2026-11-16T09:15:00+01:00', '2026-11-16T10:30:00+01:00')],
-      entries: [],
+      fichajes: [
+        attendance('f1', '2026-11-16T08:17:00+01:00', '2026-11-16T14:20:00+01:00'),
+        attendance('f2', '2026-11-16T16:01:00+01:00', '2026-11-16T18:17:00+01:00'),
+      ],
+      entries: [
+        entry('e1', '2026-11-16T08:20:00+01:00', '2026-11-16T10:30:00+01:00'),
+        entry('e2', '2026-11-16T11:00:00+01:00', '2026-11-16T14:20:00+01:00', { tarea_id: 't2' }),
+      ],
+    },
+    '2026-11-16',
+    zone,
+    { now: '2026-11-16T20:00:00+01:00' },
+  );
+  const timeline = buildDayContextTimeline(context, '2026-11-16T20:00:00+01:00');
+  assert.ok(timeline);
+  assert.equal(timeline.blocks.length, 2);
+
+  const [first, second] = timeline.blocks;
+  assert.equal(first!.kind, 'attendance');
+  assert.equal(first!.start, '08:17');
+  assert.equal(first!.end, '14:20');
+  assert.equal(first!.open, false);
+  assert.equal(first!.durationLabel, '6 h 03 min');
+  assert.equal(first!.ariaLabel, 'Fichaje 08:17–14:20, 6 h 03 min');
+  assert.deepEqual(
+    first!.items.map((item) => [item.kind, item.title, item.start, item.end, item.durationLabel]),
+    [
+      ['gap', 'Sin imputar', '08:17', '08:20', '3 min'],
+      ['entry', 'Migrar ERP', '08:20', '10:30', '2 h 10 min'],
+      ['gap', 'Sin imputar', '10:30', '11:00', '30 min'],
+      ['entry', 'Revisar permisos', '11:00', '14:20', '3 h 20 min'],
+    ],
+  );
+
+  assert.equal(second!.kind, 'attendance');
+  assert.equal(second!.start, '16:01');
+  assert.equal(second!.end, '18:17');
+  assert.equal(second!.durationLabel, '2 h 16 min');
+  assert.deepEqual(
+    second!.items.map((item) => [item.kind, item.title, item.start, item.end, item.durationLabel]),
+    [['gap', 'Sin imputar', '16:01', '18:17', '2 h 16 min']],
+  );
+
+  assert.equal(timeline.pauses.length, 1);
+  assert.equal(timeline.pauses[0]!.afterBlockIndex, 0);
+  assert.equal(timeline.pauses[0]!.start, '14:20');
+  assert.equal(timeline.pauses[0]!.end, '16:01');
+  assert.equal(timeline.pauses[0]!.durationLabel, '1 h 41 min');
+  assert.equal(timeline.unimputedSeconds, (3 + 30 + 136) * 60);
+});
+
+test('clips an entry crossing the end of attendance and places the remainder outside', () => {
+  const context = dayContext(
+    {
+      ...base,
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T14:00:00+01:00')],
+      entries: [entry('e1', '2026-11-16T13:00:00+01:00', '2026-11-16T15:00:00+01:00')],
     },
     '2026-11-16',
     zone,
     { now: '2026-11-16T18:00:00+01:00' },
   );
-  const shortTimeline = buildDayContextTimeline(shortContext, '2026-11-16T18:00:00+01:00');
-  assert.ok(shortTimeline);
-  assert.equal(shortTimeline.totalHours, DAY_TIMELINE_MIN_HOURS);
-  assert.equal(shortTimeline.heightPx, DAY_TIMELINE_MIN_HOURS * DAY_TIMELINE_PX_PER_HOUR);
-  assert.deepEqual(
-    shortTimeline.ticks.map((tick) => tick.label),
-    ['09:00', '10:00', '11:00', '12:00', '13:00'],
-  );
-  assert.equal(shortTimeline.attendance[0]!.topPercent, (15 / 240) * 100);
-  assert.equal(shortTimeline.attendance[0]!.heightPercent, (75 / 240) * 100);
+  const timeline = buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00');
+  assert.ok(timeline);
+  assert.equal(timeline.blocks.length, 2);
+  assert.deepEqual(timeline.pauses, []);
 
-  const lateContext = dayContext(
-    {
-      ...base,
-      fichajes: [attendance('f2', '2026-11-16T22:30:00+01:00', '2026-11-16T23:15:00+01:00')],
-      entries: [],
-    },
-    '2026-11-16',
-    zone,
-    { now: '2026-11-16T23:30:00+01:00' },
-  );
-  const lateTimeline = buildDayContextTimeline(lateContext, '2026-11-16T23:30:00+01:00');
-  assert.ok(lateTimeline);
-  assert.equal(lateTimeline.totalHours, DAY_TIMELINE_MIN_HOURS);
+  const [attBlock, outsideBlock] = timeline.blocks;
+  assert.equal(attBlock!.kind, 'attendance');
   assert.deepEqual(
-    lateTimeline.ticks.map((tick) => tick.label),
-    ['20:00', '21:00', '22:00', '23:00', '00:00'],
+    attBlock!.items.map((item) => [
+      item.kind,
+      item.title,
+      item.start,
+      item.end,
+      item.durationLabel,
+    ]),
+    [
+      ['gap', 'Sin imputar', '08:00', '13:00', '5 h'],
+      ['entry', 'Migrar ERP', '13:00', '14:00', '1 h'],
+    ],
   );
-  assert.equal(lateTimeline.attendance[0]!.topPercent, (150 / 240) * 100);
+
+  assert.equal(outsideBlock!.kind, 'outside');
+  assert.equal(outsideBlock!.ariaLabel, 'Fuera de fichaje, 1 h');
+  assert.deepEqual(
+    outsideBlock!.items.map((item) => [
+      item.kind,
+      item.title,
+      item.start,
+      item.end,
+      item.durationLabel,
+    ]),
+    [['entry', 'Migrar ERP', '14:00', '15:00', '1 h']],
+  );
 });
 
-test('computes hourly ticks, proportional blocks, gaps, and summary for a normal day', () => {
+test('places entries outside any attendance into a dedicated outside block without gaps', () => {
   const context = dayContext(
     {
       ...base,
-      fichajes: [attendance('f1', '2026-11-16T10:14:00+01:00', '2026-11-16T16:23:00+01:00')],
+      fichajes: [attendance('f1', '2026-11-16T09:00:00+01:00', '2026-11-16T13:00:00+01:00')],
       entries: [
-        entry('e1', '2026-11-16T10:30:00+01:00', '2026-11-16T12:30:00+01:00'),
-        entry('e2', '2026-11-16T13:00:00+01:00', '2026-11-16T16:15:00+01:00', { tarea_id: 't2' }),
+        entry('e1', '2026-11-16T15:00:00+01:00', '2026-11-16T16:30:00+01:00'),
+        entry('e2', '2026-11-16T18:00:00+01:00', '2026-11-16T19:00:00+01:00', { tarea_id: 't2' }),
+      ],
+    },
+    '2026-11-16',
+    zone,
+    { now: '2026-11-16T20:00:00+01:00' },
+  );
+  const timeline = buildDayContextTimeline(context, '2026-11-16T20:00:00+01:00');
+  assert.ok(timeline);
+  assert.equal(timeline.blocks.length, 2);
+
+  const outside = timeline.blocks[1]!;
+  assert.equal(outside.kind, 'outside');
+  assert.equal(outside.durationLabel, '2 h 30 min');
+  assert.deepEqual(
+    outside.items.map((item) => [item.kind, item.title, item.start, item.end, item.durationLabel]),
+    [
+      ['entry', 'Migrar ERP', '15:00', '16:30', '1 h 30 min'],
+      ['entry', 'Revisar permisos', '18:00', '19:00', '1 h'],
+    ],
+  );
+});
+
+test('shows unimputed gaps at start, middle, and end of an attendance block', () => {
+  const context = dayContext(
+    {
+      ...base,
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T12:00:00+01:00')],
+      entries: [
+        entry('e1', '2026-11-16T08:30:00+01:00', '2026-11-16T09:30:00+01:00'),
+        entry('e2', '2026-11-16T10:00:00+01:00', '2026-11-16T11:30:00+01:00', { tarea_id: 't2' }),
       ],
     },
     '2026-11-16',
@@ -100,78 +190,39 @@ test('computes hourly ticks, proportional blocks, gaps, and summary for a normal
   );
   const timeline = buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00');
   assert.ok(timeline);
-  assert.equal(timeline.totalHours, 7);
   assert.deepEqual(
-    timeline.ticks.map((tick) => tick.label),
-    ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
-  );
-  assert.equal(timeline.entries.length, 2);
-  assert.equal(timeline.entries[0]!.durationLabel, '2 h');
-  assert.equal(timeline.entries[0]!.lane, 0);
-  assert.equal(timeline.entries[0]!.laneCount, 1);
-  assert.deepEqual(
-    timeline.gaps.map((gap) => [gap.startLabel, gap.endLabel, gap.durationLabel]),
+    timeline.blocks[0]!.items.map((item) => [item.kind, item.start, item.end, item.durationLabel]),
     [
-      ['10:14', '10:30', '16 min'],
-      ['12:30', '13:00', '30 min'],
-      ['16:15', '16:23', '8 min'],
+      ['gap', '08:00', '08:30', '30 min'],
+      ['entry', '08:30', '09:30', '1 h'],
+      ['gap', '09:30', '10:00', '30 min'],
+      ['entry', '10:00', '11:30', '1 h 30 min'],
+      ['gap', '11:30', '12:00', '30 min'],
     ],
   );
-  assert.equal(timeline.unimputedSeconds, 54 * 60);
-  assert.equal(
-    timeline.ariaLabel,
-    'Fichado 10:14–16:23 (6 h 09 min); 2 partes (5 h 15 min); sin imputar 54 min',
-  );
+  assert.equal(timeline.unimputedSeconds, 90 * 60);
 });
 
-test('edited draft expands the vertical range earlier and later than attendance', () => {
-  const earlierContext = dayContext(
+test('omits unimputed gaps shorter than 1 minute', () => {
+  const context = dayContext(
     {
       ...base,
-      fichajes: [attendance('f1', '2026-11-16T10:00:00+01:00', '2026-11-16T14:00:00+01:00')],
-      entries: [],
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T10:00:00+01:00')],
+      entries: [
+        entry('e1', '2026-11-16T08:00:45+01:00', '2026-11-16T09:00:00+01:00'),
+        entry('e2', '2026-11-16T09:00:30+01:00', '2026-11-16T09:59:20+01:00', { tarea_id: 't2' }),
+      ],
     },
     '2026-11-16',
     zone,
-    {
-      now: '2026-11-16T18:00:00+01:00',
-      draft: {
-        start: '2026-11-16T08:15:00+01:00',
-        end: '2026-11-16T09:30:00+01:00',
-      },
-    },
+    { now: '2026-11-16T18:00:00+01:00' },
   );
-  const earlier = buildDayContextTimeline(earlierContext, '2026-11-16T18:00:00+01:00');
-  assert.ok(earlier);
+  const timeline = buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00');
+  assert.ok(timeline);
   assert.deepEqual(
-    earlier.ticks.map((tick) => tick.label),
-    ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+    timeline.blocks[0]!.items.map((item) => item.kind),
+    ['entry', 'entry'],
   );
-  assert.ok(earlier.draft);
-  assert.equal(earlier.draft.durationLabel, '1 h 15 min');
-  assert.equal(earlier.draft.hasOverlap, false);
-  assert.deepEqual(earlier.overlapSegments, []);
-
-  const laterContext = dayContext(
-    {
-      ...base,
-      fichajes: [attendance('f1', '2026-11-16T10:00:00+01:00', '2026-11-16T14:00:00+01:00')],
-      entries: [],
-    },
-    '2026-11-16',
-    zone,
-    {
-      now: '2026-11-16T18:00:00+01:00',
-      draft: {
-        start: '2026-11-16T15:30:00+01:00',
-        end: '2026-11-16T17:15:00+01:00',
-      },
-    },
-  );
-  const later = buildDayContextTimeline(laterContext, '2026-11-16T18:00:00+01:00');
-  assert.ok(later);
-  assert.equal(later.ticks[0]!.label, '10:00');
-  assert.equal(later.ticks.at(-1)!.label, '18:00');
 });
 
 test('extends open attendance until now and marks uncovered tail as unimputed', () => {
@@ -188,26 +239,95 @@ test('extends open attendance until now and marks uncovered tail as unimputed', 
   );
   const timeline = buildDayContextTimeline(context, now);
   assert.ok(timeline);
-  assert.equal(timeline.attendance[0]!.open, true);
-  assert.equal(timeline.attendance[0]!.endLabel, null);
-  assert.equal(timeline.attendance[0]!.seconds, 2.75 * 3600);
-  assert.equal(timeline.totalHours, DAY_TIMELINE_MIN_HOURS);
+  const block = timeline.blocks[0]!;
+  assert.equal(block.kind, 'attendance');
+  assert.equal(block.open, true);
+  assert.equal(block.start, '09:30');
+  assert.equal(block.end, null);
+  assert.equal(block.durationLabel, '2 h 45 min');
+  assert.equal(block.ariaLabel, 'Fichaje 09:30–en curso, 2 h 45 min');
   assert.deepEqual(
-    timeline.ticks.map((tick) => tick.label),
-    ['09:00', '10:00', '11:00', '12:00', '13:00'],
+    block.items.map((item) => [item.kind, item.start, item.end, item.durationLabel]),
+    [
+      ['entry', '09:30', '11:00', '1 h 30 min'],
+      ['gap', '11:00', '12:15', '1 h 15 min'],
+    ],
   );
-  assert.deepEqual(
-    timeline.gaps.map((gap) => [gap.startLabel, gap.endLabel]),
-    [['11:00', '12:15']],
-  );
-  assert.equal(timeline.unimputedSeconds, 75 * 60);
 });
 
-test('computes red overlap segments for closed and open drafts without false positives on touching entries', () => {
+test('places the edited draft inside attendance in order or outside when unclocked', () => {
+  const insideContext = dayContext(
+    {
+      ...base,
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T14:00:00+01:00')],
+      entries: [entry('e1', '2026-11-16T08:00:00+01:00', '2026-11-16T10:00:00+01:00')],
+    },
+    '2026-11-16',
+    zone,
+    {
+      now: '2026-11-16T18:00:00+01:00',
+      draft: {
+        start: '2026-11-16T10:00:00+01:00',
+        end: '2026-11-16T12:00:00+01:00',
+      },
+    },
+  );
+  const inside = buildDayContextTimeline(insideContext, '2026-11-16T18:00:00+01:00');
+  assert.ok(inside);
+  assert.equal(inside.blocks.length, 1);
+  assert.deepEqual(
+    inside.blocks[0]!.items.map((item) => [
+      item.kind,
+      item.title,
+      item.start,
+      item.end,
+      item.durationLabel,
+      Boolean(item.overlap),
+    ]),
+    [
+      ['entry', 'Migrar ERP', '08:00', '10:00', '2 h', false],
+      ['draft', 'Este parte', '10:00', '12:00', '2 h', false],
+      ['gap', 'Sin imputar', '12:00', '14:00', '2 h', false],
+    ],
+  );
+
+  const outsideContext = dayContext(
+    {
+      ...base,
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T14:00:00+01:00')],
+      entries: [],
+    },
+    '2026-11-16',
+    zone,
+    {
+      now: '2026-11-16T18:00:00+01:00',
+      draft: {
+        start: '2026-11-16T15:30:00+01:00',
+        end: '2026-11-16T17:00:00+01:00',
+      },
+    },
+  );
+  const outside = buildDayContextTimeline(outsideContext, '2026-11-16T18:00:00+01:00');
+  assert.ok(outside);
+  assert.equal(outside.blocks.length, 2);
+  assert.equal(outside.blocks[1]!.kind, 'outside');
+  assert.deepEqual(
+    outside.blocks[1]!.items.map((item) => [
+      item.kind,
+      item.title,
+      item.start,
+      item.end,
+      item.durationLabel,
+    ]),
+    [['draft', 'Este parte', '15:30', '17:00', '1 h 30 min']],
+  );
+});
+
+test('marks overlapping draft and entries without false positives on touching boundaries', () => {
   const context = dayContext(
     {
       ...base,
-      fichajes: [],
+      fichajes: [attendance('f1', '2026-11-16T08:00:00+01:00', '2026-11-16T14:00:00+01:00')],
       entries: [
         entry('e1', '2026-11-16T09:00:00+01:00', '2026-11-16T10:30:00+01:00'),
         entry('e2', '2026-11-16T11:30:00+01:00', '2026-11-16T12:30:00+01:00', { tarea_id: 't2' }),
@@ -225,16 +345,21 @@ test('computes red overlap segments for closed and open drafts without false pos
   );
   const timeline = buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00');
   assert.ok(timeline);
-  assert.ok(timeline.draft);
-  assert.equal(timeline.draft.hasOverlap, true);
-  assert.equal(timeline.entries[0]!.overlapsDraft, true);
-  assert.equal(timeline.entries[1]!.overlapsDraft, false, 'touching at 11:30 is not an overlap');
-  assert.equal(timeline.overlapSegments.length, 1);
-  assert.equal(timeline.overlapSegments[0]!.startLabel, '10:00');
-  assert.equal(timeline.overlapSegments[0]!.endLabel, '10:30');
-  assert.equal(timeline.overlapSegments[0]!.durationLabel, '30 min');
-  assert.deepEqual(timeline.overlapSegments[0]!.tasks, ['Desarrollo']);
-  assert.match(timeline.ariaLabel, /se solapa con otro parte/);
+  assert.deepEqual(
+    timeline.blocks[0]!.items.map((item) => [
+      item.kind,
+      item.start,
+      item.end,
+      Boolean(item.overlap),
+    ]),
+    [
+      ['gap', '08:00', '09:00', false],
+      ['entry', '09:00', '10:30', true],
+      ['draft', '10:00', '11:30', true],
+      ['entry', '11:30', '12:30', false],
+      ['gap', '12:30', '14:00', false],
+    ],
+  );
 
   const openDraftContext = dayContext(
     {
@@ -250,41 +375,24 @@ test('computes red overlap segments for closed and open drafts without false pos
     },
   );
   const openTimeline = buildDayContextTimeline(openDraftContext, '2026-11-16T10:00:00+01:00');
-  assert.ok(openTimeline?.draft);
-  assert.equal(openTimeline.draft.open, true);
-  assert.equal(openTimeline.overlapSegments.length, 1);
-  assert.equal(openTimeline.overlapSegments[0]!.startLabel, '11:00');
-  assert.equal(openTimeline.overlapSegments[0]!.endLabel, '12:00');
-});
-
-test('assigns side-by-side lanes when two existing entries overlap each other', () => {
-  const context = dayContext(
-    {
-      ...base,
-      fichajes: [],
-      entries: [
-        entry('e1', '2026-11-16T09:00:00+01:00', '2026-11-16T11:00:00+01:00'),
-        entry('e2', '2026-11-16T10:00:00+01:00', '2026-11-16T12:00:00+01:00', { tarea_id: 't2' }),
-        entry('e3', '2026-11-16T13:00:00+01:00', '2026-11-16T14:00:00+01:00'),
-      ],
-    },
-    '2026-11-16',
-    zone,
-    { now: '2026-11-16T18:00:00+01:00' },
-  );
-  const timeline = buildDayContextTimeline(context, '2026-11-16T18:00:00+01:00');
-  assert.ok(timeline);
+  assert.ok(openTimeline);
+  assert.equal(openTimeline.blocks[0]!.kind, 'outside');
   assert.deepEqual(
-    timeline.entries.map((item) => [item.id, item.lane, item.laneCount]),
+    openTimeline.blocks[0]!.items.map((item) => [
+      item.kind,
+      item.start,
+      item.end,
+      Boolean(item.open),
+      Boolean(item.overlap),
+    ]),
     [
-      ['e1', 0, 2],
-      ['e2', 1, 2],
-      ['e3', 0, 1],
+      ['draft', '10:00', null, true, true],
+      ['entry', '11:00', '12:00', false, true],
     ],
   );
 });
 
-test('clamps intervals crossing midnight to the shown day', () => {
+test('clamps intervals crossing midnight to HH:MM on the shown day and clamps row heights', () => {
   const context = dayContext(
     {
       ...base,
@@ -297,12 +405,12 @@ test('clamps intervals crossing midnight to the shown day', () => {
   );
   const timeline = buildDayContextTimeline(context, '2026-11-16T12:00:00+01:00');
   assert.ok(timeline);
-  assert.equal(timeline.totalHours, DAY_TIMELINE_MIN_HOURS);
-  assert.deepEqual(
-    timeline.ticks.map((tick) => tick.label),
-    ['00:00', '01:00', '02:00', '03:00', '04:00'],
-  );
-  assert.equal(timeline.entries[0]!.topPercent, 0);
-  assert.equal(timeline.entries[0]!.heightPercent, 25);
-  assert.equal(timeline.entries[0]!.durationLabel, '1 h');
+  const item = timeline.blocks[0]!.items[0]!;
+  assert.equal(item.start, '00:00');
+  assert.equal(item.end, '01:00');
+  assert.equal(item.durationLabel, '1 h');
+
+  assert.equal(computeItemHeightPx(5 * 60), DAY_BLOCK_ITEM_MIN_HEIGHT_PX);
+  assert.ok(computeItemHeightPx(2 * 3600) > computeItemHeightPx(1 * 3600));
+  assert.equal(computeItemHeightPx(10 * 3600), DAY_BLOCK_ITEM_MAX_HEIGHT_PX);
 });
