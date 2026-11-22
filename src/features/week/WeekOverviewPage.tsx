@@ -25,7 +25,7 @@ import '../timesheet/timesheet.css';
 import './week.css';
 import './weekOverview.css';
 
-const percentFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 2 });
+const percentFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 1 });
 
 function percentLabel(value: number | null) {
   return value === null ? '—' : `${percentFormat.format(value)}%`;
