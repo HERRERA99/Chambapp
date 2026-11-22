@@ -1,5 +1,6 @@
 import { answerLocal } from '../local/extensionBridge';
 import { readableError } from '../../lib/supabase/errors';
+import { dataGeneration } from '../../lib/localGeneration';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +9,7 @@ import { APP_SOURCE, isExtensionMessage, lockedIds } from './protocol';
 import type {
   AppMessage,
   ExtensionHello,
+  ExtensionMessage,
   OdooRequest,
   QueueAction,
   QueueSummaryItem,
@@ -40,9 +42,22 @@ export function ExtensionProvider({ children }: { children: ReactNode }) {
   /** Pings without an answer: after an uninstall the bridge stops replying. */
   const unanswered = useRef(0);
   const [queue, setQueue] = useState<QueueSummaryItem[]>([]);
+  const [heraRequests, setHeraRequests] = useState<Extract<
+    ExtensionMessage,
+    { type: 'hera-requests' }
+  > | null>(null);
   const pending = useRef<Pending>(new Map());
 
   useEffect(() => {
+    function askHeraRequests() {
+      if (user)
+        post({
+          source: APP_SOURCE,
+          type: 'hera-requests-get',
+          userId: user.id,
+          generation: dataGeneration(),
+        });
+    }
     function onMessage(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
       const message = event.data as unknown;
@@ -54,8 +69,23 @@ export function ExtensionProvider({ children }: { children: ReactNode }) {
           userId: message.userId,
           odooOrigin: message.odooOrigin,
         });
+        if (user && message.userId === user.id) askHeraRequests();
+        else setHeraRequests(null);
       } else if (message.type === 'queue') setQueue(message.items);
-      else if (message.type === 'local-request') {
+      else if (message.type === 'hera-requests-changed') askHeraRequests();
+      else if (message.type === 'hera-requests') {
+        if (!user || message.userId !== user.id || message.generation !== dataGeneration()) return;
+        setHeraRequests((previous) =>
+          previous &&
+          previous.userId === message.userId &&
+          previous.generation === message.generation &&
+          message.readAt !== null &&
+          previous.readAt !== null &&
+          previous.readAt >= message.readAt
+            ? previous
+            : message,
+        );
+      } else if (message.type === 'local-request') {
         // Only for the signed-in account; another account's request gets no answer.
         if (!user || message.userId !== user.id) return;
         const reply = (ok: boolean, error: string, data?: unknown) =>
@@ -131,6 +161,12 @@ export function ExtensionProvider({ children }: { children: ReactNode }) {
       refresh: () => post({ source: APP_SOURCE, type: 'ping' }),
       openTutorial: ({ download = false } = {}) => setTutorial({ step: 0, download }),
       queue: mine,
+      heraRequests:
+        connected &&
+        heraRequests?.userId === user.id &&
+        heraRequests.generation === dataGeneration()
+          ? heraRequests
+          : null,
       send: (odooRequest: OdooRequest) =>
         request(odooRequest.requestId, {
           source: APP_SOURCE,
@@ -144,7 +180,7 @@ export function ExtensionProvider({ children }: { children: ReactNode }) {
           ? SENDING_TO_ODOO
           : null,
     };
-  }, [hello, queue, request, user]);
+  }, [hello, heraRequests, queue, request, user]);
 
   return (
     <ExtensionContext.Provider value={value}>

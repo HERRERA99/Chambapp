@@ -47,7 +47,10 @@ const manifest = JSON.parse(readFileSync(join(extension, 'manifest.json'), 'utf8
 manifest.host_permissions.push('http://127.0.0.1/*');
 writeFileSync(join(extension, 'manifest.json'), JSON.stringify(manifest, null, 2));
 const timesheetScript = readFileSync(join(extension, 'content/odoo-timesheet.js'), 'utf8');
-const exampleScript = readFileSync(join(root, 'tools/ext-smoke/reference-extension/manifest.json'), 'utf8'); // misnamed content script
+const exampleScript = readFileSync(
+  join(root, 'tools/ext-smoke/reference-extension/manifest.json'),
+  'utf8',
+); // misnamed content script
 
 const context = await chromium.launchPersistentContext(
   mkdtempSync(join(tmpdir(), 'chambapp-profile-')),
@@ -146,6 +149,16 @@ check(
   slow.done.type === 'form-saved' && slow.after === slow.before + 1,
   `${slow.messages.join(' → ')}`,
 );
+for (const mode of ['ignored', 'ignored-line']) {
+  const ignored = await attempt(mode);
+  const button = mode === 'ignored' ? 'form-save' : 'line-save';
+  const clicks = ignored.log.filter((item) => item === button).length;
+  check(
+    `${mode}: reintenta el guardado ignorado y crea una sola línea`,
+    ignored.done.type === 'form-saved' && ignored.after === ignored.before + 1 && clicks === 2,
+    `${ignored.messages.join(' → ')} · clics ${clicks} · antes ${ignored.before}, después ${ignored.after}`,
+  );
+}
 const rejected = await attempt('rejected');
 check(
   'rechazado (notificación de error con «guardado»): falla, no da éxito',

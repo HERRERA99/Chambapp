@@ -6,6 +6,7 @@ import { AuthContext } from '../../src/features/auth/AuthContext';
 import { WorkspaceContext } from '../../src/features/workspace/useWorkspace';
 import { TrackerContext } from '../../src/features/tracker/useTracker';
 import { AttendanceContext } from '../../src/features/attendance/useAttendance';
+import { ExtensionContext, useExtension } from '../../src/features/extension/useExtension';
 import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
@@ -30,6 +31,45 @@ const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
 const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
 const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
 const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
+const AttendancePage = lazy(() => import('../../src/features/attendance/AttendancePage'));
+/**
+ * `?ext=hera`: a connected extension with Hera change requests for the fixture
+ * attendance day (2026-10-02): one granted and one pending.
+ */
+const extensionStatus = (() => {
+  if (new URLSearchParams(window.location.search).get('ext') !== 'hera') return null;
+  const items = [
+    {
+      date: '2026-10-02',
+      original: { kind: 'salida' as const, time: '15:57' },
+      operation: 'Actualizar',
+      change: { kind: 'salida' as const, time: '14:20' },
+      reason: 'Olvido de fichaje',
+      status: 'concedida' as const,
+      statusText: 'Solicitud Concedida',
+    },
+    {
+      date: '2026-10-02',
+      original: null,
+      operation: 'Añadir',
+      change: { kind: 'salida' as const, time: '17:30' },
+      reason: 'Se me olvidó fichar la salida',
+      status: 'pendiente' as const,
+      statusText: 'Solicitud Pendiente',
+    },
+  ];
+  return { connected: true, available: true, heraRequests: { readAt: Date.now(), items } };
+})();
+
+function AttendanceWithExtension() {
+  const base = useExtension();
+  if (!extensionStatus) return <AttendancePage />;
+  return (
+    <ExtensionContext.Provider value={{ ...base, ...extensionStatus }}>
+      <AttendancePage />
+    </ExtensionContext.Provider>
+  );
+}
 const noop = async () => {};
 /**
  * `?local=abierto|bloqueado|sin-datos|error`: data kept in this browser (Plan 11). With
@@ -204,6 +244,7 @@ function Smoke() {
                         <Route path="/ajustes" element={<SettingsPage />} />
                         <Route path="/tareas" element={<TasksPage />} />
                         <Route path="/parte-semanal" element={<TimesheetPage />} />
+                        <Route path="/fichajes" element={<AttendanceWithExtension />} />
                       </Route>
                     </Routes>
                   </Suspense>

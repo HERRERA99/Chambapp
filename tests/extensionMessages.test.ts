@@ -141,6 +141,53 @@ test('app and extension messages are validated by source and type', () => {
   );
 });
 
+test('Hera requests are scoped by account and their snapshots are validated', () => {
+  const get = {
+    source: 'chambapp-app',
+    type: 'hera-requests-get',
+    userId: id(2),
+    generation: null,
+  };
+  assert.equal(isAppMessage(get), true);
+  assert.equal(isAppMessage({ ...get, generation: id(8) }), true);
+  assert.equal(isAppMessage({ ...get, userId: undefined }), false);
+  assert.equal(isAppMessage({ ...get, generation: 7 }), false);
+  const item = {
+    date: '2026-03-23',
+    original: null,
+    operation: 'Añadir',
+    change: { kind: 'salida', time: '16:03' },
+    reason: 'Olvido de fichaje',
+    status: 'desconocido',
+    statusText: 'En revisión',
+  };
+  const message = {
+    source: 'chambapp-extension',
+    type: 'hera-requests',
+    userId: id(2),
+    generation: null,
+    readAt: Date.now(),
+    items: [item],
+  };
+  assert.equal(isExtensionMessage(message), true);
+  assert.equal(isExtensionMessage({ ...message, readAt: null, items: [] }), true);
+  assert.equal(isExtensionMessage({ ...message, type: 'hera-requests-changed' }), true);
+  for (const bad of [
+    { ...message, source: 'otro' },
+    { ...message, userId: 'otro' },
+    { ...message, generation: undefined },
+    { ...message, readAt: Infinity },
+    { ...message, readAt: null },
+    { ...message, items: [{ ...item, change: { kind: 'salida', time: '16:99' } }] },
+    { ...message, items: [{ ...item, change: { kind: 'S', time: '16:03' } }] },
+    { ...message, items: [{ ...item, date: '2026-02-30' }] },
+    { ...message, items: [{ ...item, status: 'otro' }] },
+    { ...message, items: [{ ...item, reason: 'r'.repeat(1001) }] },
+  ]) {
+    assert.equal(isExtensionMessage(bad), false);
+  }
+});
+
 test('lockedIds covers entries and tasks of active requests only', () => {
   const item = (n: number, status: string) => ({
     requestId: id(n),
