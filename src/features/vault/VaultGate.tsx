@@ -7,6 +7,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { readableError } from '../../lib/supabase/errors';
 import { MIN_MASTER_PASSWORD_LENGTH } from '../../lib/crypto/vault';
 import { paths } from '../../app/paths';
+import { isLocalEdition } from '../../lib/edition';
 import { useVault } from './useVault';
 import './vault.css';
 
@@ -93,8 +94,12 @@ export function VaultUnlockCard({
         <h2>{creating ? 'Crea tu clave maestra' : 'Desbloquea con tu clave maestra'}</h2>
         <p className="muted">
           {creating
-            ? `${purpose} se cifran en este navegador antes de guardarse. Ni Chambapp ni Supabase pueden leerlos.`
-            : `${purpose} están cifrados. Introduce tu clave maestra para verlos; se bloquearán tras 15 minutos sin actividad.`}
+            ? `${purpose} se cifran en este navegador antes de guardarse. ${
+                isLocalEdition
+                  ? 'Solo tú puedes leer su contenido.'
+                  : 'Ni Chambapp ni Supabase pueden leer su contenido.'
+              }`
+            : `${purpose} se guardan cifrados. Introduce tu clave maestra para ver su contenido; se bloqueará tras 15 minutos sin actividad.`}
         </p>
         {creating ? (
           <p className="vault-card__warning">
