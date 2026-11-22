@@ -1,3 +1,4 @@
+import { MenuPath } from '../../shared/ui/MenuPath';
 import { useState } from 'react';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Notice } from '../../shared/ui/Panel';
@@ -78,7 +79,7 @@ export function LocalBanners() {
       <Notice key="error" title="No se pueden leer los datos de este navegador">
         Se cifraron con una clave maestra anterior. Importa una copia de seguridad en{' '}
         <ButtonLink to={`${paths.settings}#datos`} variant="ghost">
-          Ajustes → Datos
+          <MenuPath parts={['Ajustes', 'Datos']} />
         </ButtonLink>
         {dismiss('error')}
       </Notice>
@@ -90,7 +91,7 @@ export function LocalBanners() {
         Tus proyectos nuevos se guardan en este navegador. Si vienes de otro dispositivo o
         navegador, importa tu copia de seguridad en{' '}
         <ButtonLink to={`${paths.settings}#datos`} variant="ghost">
-          Ajustes → Datos
+          <MenuPath parts={['Ajustes', 'Datos']} />
         </ButtonLink>
         {dismiss('sin-datos')}
       </Notice>

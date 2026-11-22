@@ -371,7 +371,7 @@ export default function WeekOverviewPage() {
                                         <span className="mono">
                                           {formatClockShort(record.start, zone)}
                                         </span>
-                                        {' → '}
+                                        {' · '}
                                         {record.end ? (
                                           <>
                                             Salida{' '}

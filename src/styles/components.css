@@ -2691,3 +2691,14 @@
   appearance: textfield;
   text-align: right;
 }
+
+/* Menu paths («Ajustes › Datos»): chevron icon between steps, never a text arrow. */
+.menu-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.menu-path__sep {
+  color: var(--muted);
+}

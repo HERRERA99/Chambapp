@@ -164,3 +164,19 @@ test('uses valid saved thresholds and falls back to defaults for invalid profile
   assert.equal(week.days[0]!.tone, 'warning');
   assert.equal(week.total.tone, 'warning');
 });
+
+test('lists the attendance of a day in the order it happened', () => {
+  // Given latest first, as the period query returns them.
+  const week = overview(
+    [],
+    [
+      session('2026-11-17T15:01:00Z', '2026-11-17T17:17:00Z'),
+      session('2026-11-17T07:17:00Z', '2026-11-17T13:20:00Z'),
+    ],
+  );
+  const tuesday = week.days.find((day) => day.date === '2026-11-17')!;
+  assert.deepEqual(
+    tuesday.attendance.map((record) => record.start),
+    ['2026-11-17T07:17:00.000Z', '2026-11-17T15:01:00.000Z'],
+  );
+});

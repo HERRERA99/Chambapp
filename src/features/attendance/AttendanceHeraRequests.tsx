@@ -21,7 +21,7 @@ function clock({ kind, time }: HeraRequestClock) {
 }
 
 function requestedChange({ original, operation, change }: HeraChangeRequest) {
-  return `${original ? `Fichaje ${clock(original)}` : 'Sin fichaje original'} → ${operation}${change ? ` ${clock(change)}` : ''}`;
+  return `${operation}${change ? ` ${clock(change)}` : ''} · ${original ? `antes ${clock(original)}` : 'sin fichaje original'}`;
 }
 
 function summary(item: HeraChangeRequest) {

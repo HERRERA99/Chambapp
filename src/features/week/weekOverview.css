@@ -664,3 +664,24 @@
     display: none;
   }
 }
+
+/* Open day: the row stands out (raised surface + accent bar) and its detail reads as
+   nested content below it (darker inset with the same bar), so they never blend. */
+.week-overview__days .data-table .week-overview__day[aria-expanded='true'] td,
+.week-overview__days .data-table .week-overview__day[aria-expanded='true']:hover td {
+  background: var(--surface-raised);
+}
+.week-overview__days .data-table .week-overview__day[aria-expanded='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+.week-overview__days .data-table .week-overview__detail > td,
+.week-overview__days .data-table .week-overview__detail:hover > td {
+  background: var(--surface-low);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  padding-left: 24px;
+}
+.week-overview__detail-content {
+  border-top: 0;
+  padding-top: 4px;
+}

@@ -221,13 +221,11 @@ function GroupCard({
         <span className="timesheet-group__count dim">{plural(count, 'parte', 'partes')}</span>
         <span className="timesheet-group__times">
           <span className="mono dim" title="Tiempo real">
-            {fmt(group.realSeconds)}
+            Real {fmt(group.realSeconds)}
           </span>
           <span className="timesheet-group__logged">
-            <span className="dim" aria-hidden="true">
-              →
-            </span>{' '}
             <strong className="mono" title="Tiempo imputable (redondeado sobre la suma)">
+              <span className="dim">Imputable </span>
               {fmt(group.loggedSeconds)}
             </strong>
           </span>
@@ -302,8 +300,8 @@ function GroupCard({
               </span>
               <span className="timesheet-group__imputation-row">
                 <span className="mono timesheet-group__pair">
-                  <span>{fmt(imputation.realSeconds)}</span> →{' '}
-                  <strong>{fmt(imputation.loggedSeconds)}</strong>
+                  <span className="dim">Real {fmt(imputation.realSeconds)} ·</span>{' '}
+                  <strong>Imputado {fmt(imputation.loggedSeconds)}</strong>
                 </span>
                 <Button
                   variant="ghost"
@@ -379,8 +377,10 @@ function GroupCard({
                 {selection.length ? (
                   <>
                     {plural(selection.length, 'seleccionado', 'seleccionados')}:{' '}
-                    <span className="mono">{fmt(selectionRounding.realSeconds)}</span> →{' '}
-                    <strong className="mono">{fmt(selectionRounding.loggedSeconds)}</strong>
+                    <span className="mono">real {fmt(selectionRounding.realSeconds)}</span> ·{' '}
+                    <strong className="mono">
+                      imputable {fmt(selectionRounding.loggedSeconds)}
+                    </strong>
                   </>
                 ) : (
                   <>

@@ -201,7 +201,7 @@ function EntryEditor({
           >
             {editor.duration !== null ? (
               <span className="mono">
-                Real: {formatClock(editor.duration)} → Imputada:{' '}
+                Real: {formatClock(editor.duration)} · Imputada:{' '}
                 {formatClock(roundDuration(editor.duration, editor.interval))}
               </span>
             ) : (

@@ -67,7 +67,7 @@ export function TaskEntries({
                       <strong>Sesión de trabajo</strong>
                       <OdooEntryStatus entry={entry} />
                       <span className="mono dim">
-                        {formatTime(entry.inicio_en, entry.zona_horaria)} →{' '}
+                        {formatTime(entry.inicio_en, entry.zona_horaria)} –{' '}
                         {entry.fin_en ? formatTime(entry.fin_en, entry.zona_horaria) : 'En curso'}
                       </span>
                     </div>

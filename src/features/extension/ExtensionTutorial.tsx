@@ -1,3 +1,4 @@
+import { MenuPath } from '../../shared/ui/MenuPath';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -225,9 +226,9 @@ function StepBody({
       return (
         <>
           <p>
-            Haz clic derecho sobre el archivo → <strong>Extraer todo…</strong> y guárdalo en una
-            carpeta que no vayas a borrar, por ejemplo <code className="mono">Documentos</code>. El
-            navegador carga la extensión desde ahí cada vez que se abre.
+            Haz clic derecho sobre el archivo, elige <strong>Extraer todo…</strong> y guárdalo en
+            una carpeta que no vayas a borrar, por ejemplo <code className="mono">Documentos</code>.
+            El navegador carga la extensión desde ahí cada vez que se abre.
           </p>
           <Mock label={`Carpeta ${EXTENSION_FOLDER} con manifest.json dentro`}>
             <div className="ext-tree">
@@ -261,9 +262,13 @@ function StepBody({
           <Copy text={extensionsPage(browser)} />
           <p className="field__hint">
             También llegas desde el menú{' '}
-            {edge
-              ? '⋯ → Extensiones → Administrar extensiones'
-              : '⋮ → Extensiones → Gestionar extensiones'}
+            <MenuPath
+              parts={
+                edge
+                  ? ['⋯', 'Extensiones', 'Administrar extensiones']
+                  : ['⋮', 'Extensiones', 'Gestionar extensiones']
+              }
+            />
             .
           </p>
         </>
@@ -338,8 +343,8 @@ function StepBody({
           </Mock>
           <p className="field__hint">
             ¿Se descargó el archivo en vez de preguntar? Arrástralo a una ventana de Firefox, o en{' '}
-            <code className="mono">about:addons</code> pulsa el engranaje → «Instalar complemento
-            desde archivo…».
+            <code className="mono">about:addons</code> pulsa el engranaje y elige «Instalar
+            complemento desde archivo…».
           </p>
           <Detected onReload={onReload} />
         </>
@@ -372,7 +377,7 @@ function StepBody({
               <>
                 Después abre la extensión: se conecta sola con Chambapp local en{' '}
                 <code className="mono">{DEFAULT_LOCAL_ORIGIN}</code>. Si usas otro puerto, cámbialo
-                en <strong>⋯ → Ajustes → Conexión</strong>.
+                en <MenuPath parts={['⋯', 'Ajustes', 'Conexión']} />.
               </>
             ) : (
               <>
@@ -404,7 +409,7 @@ function StepBody({
             waitText={
               extension.available
                 ? isLocalEdition
-                  ? 'Instalada. Abre la extensión y comprueba en Ajustes → Conexión que apunta a esta dirección.'
+                  ? 'Instalada. Abre la extensión y comprueba en sus ajustes, apartado Conexión, que apunta a esta dirección.'
                   : 'Instalada. Falta iniciar sesión en la extensión con esta cuenta.'
                 : 'Primero instala la extensión (paso anterior).'
             }
@@ -416,7 +421,7 @@ function StepBody({
         <>
           <p>
             Para importar tareas y enviar partes, en la extensión abre el menú{' '}
-            <strong>⋯ → Ajustes</strong>, escribe la dirección de tu Odoo (por ejemplo{' '}
+            <MenuPath parts={['⋯', 'Ajustes']} />, escribe la dirección de tu Odoo (por ejemplo{' '}
             <code className="mono">https://empresa.odoo.com</code>) y pulsa{' '}
             <strong>Guardar y conceder permiso</strong>. Elige también el formato de fecha con el
             que tu Odoo muestra los partes.
@@ -468,7 +473,9 @@ function StepBody({
               <Icon name="key" size={14} /> Ir a Contraseñas
             </Link>
           </div>
-          <p className="field__hint">Puedes volver a ver este tutorial en Ajustes → Extensión.</p>
+          <p className="field__hint">
+            Puedes volver a ver este tutorial en <MenuPath parts={['Ajustes', 'Extensión']} />.
+          </p>
         </>
       );
   }

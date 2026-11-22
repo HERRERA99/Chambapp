@@ -51,17 +51,20 @@ export function buildWeekOverview(data: WorkspaceData, monday: string, today: st
         nowMs < end,
     );
     if (justOpened) records.unshift(justOpened);
-    const attendance = records.map((record) => {
-      const from = Math.max(Date.parse(record.inicio_en), start);
-      const to = Math.min(Date.parse(record.fin_en ?? now), end);
-      return {
-        id: record.id,
-        start: new Date(from).toISOString(),
-        end: record.fin_en || to === end ? new Date(to).toISOString() : null,
-        seconds: Math.max(0, to - from) / 1000,
-        provisional: !record.fin_en,
-      };
-    });
+    const attendance = records
+      .map((record) => {
+        const from = Math.max(Date.parse(record.inicio_en), start);
+        const to = Math.min(Date.parse(record.fin_en ?? now), end);
+        return {
+          id: record.id,
+          start: new Date(from).toISOString(),
+          end: record.fin_en || to === end ? new Date(to).toISOString() : null,
+          seconds: Math.max(0, to - from) / 1000,
+          provisional: !record.fin_en,
+        };
+      })
+      // In the order they happened (the period query returns the latest first).
+      .sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
     const sheetDay = timesheetByDate.get(day.date);
     const count = sheetDay?.items.length ?? 0;
     if (index >= 5 && !attendance.length && !count) return [];

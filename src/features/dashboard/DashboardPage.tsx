@@ -228,7 +228,7 @@ export default function DashboardPage() {
                   <span className="mono dim entry-summary__duration">
                     Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
                     <span className="accent">
-                      → Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
+                      · Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
                     </span>
                   </span>
                 </div>
