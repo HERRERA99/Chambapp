@@ -247,31 +247,41 @@ try {
   const heraPage = await context.newPage();
   await heraPage.goto(`${HERA}/rrhh/solicitar-fichajes`);
 
-  // ---- popup: preview through the real UI
+  // An open Chambapp tab must refresh on its own when the extension writes.
+  const watcher = await context.newPage();
+  await watcher.goto(`${LOCAL}/fichajes?fecha=${thu}`);
+  await watcher.waitForSelector('.ext-status--on', { timeout: 15_000 }).catch(() => null);
+  const thursdayBefore = ((await watcher.textContent('main')) ?? '').includes('08:16:00');
+
+  // ---- popup: one click reads Hera and applies the changes on its own
   const popup = await context.newPage();
   await popup.setViewportSize({ width: 380, height: 900 });
   await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
   await popup.waitForSelector('.popup__tabs', { timeout: 10_000 });
   await popup.click('.popup__tabs >> text=Fichaje');
   await popup.click('button:has-text("Recuperar fichajes de la semana")');
-  const shown = await popup
-    .waitForSelector('button:has-text("Aplicar")', { timeout: 30_000 })
+  const done = await popup
+    .waitForSelector('text=/creados?|actualizados?|coincide con Hera/', { timeout: 45_000 })
     .then(() => true)
     .catch(() => false);
-  if (!shown) {
-    await popup.screenshot({ path: join(shots, 'popup-sin-vista-previa.png'), fullPage: true });
+  const resultText = ((await popup.textContent('body')) ?? '').replace(/s+/g, ' ');
+  await popup.screenshot({ path: join(shots, 'popup-recuperado.png'), fullPage: true });
+  if (!done)
     throw new Error(
-      `El popup no muestra la vista previa: ${((await popup.textContent('body')) ?? '').replace(/s+/g, ' ').slice(0, 600)} · Hera: ${heraCalls.join(', ')}`,
+      `El popup no termina: ${resultText.slice(0, 600)} · Hera: ${heraCalls.join(', ')}`,
     );
-  }
-  const previewText = (await popup.textContent('body')) ?? '';
-  await popup.screenshot({ path: join(shots, 'popup-vista-previa.png'), fullPage: true });
-  const applyLabel = (await popup.textContent('button:has-text("Aplicar")'))?.trim();
-  check('popup: vista previa con 5 cambios', applyLabel === 'Aplicar 5 cambios', applyLabel);
+  check(
+    'popup: se aplica solo (sin botón Aplicar)',
+    !(await popup.$('button:has-text("Aplicar")')),
+  );
+  check(
+    'popup: resumen 3 creados y 2 actualizados',
+    /3 creados, 2 actualizados/.test(resultText),
+    resultText.slice(0, 300),
+  );
   check(
     'popup: muestra avisos de día incompleto y de solo en Chambapp',
-    /sin salida|incomplet/i.test(previewText) && /Chambapp/.test(previewText),
-    previewText.replace(/\s+/g, ' ').slice(0, 300),
+    /sin salida|incomplet/i.test(resultText) && /Solo en Chambapp/.test(resultText),
   );
   check(
     'Hera: solo la página (GET) y la consulta de accesos (POST)',
@@ -288,17 +298,17 @@ try {
     heraTabsOpen === 1,
     String(heraTabsOpen),
   );
-
-  // ---- apply
-  await popup.click('button:has-text("Aplicar")');
-  await popup.waitForSelector('text=/creados?|actualizados?/', { timeout: 30_000 });
-  const resultText = (await popup.textContent('body'))?.replace(/\s+/g, ' ') ?? '';
-  await popup.screenshot({ path: join(shots, 'popup-aplicado.png'), fullPage: true });
-  check(
-    'popup: resumen tras aplicar',
-    /3 creados?.*2 actualizados?|2 actualizados?.*3 creados?/.test(resultText),
-    resultText.slice(0, 300),
-  );
+  const refreshed = await watcher
+    .waitForFunction(
+      () => document.querySelector('main')?.textContent?.includes('08:16:00'),
+      null,
+      {
+        timeout: 15_000,
+      },
+    )
+    .then(() => true)
+    .catch(() => false);
+  check('app abierta: se actualiza sola con los fichajes nuevos', !thursdayBefore && refreshed);
 
   const after = describe(await weekRows());
   const expected = [

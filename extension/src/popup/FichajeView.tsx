@@ -10,27 +10,15 @@ import { errorMessage } from '../shared/feedback';
 
 const KIND = { entrada: 'Entrada', salida: 'Salida' } as const;
 
-function WeekPreview({
-  preview,
-  syncing,
-  applying,
-  onApply,
-  onCancel,
-}: {
-  preview: HeraWeekPreview;
-  syncing: boolean;
-  applying: boolean;
-  onApply: () => void;
-  onCancel: () => void;
-}) {
+/** What Hera shows for each day and what was done with it (applied on its own). */
+function WeekPreview({ preview }: { preview: HeraWeekPreview }) {
   const time = (iso: string) => DateTime.fromISO(iso, { zone: preview.zone }).toFormat('HH:mm');
   const range = ({ inicio_en, fin_en }: Pick<AttendanceRow, 'inicio_en' | 'fin_en'>) =>
     `${time(inicio_en)}–${fin_en ? time(fin_en) : 'abierto'}`;
-  const count = preview.days.reduce((sum, day) => sum + day.create.length + day.update.length, 0);
 
   return (
     <div className="panel stack stack--tight">
-      <h3>Vista previa de la semana</h3>
+      <h3>Semana en Hera</h3>
       <ErrorText>{preview.requestsError}</ErrorText>
       {preview.days.map((day) => {
         const date = DateTime.fromISO(day.date, { zone: preview.zone, locale: 'es' });
@@ -56,14 +44,6 @@ function WeekPreview({
           </p>
         );
       })}
-      <div className="row row--wrap hera-week__actions">
-        <Button variant="primary" disabled={syncing || applying || count === 0} onClick={onApply}>
-          {applying ? 'Aplicando…' : `Aplicar ${count} ${count === 1 ? 'cambio' : 'cambios'}`}
-        </Button>
-        <Button disabled={applying} onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
     </div>
   );
 }
@@ -113,7 +93,21 @@ export function FichajeView() {
     setWeekResult(null);
     setRequestsCount(null);
     try {
-      setPreview(await ask<HeraWeekPreview>({ type: 'hera-week-preview' }));
+      const next = await ask<HeraWeekPreview>({ type: 'hera-week-preview' });
+      setPreview(next);
+      const changes = next.days.reduce(
+        (sum, day) => sum + day.create.length + day.update.length,
+        0,
+      );
+      // Changes are applied straight away; apply re-reads Chambapp and refuses if it changed.
+      if (changes === 0) {
+        setWeekResult({ created: 0, updated: 0, remaining: 0 });
+      } else {
+        setWeekBusy('apply');
+        const applied = await ask<HeraWeekResult>({ type: 'hera-week-apply', previewId: next.id });
+        setWeekResult(applied);
+        if (applied.error) setError(applied.error);
+      }
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -132,21 +126,6 @@ export function FichajeView() {
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
-      setWeekBusy(null);
-    }
-  }
-
-  async function applyWeek(previewId: string) {
-    setWeekBusy('apply');
-    setError('');
-    try {
-      const applied = await ask<HeraWeekResult>({ type: 'hera-week-apply', previewId });
-      setWeekResult(applied);
-      if (applied.error) setError(applied.error);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setPreview(null);
       setWeekBusy(null);
     }
   }
@@ -180,7 +159,11 @@ export function FichajeView() {
         disabled={busy || weekBusy !== null || permission !== true}
         onClick={() => void previewWeek()}
       >
-        {weekBusy === 'preview' ? 'Leyendo la semana en Hera…' : 'Recuperar fichajes de la semana'}
+        {weekBusy === 'preview'
+          ? 'Leyendo la semana en Hera…'
+          : weekBusy === 'apply'
+            ? 'Guardando en Chambapp…'
+            : 'Recuperar fichajes de la semana'}
       </Button>
       <div className="row row--wrap">
         <Button
@@ -197,21 +180,16 @@ export function FichajeView() {
         ) : null}
       </div>
       <ErrorText>{error}</ErrorText>
-      {preview ? (
-        <WeekPreview
-          preview={preview}
-          syncing={busy || weekBusy === 'requests'}
-          applying={weekBusy === 'apply'}
-          onApply={() => void applyWeek(preview.id)}
-          onCancel={() => setPreview(null)}
-        />
-      ) : null}
       {weekResult ? (
         <p className={weekResult.error ? 'dim' : 'form-ok'} role="status">
-          {weekResult.created} creados, {weekResult.updated} actualizados
-          {weekResult.remaining > 0 ? `. Cambios sin confirmar: ${weekResult.remaining}.` : '.'}
+          {weekResult.created + weekResult.updated === 0 && !weekResult.error
+            ? 'Todo coincide con Hera: no había nada que cambiar.'
+            : `${weekResult.created} creados, ${weekResult.updated} actualizados${
+                weekResult.remaining > 0 ? `. Cambios sin guardar: ${weekResult.remaining}.` : '.'
+              }`}
         </p>
       ) : null}
+      {preview ? <WeekPreview preview={preview} /> : null}
       {result ? (
         <div className="panel stack stack--tight" role="status">
           <p className="eyebrow">Hera</p>
