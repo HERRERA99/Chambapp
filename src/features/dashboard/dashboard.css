@@ -1,3 +1,50 @@
+.dashboard-header {
+  flex-wrap: wrap;
+}
+
+.dashboard-header__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 10px;
+}
+
+.dashboard-header__meta .page-description {
+  margin-top: 0;
+}
+
+.dashboard-day-nav {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dashboard-day-nav .button {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.dashboard-day-nav__input {
+  width: auto;
+  min-height: 34px;
+  padding: 5px 10px;
+  margin-left: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboard-attendance .panel__header {
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.dashboard-live-note {
+  font-size: 12px;
+}
+
 .today-strip {
   display: flex;
   align-items: center;
@@ -87,6 +134,10 @@
 }
 
 @media (max-width: 650px) {
+  .dashboard-day-nav__input {
+    margin-left: 0;
+  }
+
   .today-strip {
     padding: 16px 18px;
   }

@@ -1,8 +1,10 @@
+import { DateTime } from 'luxon';
 import type { WorkspaceData } from '../../domain/models.ts';
 import { mondayForDate } from '../../domain/time.ts';
 import { buildWeekOverview } from '../week/weekOverview.model.ts';
 
-const percentFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 2 });
+const percentFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 1 });
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 type DashboardToday = {
   workedSeconds: number;
@@ -23,16 +25,40 @@ export function formatDashboardPercent(value: number | null) {
   return value === null ? '—' : `${percentFormat.format(value)}%`;
 }
 
+export function isValidIsoDate(value: string | null | undefined): value is string {
+  if (!value || !isoDatePattern.test(value)) return false;
+  const parsed = DateTime.fromISO(value, { zone: 'UTC' });
+  return parsed.isValid && parsed.toISODate() === value;
+}
+
+export function parseDashboardDate(value: string | null | undefined, today: string): string {
+  return isValidIsoDate(value) ? value : today;
+}
+
+export function shiftDashboardDate(date: string, days: number): string {
+  return DateTime.fromISO(date, { zone: 'UTC' }).plus({ days }).toISODate()!;
+}
+
+export function formatDashboardDayTitle(date: string, today: string): string {
+  const parsed = DateTime.fromISO(date, { zone: 'UTC' }).setLocale('es');
+  if (!parsed.isValid) return date;
+  const sameYear = date.slice(0, 4) === today.slice(0, 4);
+  const formatted = parsed.toFormat(sameYear ? "cccc d 'de' LLLL" : "cccc d 'de' LLLL 'de' yyyy");
+  return formatted[0]!.toLocaleUpperCase('es') + formatted.slice(1);
+}
+
 export function dashboardSummary(
   data: WorkspaceData,
   today: string,
   now = new Date().toISOString(),
+  selectedDate: string = today,
 ): {
   today: DashboardToday;
   alerts: DashboardAlert[];
 } {
-  const overview = buildWeekOverview(data, mondayForDate(today), today, now);
-  const current = overview.days.find((day) => day.isToday);
+  const date = parseDashboardDate(selectedDate, today);
+  const overview = buildWeekOverview(data, mondayForDate(date), today, now);
+  const current = overview.days.find((day) => day.date === date);
   const todaySummary: DashboardToday = {
     workedSeconds: current?.workedSeconds ?? 0,
     imputedSeconds: current?.imputedSeconds ?? 0,
@@ -40,6 +66,10 @@ export function dashboardSummary(
     tone: current?.tone ?? null,
     provisional: current?.provisional ?? false,
   };
+
+  if (date !== today) {
+    return { today: todaySummary, alerts: [] };
+  }
 
   const offDays = overview.days.filter(
     (day) => day.date < today && day.hasData && day.tone !== 'success',
