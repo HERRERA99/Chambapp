@@ -199,6 +199,11 @@
           document.body.append(modal);
           modal.querySelector('.o_form_button_save').addEventListener('click', () => {
             log.push('line-save');
+            // "ignored-line": Odoo drops the first click on "Guardar y cerrar".
+            if (mode === 'ignored-line' && !modal.dataset.clicked) {
+              modal.dataset.clicked = '1';
+              return;
+            }
             const value = (id) => modal.querySelector(`#${id}`).value;
             if (mode === 'invalid') {
               modal.querySelector('[name="unit_amount"]').classList.add('o_field_invalid');
@@ -211,6 +216,11 @@
         });
       mainSave.addEventListener('click', () => {
         log.push('form-save');
+        // "ignored": Odoo drops the first click on the task's "save" (still busy).
+        if (mode === 'ignored' && !mainSave.dataset.clicked) {
+          mainSave.dataset.clicked = '1';
+          return;
+        }
         if (mode === 'rejected') {
           setTimeout(() => {
             const note = document.createElement('div');

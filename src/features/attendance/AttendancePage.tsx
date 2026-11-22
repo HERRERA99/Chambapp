@@ -15,10 +15,13 @@ import { DataTable } from '../../shared/ui/DataTable';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
 import { useWorkspace } from '../workspace/useWorkspace';
+import { useExtension } from '../extension/useExtension';
+import type { HeraChangeRequest } from '../extension/heraRequests';
 import { useAttendance } from './useAttendance';
 import { AttendanceControls } from './AttendanceControls';
 import { AttendanceEditor } from './AttendanceEditor';
 import { AttendanceChart } from './AttendanceChart';
+import { HeraDayBadge, HeraDayDetails } from './AttendanceHeraRequests';
 import { formatAttendanceDuration, formatImputedPercent } from './attendanceLabels';
 import './attendance.css';
 
@@ -31,6 +34,7 @@ function validDate(value: string | null): string | null {
 export default function AttendancePage() {
   const { data, isLoading, error, reload } = useWorkspace();
   const attendance = useAttendance();
+  const { connected, heraRequests } = useExtension();
   const notify = useFeedback();
   const [search, setSearch] = useSearchParams();
   const [period, setPeriod] = useState<'day' | 'week'>('week');
@@ -52,6 +56,16 @@ export default function AttendancePage() {
     () => (data ? attendanceInPeriod(data.fichajes, dates, zone, attendance.now) : []),
     [data, dates, zone, attendance.now],
   );
+  const requestsByDate = useMemo(() => {
+    const byDate = new Map<string, HeraChangeRequest[]>();
+    for (const item of heraRequests?.items ?? []) {
+      const day = byDate.get(item.date);
+      if (day) day.push(item);
+      else byDate.set(item.date, [item]);
+    }
+    return byDate;
+  }, [heraRequests]);
+  const selectedDay = days.find((day) => day.date === selectedDate);
   const total = attendanceTotal(days);
   const blocked = attendance.busy || attendance.pending || !!error;
 
@@ -223,15 +237,18 @@ export default function AttendancePage() {
           {days.map((day) => (
             <tr key={day.date}>
               <td>
-                <button
-                  className="text-link attendance-day-link"
-                  onClick={() => {
-                    selectDate(day.date);
-                    setPeriod('day');
-                  }}
-                >
-                  {day.date}
-                </button>
+                <div className="attendance-day-date">
+                  <button
+                    className="text-link attendance-day-link"
+                    onClick={() => {
+                      selectDate(day.date);
+                      setPeriod('day');
+                    }}
+                  >
+                    {day.date}
+                  </button>
+                  <HeraDayBadge items={requestsByDate.get(day.date) ?? []} />
+                </div>
               </td>
               <td className="mono">{formatAttendanceDuration(day.workedSeconds)}</td>
               <td className="mono">
@@ -248,6 +265,21 @@ export default function AttendancePage() {
           tiempo transcurrido en cada día de {zone}; el redondeo de los partes se distribuye
           proporcionalmente.
         </p>
+        {connected ? (
+          <>
+            {selectedDay ? (
+              <HeraDayDetails
+                items={requestsByDate.get(selectedDay.date) ?? []}
+                workedSeconds={selectedDay.workedSeconds}
+              />
+            ) : null}
+            <p className="field__hint attendance-comparison__hint">
+              {heraRequests?.readAt
+                ? `Solicitudes leídas de Hera el ${DateTime.fromMillis(heraRequests.readAt, { zone }).toFormat('dd/MM HH:mm')}`
+                : 'Abre la extensión → Fichaje para leer las solicitudes'}
+            </p>
+          </>
+        ) : null}
       </Panel>
       <Panel
         title="Historial de entradas y salidas"

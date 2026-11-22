@@ -184,6 +184,52 @@ function mainSaveButton() {
   );
 }
 
+function enabled(button: HTMLElement) {
+  return !(button as HTMLButtonElement).disabled && button.getAttribute('aria-disabled') !== 'true';
+}
+
+/** Quiet time after a save click (no click, no Odoo request running) before clicking again. */
+const SAVE_RETRY_MS = 4_000;
+/** Total save clicks on one button (the first one included). */
+const SAVE_MAX_CLICKS = 4;
+
+/** Odoo is talking to its server or has blocked the page (a save may be in flight). */
+function odooBusy() {
+  return [...document.querySelectorAll('.o_loading_indicator, .o_blockUI, body.loading')].some(
+    (element) => element === document.body || visible(element),
+  );
+}
+
+/**
+ * Clicks a save button and, on `retry()`, again when the previous click seems
+ * ignored: after SAVE_RETRY_MS without clicks or Odoo requests, at most
+ * SAVE_MAX_CLICKS in total, and only if `ready()` still returns an enabled button.
+ */
+function retryingClicker(ready: () => HTMLElement | null | undefined) {
+  let clicks = 0;
+  let last = 0;
+  const press = (button: HTMLElement) => {
+    clicks += 1;
+    last = Date.now();
+    click(button);
+  };
+  return {
+    click: press,
+    retry() {
+      if (clicks >= SAVE_MAX_CLICKS) return;
+      if (clicks && odooBusy()) {
+        // A save in flight: the quiet time starts again once Odoo is idle.
+        last = Date.now();
+        return;
+      }
+      if (Date.now() - last < (clicks ? SAVE_RETRY_MS : 0)) return;
+      const button = ready();
+      if (button) press(button);
+    },
+    count: () => clicks,
+  };
+}
+
 function dialog() {
   return [...document.querySelectorAll<HTMLElement>('.modal')].find(
     (modal) => visible(modal) && modal.querySelector('.o_form_view'),
@@ -399,32 +445,51 @@ async function run(session: Session) {
         dialogSaveButton(form.modal!),
       );
       await writeBoundary();
-      click(save);
+      // Odoo sometimes ignores a click that lands while it is still processing the
+      // fields. Click again only while the dialog is still open, shows no error and
+      // its button is enabled (Odoo disables it while a save is in flight), so a
+      // save in progress is never doubled. The final count still has to find
+      // exactly one new line.
+      const dialogClicks = retryingClicker(() => {
+        const button = dialogSaveButton(form.modal!);
+        return button && enabled(button) ? button : null;
+      });
+      dialogClicks.click(save);
       await waitFor('el cierre del formulario de la línea', () => {
         const shown = errors();
         if (shown) throw new Error(shown);
-        return !visible(form.modal) || !form.modal!.isConnected;
+        if (!visible(form.modal) || !form.modal!.isConnected) return true;
+        dialogClicks.retry();
+        return false;
       });
     } else {
       await writeBoundary();
     }
-    const formSave = mainSaveButton();
-    if (formSave && !(formSave as HTMLButtonElement).disabled) click(formSave);
+    // The main "save" may not be ready yet right after the line closes: instead of
+    // clicking once (and waiting in vain if it was ignored), keep clicking it while
+    // the form is dirty and the button is enabled, a few times at most.
+    const formClicks = retryingClicker(() => {
+      const button = mainSaveButton();
+      return button && enabled(button) ? button : null;
+    });
     // Saved when no error shows and the form stops offering "save" for a moment.
     let cleanSince = 0;
     await waitFor('la confirmación del guardado de la tarea', () => {
       const shown = errors();
       if (shown) throw new Error(shown);
       const pending = mainSaveButton();
-      const dirty = !!pending && !(pending as HTMLButtonElement).disabled;
+      const dirty = !!pending && enabled(pending);
       const indicatorDirty = !!document.querySelector('.o_form_status_indicator .o_form_dirty');
       if (dirty || indicatorDirty) {
         cleanSince = 0;
+        formClicks.retry();
         return false;
       }
       cleanSince ||= Date.now();
       return Date.now() - cleanSince >= 600;
     });
+    if (formClicks.count() > 1)
+      console.info(`[Chambapp] Guardar la tarea en Odoo necesitó ${formClicks.count()} clics.`);
     post({ type: 'form-saved', attemptId: config.attemptId });
   } catch (cause) {
     post({

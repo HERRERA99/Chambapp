@@ -17,15 +17,23 @@ import {
   buildOdooRequest,
   buildTimesheetWeek,
   odooDescriptionChoices,
+  planWeekOdooSend,
 } from './timesheet.model';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useExtension } from '../extension/useExtension';
-import { LONG_ODOO_MINUTES } from '../extension/protocol';
+import { formatHoursMinutes, lockedIds, LONG_ODOO_MINUTES } from '../extension/protocol';
 import type { OdooRequest, QueueAction } from '../extension/protocol';
-import type { ImputationResultEntry, TimesheetGroup, TimesheetItem } from './timesheet.model';
+import type {
+  ImputationResultEntry,
+  TimesheetGroup,
+  TimesheetItem,
+  WeekOdooSendRow,
+} from './timesheet.model';
 import { TimesheetGroups } from './components/TimesheetGroups';
 import { TimesheetDayHeader } from './components/TimesheetDayHeader';
 import { OdooDescriptionDialog } from './components/OdooDescriptionDialog';
+import { WeekOdooSendDialog } from './components/WeekOdooSendDialog';
+import type { WeekOdooSendSelection } from './components/WeekOdooSendDialog';
 import './timesheet.css';
 
 function weekLabel(monday: string, lastDay: string) {
@@ -53,6 +61,9 @@ export default function TimesheetPage() {
     request: OdooRequest;
     choices: string[];
   } | null>(null);
+  const [weekSendRows, setWeekSendRows] = useState<WeekOdooSendRow[] | null>(null);
+  const [sendingWeek, setSendingWeek] = useState(false);
+  const [weekBatchIds, setWeekBatchIds] = useState<string[]>([]);
   const extension = useExtension();
   const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
   const today = todayInZone(zone);
@@ -66,6 +77,38 @@ export default function TimesheetPage() {
   const busy = pending || tracker.busy || tracker.pending;
   const lastDay = week.days.at(-1)?.date ?? monday;
   const timelineCount = week.days.reduce((total, day) => total + day.items.length, 0);
+  const locked = lockedIds(extension.queue);
+  const weekPlan = planWeekOdooSend({
+    days: week.days,
+    tasks: data?.tasks ?? [],
+    userId: user?.id ?? '',
+    locked,
+    nextId: () => '00000000-0000-4000-8000-000000000000',
+    odooOrigin: extension.connected ? extension.odooOrigin : null,
+  });
+  const sendableRows = weekPlan.filter(
+    (row) => row.exclusionReason === null && row.request !== null,
+  );
+  const sendableMinutes = sendableRows.reduce((sum, row) => sum + (row.request?.minutos ?? 0), 0);
+  const batchQueueById = new Map(extension.queue.map((item) => [item.requestId, item]));
+  const batchInFlight = weekBatchIds.filter((id) => {
+    const status = batchQueueById.get(id)?.status;
+    return status === 'pending' || status === 'processing';
+  }).length;
+  const batchDone = weekBatchIds.length - batchInFlight;
+  const weekSendDisabledReason = !extension.available
+    ? 'Instala la extensión de Chambapp para enviar a Odoo.'
+    : !extension.connected
+      ? 'Conecta la extensión con esta cuenta para enviar a Odoo.'
+      : !extension.odooOrigin
+        ? 'Configura tu Odoo en los ajustes de la extensión.'
+        : busy || sendingWeek
+          ? 'Espera a que terminen los cambios actuales.'
+          : sendableRows.length === 0
+            ? weekPlan.length > 0
+              ? 'No hay partes enviables esta semana (revisa el estado de cada grupo).'
+              : 'No hay partes pendientes esta semana.'
+            : null;
 
   function moveWeek(weeks: number) {
     setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
@@ -184,8 +227,80 @@ export default function TimesheetPage() {
       notify(`Marcando como imputados los partes de ${group.title}…`);
   }
 
+  async function sendWeek(items: WeekOdooSendSelection[]) {
+    if (!user || !items.length) return;
+    setActionError('');
+    setSendingWeek(true);
+    const queuedIds: string[] = [];
+    const errors: string[] = [];
+    try {
+      for (const item of items) {
+        const built = buildOdooRequest({
+          group: item.row.group,
+          entries: item.row.group.pending,
+          task: data?.tasks.find((task) => task.id === item.row.group.taskId),
+          userId: user.id,
+          requestId: crypto.randomUUID(),
+          descripcion: item.descripcion,
+          confirmLong: item.row.isLong,
+        });
+        if ('problem' in built) {
+          errors.push(`${item.row.group.title}: ${built.problem}`);
+          continue;
+        }
+        const result = await extension.send(built.request);
+        if (result.ok) {
+          queuedIds.push(built.request.requestId);
+        } else {
+          errors.push(result.error || `${item.row.group.title}: no se pudo enviar a Odoo.`);
+        }
+      }
+    } finally {
+      setSendingWeek(false);
+    }
+    if (queuedIds.length > 0) {
+      setWeekBatchIds((prev) => {
+        const stillInFlight = prev.filter((id) => {
+          const status = batchQueueById.get(id)?.status;
+          return status === 'pending' || status === 'processing';
+        });
+        return [...stillInFlight, ...queuedIds];
+      });
+    }
+    setWeekSendRows(null);
+    if (errors.length === 0) {
+      notify(
+        queuedIds.length === 1
+          ? '1 línea en cola para Odoo'
+          : `${queuedIds.length} líneas en cola para Odoo`,
+      );
+    } else if (queuedIds.length > 0) {
+      notify(
+        errors.length === 1
+          ? `${queuedIds.length} en cola, 1 rechazada: ${errors[0]}`
+          : `${queuedIds.length} en cola, ${errors.length} rechazadas: ${errors.join(' · ')}`,
+      );
+    } else {
+      const message =
+        errors.length === 1
+          ? `No se pudo enviar a Odoo: ${errors[0]}`
+          : `${errors.length} líneas rechazadas: ${errors.join(' · ')}`;
+      setActionError(message);
+      notify(message);
+    }
+  }
+
   return (
     <div className="timesheet">
+      {weekSendRows ? (
+        <WeekOdooSendDialog
+          open
+          weekLabel={weekLabel(monday, lastDay)}
+          rows={weekSendRows}
+          onClose={() => setWeekSendRows(null)}
+          onConfirm={sendWeek}
+        />
+      ) : null}
       {describe ? (
         <OdooDescriptionDialog
           key={describe.key}
@@ -238,6 +353,25 @@ export default function TimesheetPage() {
         <span className="timesheet__total mono" aria-label="Total imputable de la semana">
           {formatDuration(week.loggedSeconds)}
         </span>
+        {weekBatchIds.length > 0 && batchInFlight > 0 ? (
+          <span className="timesheet__batch-progress" role="status" aria-live="polite">
+            <Icon name="refresh" size={13} />
+            Enviando a Odoo {batchDone}/{weekBatchIds.length}…
+          </span>
+        ) : null}
+        <Button
+          id="timesheet-send-week"
+          className="timesheet__send-week"
+          icon="send"
+          disabled={weekSendDisabledReason !== null}
+          title={
+            weekSendDisabledReason ??
+            'Revisar y enviar todos los partes pendientes de la semana a Odoo'
+          }
+          onClick={() => setWeekSendRows(weekPlan)}
+        >
+          Enviar semana a Odoo ({formatHoursMinutes(sendableMinutes)})
+        </Button>
         <div className="timesheet__nav">
           <IconButton icon="left" label="Semana anterior" onClick={() => moveWeek(-1)} />
           <Button

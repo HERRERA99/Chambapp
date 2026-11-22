@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { OdooRequest, QueueAction, QueueSummaryItem } from './protocol';
+import type { HeraRequestsSnapshot } from './heraRequests';
 
 export type ExtensionStatus = {
   /** The Chambapp extension answered in this tab. */
@@ -17,6 +18,7 @@ export type ExtensionStatus = {
   /** Opens the installation tutorial; with `download`, it starts the download first. */
   openTutorial: (options?: { download?: boolean }) => void;
   queue: QueueSummaryItem[];
+  heraRequests: HeraRequestsSnapshot | null;
   send: (request: OdooRequest) => Promise<{ ok: boolean; error: string }>;
   act: (requestId: string, action: QueueAction) => Promise<{ ok: boolean; error: string }>;
   /** Reason why these entries or tasks cannot change now (being sent to Odoo); null if free. */
@@ -38,6 +40,7 @@ const offline: ExtensionStatus = {
   refresh: () => {},
   openTutorial: () => {},
   queue: [],
+  heraRequests: null,
   send: async () => ({ ok: false, error: 'La extensión de Chambapp no está disponible.' }),
   act: async () => ({ ok: false, error: 'La extensión de Chambapp no está disponible.' }),
   lockReason: () => null,

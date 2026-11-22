@@ -4,7 +4,13 @@ import { ATTEMPT_PORT_PREFIX } from '../shared/automation';
 import type { ExtensionState, PopupRequest, PopupResponse } from '../shared/messages';
 import { accountChange, signInWithPassword, signInWithProvider, signOut } from './auth';
 import { autofill } from './autofill';
-import { syncHera } from './hera';
+import {
+  applyHeraWeek,
+  cachedHeraRequests,
+  previewHeraWeek,
+  refreshHeraRequests,
+  syncHera,
+} from './hera';
 import {
   clearCredentialCache,
   credentialValue,
@@ -135,7 +141,11 @@ async function broadcastQueue() {
 onQueueChange(() => void broadcastQueue());
 onWorkspaceChanged(() => void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' }));
 
-async function handleApp(message: AppMessage, tabId: number): Promise<ExtensionMessage | null> {
+async function handleApp(
+  message: AppMessage,
+  tabId: number,
+  origin: string,
+): Promise<ExtensionMessage | null> {
   if (message.type === 'local-reply') {
     onLocalReply(message, tabId);
     return null;
@@ -143,6 +153,27 @@ async function handleApp(message: AppMessage, tabId: number): Promise<ExtensionM
   if (message.type === 'ping') {
     await toApp({ source: EXTENSION_SOURCE, type: 'queue', items: await queueSummary() }, tabId);
     return hello();
+  }
+  if (message.type === 'hera-requests-get') {
+    const session = await currentSession();
+    if (
+      !session ||
+      session.user.id !== message.userId ||
+      session.generation !== message.generation ||
+      (session.backend === 'local' && !session.account.startsWith(`local:${origin}|`))
+    )
+      return null;
+    const snapshot = await cachedHeraRequests(session.account);
+    const current = await currentSession();
+    if (current?.account !== session.account || current.epoch !== session.epoch) return null;
+    return {
+      source: EXTENSION_SOURCE,
+      type: 'hera-requests',
+      userId: session.user.id,
+      generation: session.generation,
+      readAt: snapshot.readAt,
+      items: snapshot.items,
+    };
   }
   if (message.type === 'send-odoo') {
     try {
@@ -271,6 +302,21 @@ async function handlePage(request: PopupRequest): Promise<unknown> {
         void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' });
       return result;
     }
+    case 'hera-week-preview':
+      return previewHeraWeek();
+    case 'hera-requests-refresh':
+      return refreshHeraRequests();
+    case 'hera-week-apply': {
+      if (
+        typeof request.previewId !== 'string' ||
+        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(request.previewId)
+      )
+        throw new Error('Referencia de vista previa no válida.');
+      const result = await applyHeraWeek(request.previewId);
+      if (result.created || result.updated)
+        void toApp({ source: EXTENSION_SOURCE, type: 'workspace-changed' });
+      return result;
+    }
     case 'queue-list':
       return queueViews();
     case 'queue-action':
@@ -317,8 +363,9 @@ chrome.runtime.onMessage.addListener((raw, sender, respond) => {
     // The local installation's origin comes from the settings (the worker may have restarted).
     applyBackend()
       .then(() => {
-        if (!appOrigins().includes(senderOrigin(sender) ?? '')) return null;
-        return handleApp(appMessage, tabId);
+        const origin = senderOrigin(sender);
+        if (!origin || !appOrigins().includes(origin)) return null;
+        return handleApp(appMessage, tabId, origin);
       })
       .then(respond, () => respond(null));
     return true;

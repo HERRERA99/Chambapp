@@ -9,7 +9,7 @@ import type { ImportChoice } from './importTask';
 import type { QueuePhase } from './queue';
 import type { DateFormat } from './automation';
 import type { Backend } from './backend';
-import type { HeraAction } from './hera';
+import type { HeraAction, HeraDayPlan } from './hera';
 
 export type VaultStatus = 'signed-out' | 'none' | 'locked' | 'unlocked';
 
@@ -92,6 +92,9 @@ export type PopupRequest =
   | { type: 'odoo-origin-set'; origin: string | null }
   | { type: 'backend-set'; backend: Backend; localOrigin: string }
   | { type: 'hera-sync' }
+  | { type: 'hera-week-preview' }
+  | { type: 'hera-week-apply'; previewId: string }
+  | { type: 'hera-requests-refresh' }
   | { type: 'vault-unlock'; password: string }
   | { type: 'vault-lock' }
   | { type: 'credentials-list' }
@@ -124,6 +127,19 @@ export type HeraSyncResult = {
   action: HeraAction;
   outcome: 'created' | 'closed' | 'already';
   message: string;
+};
+
+export type HeraWeekPreview = {
+  id: string;
+  zone: string;
+  days: HeraDayPlan[];
+  requestsError?: string;
+};
+export type HeraWeekResult = {
+  created: number;
+  updated: number;
+  remaining: number;
+  error?: string;
 };
 
 export type PopupResponse<T = unknown> = { ok: true; data: T } | { ok: false; error: string };
