@@ -1,3 +1,7 @@
+.week-overview.page-stack {
+  gap: 14px;
+}
+
 .week-overview__header,
 .week-overview__actions,
 .week-overview__summary,
@@ -5,12 +9,16 @@
 .week-overview__day-label {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.week-overview__header {
+  flex-wrap: wrap;
 }
 
 .week-overview__header h1 {
   margin: 0;
-  font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+  font-size: clamp(1.2rem, 2.3vw, 1.65rem);
 }
 
 .week-overview__actions {
@@ -43,42 +51,88 @@
   top: calc(100% + 4px);
   right: 0;
   display: grid;
+  min-width: 170px;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px #0006;
 }
 
 .week-overview__menu-items .button {
   justify-content: flex-start;
+  white-space: nowrap;
 }
 
 .week-overview__summary {
+  align-items: baseline;
   flex-wrap: wrap;
+  gap: 6px 14px;
 }
 
 .week-overview__summary strong {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-size: clamp(1.75rem, 3.6vw, 2.4rem);
+  font-weight: 600;
   line-height: 1;
+}
+
+.week-overview__summary strong[data-empty='true'] {
+  color: var(--dim);
+  font-weight: 500;
 }
 
 .week-overview__summary > span {
   font-size: 0.85rem;
 }
 
-.week-overview [data-tone='success'] {
+.week-overview__summary strong[data-tone='success'] {
   color: var(--success);
 }
 
-.week-overview [data-tone='warning'] {
+.week-overview__summary strong[data-tone='warning'] {
   color: var(--warning);
 }
 
-.week-overview [data-tone='danger'] {
+.week-overview__summary strong[data-tone='danger'] {
   color: var(--danger);
 }
 
+/* Compact chart panel kept at or under ~220 px total height. */
+.week-overview__chart.panel {
+  padding: 14px 16px;
+}
+
+.week-overview__chart .bar-chart__plot {
+  margin-top: 8px;
+  padding-top: 10px;
+}
+
+.week-overview__chart .bar-chart__day {
+  padding: 10px 4px 6px;
+  gap: 6px;
+}
+
+.week-overview__chart .bar-chart__columns {
+  height: 104px;
+}
+
+/* Days table. */
 .week-overview__days .data-table {
+  min-width: 0;
+}
+
+.week-overview__days .data-table th {
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--surface-raised) 40%, var(--surface));
+}
+
+.week-overview__days .data-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+
+.week-overview__days .data-table td:first-child,
+.week-overview__days .data-table td:nth-child(2) {
   min-width: 0;
 }
 
@@ -86,77 +140,519 @@
   cursor: pointer;
 }
 
-.week-overview__day--today td {
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+.week-overview__day:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: -2px;
+}
+
+.week-overview__days .data-table .week-overview__day:hover td {
+  background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface));
+}
+
+.week-overview__days .data-table .week-overview__day--today td {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.week-overview__days .data-table .week-overview__day--today td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.week-overview__days .data-table .week-overview__day--today:hover td {
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+}
+
+.week-overview__days .data-table .week-overview__day[aria-expanded='true'] td {
+  border-bottom-color: transparent;
 }
 
 .week-overview__day td > small {
   display: block;
+  font-family: var(--font-body);
+  font-size: 11px;
+  margin-top: 1px;
 }
 
 .week-overview__day-label {
   flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.week-overview__day-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.week-overview__day--today .week-overview__day-name {
+  font-weight: 600;
+}
+
+.week-overview__cell-worked,
+.week-overview__cell-imputed,
+.week-overview__cell-percent {
+  white-space: nowrap;
+}
+
+.week-overview__pct-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.week-overview__pct-pill[data-tone='success'] {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.week-overview__pct-pill[data-tone='warning'] {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
+.week-overview__pct-pill[data-tone='danger'] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.week-overview__odoo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.week-overview__chevron {
+  color: var(--dim);
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+
+.week-overview__day:hover .week-overview__chevron,
+.week-overview__day[aria-expanded='true'] .week-overview__chevron {
+  color: var(--muted);
+}
+
+.week-overview__day[aria-expanded='true'] .week-overview__chevron {
+  transform: rotate(180deg);
+}
+
+/* Expanded day detail: stays on the panel surface, no dark cutout boxes. */
+.week-overview__days .data-table .week-overview__detail > td,
+.week-overview__days .data-table .week-overview__detail:hover > td {
+  background: var(--surface);
+  padding: 12px 16px 16px;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.week-overview__detail-content {
+  display: grid;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Day timeline bar: ~40 px track + discrete hour marks. */
+.day-timeline {
+  display: grid;
   gap: 6px;
 }
 
-.week-overview__day-label button {
+.day-timeline__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.day-timeline__legend > span {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+}
+
+.day-timeline__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.day-timeline__swatch--attendance {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.day-timeline__swatch--entry {
+  background: color-mix(in srgb, var(--accent) 78%, var(--accent-deep));
+  border: 1px solid color-mix(in srgb, var(--accent-soft) 45%, var(--accent));
+}
+
+.day-timeline__swatch--gap {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--warning) 35%, transparent) 0 3px,
+    color-mix(in srgb, var(--warning) 10%, transparent) 3px 6px
+  );
+  border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent);
+}
+
+.day-timeline__chart {
+  display: grid;
   gap: 4px;
-  text-align: left;
 }
 
-.week-overview__day-label button[aria-expanded='true'] svg {
-  rotate: 180deg;
+.day-timeline__track {
+  position: relative;
+  height: 40px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-raised) 22%, var(--surface));
+  overflow: hidden;
 }
 
-.week-overview__days .week-overview__detail > td {
-  background: var(--surface-low);
-  white-space: normal;
+.day-timeline__gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--border-subtle) 75%, transparent);
+  pointer-events: none;
 }
 
-.week-overview__detail td > * + * {
-  margin-top: 16px;
+.day-timeline__attendance {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+
+.day-timeline__attendance--open {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--muted) 65%, var(--border));
+}
+
+.day-timeline__gap {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  min-width: 2px;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, transparent);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--warning) 26%, transparent) 0 4px,
+    color-mix(in srgb, var(--warning) 9%, transparent) 4px 8px
+  );
+}
+
+.day-timeline__entry {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  min-width: 3px;
+  border: 1px solid color-mix(in srgb, var(--accent-soft) 45%, var(--accent));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 78%, var(--accent-deep));
+  transition: background 0.15s ease;
+}
+
+.day-timeline__entry:hover {
+  z-index: 2;
+  background: var(--accent);
+}
+
+.day-timeline__entry--running {
+  border-style: dashed;
+}
+
+.day-timeline__axis {
+  position: relative;
+  height: 16px;
+}
+
+.day-timeline__tick {
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.day-timeline__tick--center {
+  transform: translateX(-50%);
+}
+
+.day-timeline__tick--end {
+  transform: translateX(-100%);
+}
+
+.week-overview__detail-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.4fr);
+  gap: 16px 24px;
+  align-items: start;
+}
+
+.week-overview__detail-block {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .week-overview__detail-header {
   justify-content: space-between;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
-.week-overview__detail-header h2 {
+.week-overview__detail-header h2,
+.week-overview__detail .attendance-hera h3 {
   margin: 0;
-  font-size: 1rem;
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.week-overview__detail-action.button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .week-overview__attendance {
   display: grid;
   gap: 6px;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .week-overview__attendance li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--text);
 }
 
-@media (max-width: 760px) {
-  .week-overview__header {
-    flex-wrap: wrap;
+.week-overview__attendance-total {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.week-overview__attendance-total strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.week-overview__unimputed {
+  margin: 0;
+  font-size: 12px;
+  color: var(--warning);
+}
+
+.week-overview__unimputed strong {
+  font-weight: 600;
+}
+
+.week-overview__empty-parts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.week-overview__detail .timesheet__grid--embedded {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.week-overview__detail .timesheet__grid--embedded .timesheet__day {
+  border: 0;
+  background: transparent;
+}
+
+.week-overview__detail .timesheet__grid--embedded .timesheet__items {
+  padding: 0;
+}
+
+.week-overview__detail .timesheet-group {
+  background: color-mix(in srgb, var(--surface-raised) 50%, var(--surface));
+}
+
+.week-overview__detail .attendance-hera {
+  margin-top: 0;
+}
+
+/* Mobile stacked rows without page-level horizontal scroll. */
+@media (max-width: 720px) {
+  .week-overview.page-stack {
+    gap: 12px;
+  }
+
+  .week-overview__header h1 {
+    flex: 1 1 100%;
+  }
+
+  .week-overview__chart.panel {
+    padding: 12px;
+  }
+
+  .week-overview__chart .bar-chart__plot {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .week-overview__days .table-scroll {
+    overflow: visible;
+  }
+
+  .week-overview__days .data-table,
+  .week-overview__days .data-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .week-overview__days .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .week-overview__days .data-table tr.week-overview__day {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-areas:
+      'day day percent'
+      'worked imputed odoo';
+    gap: 8px 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface);
+  }
+
+  .week-overview__days .data-table tr.week-overview__day:hover {
+    background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface));
+  }
+
+  .week-overview__days .data-table tr.week-overview__day--today {
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  .week-overview__days .data-table tr.week-overview__day--today:hover {
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  }
+
+  .week-overview__days .data-table tr.week-overview__day--today td:first-child {
+    box-shadow: none;
+  }
+
+  .week-overview__days .data-table tr.week-overview__day[aria-expanded='true'] {
+    border-bottom-color: transparent;
+  }
+
+  .week-overview__days .data-table tr.week-overview__day:last-child,
+  .week-overview__days .data-table tr.week-overview__detail:last-child {
+    border-bottom: 0;
+  }
+
+  .week-overview__days .data-table tr.week-overview__day > td,
+  .week-overview__days .data-table tr.week-overview__day:hover > td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .week-overview__cell-day {
+    grid-area: day;
+  }
+
+  .week-overview__cell-percent {
+    grid-area: percent;
+    justify-self: end;
+    align-self: center;
+  }
+
+  .week-overview__cell-worked {
+    grid-area: worked;
+  }
+
+  .week-overview__cell-imputed {
+    grid-area: imputed;
+  }
+
+  .week-overview__cell-odoo {
+    grid-area: odoo;
+  }
+
+  .week-overview__cell-worked::before,
+  .week-overview__cell-imputed::before,
+  .week-overview__cell-odoo::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .week-overview__days .data-table tr.week-overview__detail {
+    display: block;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .week-overview__days .data-table tr.week-overview__detail > td,
+  .week-overview__days .data-table tr.week-overview__detail:hover > td {
+    display: block;
+    width: 100%;
+    padding: 8px 14px 14px;
+    border-bottom: 0;
+  }
+
+  .week-overview__detail-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .day-timeline__tick {
+    font-size: 9px;
   }
 }
 
 @media (max-width: 520px) {
   .week-overview__tools {
     margin-left: 0;
-  }
-
-  .week-overview__days .data-table td,
-  .week-overview__days .data-table th {
-    padding-inline: 5px;
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

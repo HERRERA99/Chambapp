@@ -1,13 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { DateTime } from 'luxon';
-import { formatTime, mondayForDate } from '../../domain/time';
+import { mondayForDate } from '../../domain/time';
 import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
 import { DataTable } from '../../shared/ui/DataTable';
 import { Icon } from '../../shared/ui/Icon';
 import { Notice, Panel } from '../../shared/ui/Panel';
 import { AttendanceChart } from '../attendance/AttendanceChart';
 import { HeraDayBadge, HeraDayDetails } from '../attendance/AttendanceHeraRequests';
-import { formatAttendanceDuration } from '../attendance/attendanceLabels';
 import { useAttendance } from '../attendance/useAttendance';
 import type { HeraChangeRequest } from '../extension/heraRequests';
 import { formatHoursMinutes } from '../extension/protocol';
@@ -18,6 +17,8 @@ import { useTimesheetOdoo } from '../timesheet/useTimesheetOdoo';
 import { useCommand } from '../workspace/useCommand';
 import { useWorkspace } from '../workspace/useWorkspace';
 import { WeekReport } from './components/WeekReport';
+import { DayTimeline } from './components/DayTimeline';
+import { buildDayTimeline, formatReadableDuration } from './components/dayTimeline.model';
 import { exportWeekCsv } from './exportWeekCsv';
 import { buildWeekOverview } from './weekOverview.model';
 import '../timesheet/timesheet.css';
@@ -32,6 +33,10 @@ function percentLabel(value: number | null) {
 
 function hoursMinutes(seconds: number) {
   return formatHoursMinutes(Math.floor(seconds / 60));
+}
+
+function formatClockShort(iso: string, zone: string) {
+  return DateTime.fromISO(iso, { zone }).toFormat('HH:mm');
 }
 
 function weekLabel(monday: string) {
@@ -127,6 +132,17 @@ export default function WeekOverviewPage() {
     selectedDay === undefined
       ? week.days.find((day) => day.isToday && day.hasData)?.date
       : selectedDay;
+  const hasSendable = odoo.sendableMinutes > 0;
+  const sendDisabledReason =
+    odoo.weekSendDisabledReason ??
+    (!hasSendable ? 'No hay partes pendientes para enviar a Odoo.' : null);
+  const totalEmpty = week.total.imputedPercent === null;
+  const summaryDetail =
+    week.total.workedSeconds > 0
+      ? `Imputado ${hoursMinutes(week.total.imputedSeconds)} · Fichado ${hoursMinutes(week.total.workedSeconds)}${week.targetSeconds > 0 ? ` de ${hoursMinutes(week.targetSeconds)}` : ''}`
+      : week.total.imputedSeconds > 0
+        ? `Imputado ${hoursMinutes(week.total.imputedSeconds)} · Sin fichajes${week.targetSeconds > 0 ? ` · Objetivo ${hoursMinutes(week.targetSeconds)}` : ''}`
+        : `Sin fichajes ni partes esta semana${week.targetSeconds > 0 ? ` · Objetivo ${hoursMinutes(week.targetSeconds)}` : ''}`;
 
   return (
     <div className="page-stack week-page week-overview">
@@ -149,11 +165,13 @@ export default function WeekOverviewPage() {
             id="timesheet-send-week"
             icon="send"
             variant="primary"
-            disabled={odoo.weekSendDisabledReason !== null}
-            title={odoo.weekSendDisabledReason ?? 'Revisar los partes pendientes de la semana'}
+            disabled={sendDisabledReason !== null}
+            title={sendDisabledReason ?? 'Revisar los partes pendientes de la semana'}
             onClick={odoo.openWeekSend}
           >
-            Enviar a Odoo ({formatHoursMinutes(odoo.sendableMinutes)})
+            {hasSendable
+              ? `Enviar a Odoo (${formatHoursMinutes(odoo.sendableMinutes)})`
+              : 'Enviar a Odoo'}
           </Button>
           <details
             className="week-overview__menu"
@@ -235,20 +253,17 @@ export default function WeekOverviewPage() {
         <strong
           className="mono"
           data-tone={week.total.tone ?? undefined}
-          aria-label={`Porcentaje imputado de la semana: ${percentLabel(week.total.imputedPercent)}`}
+          data-empty={totalEmpty ? 'true' : undefined}
+          aria-label={`Porcentaje imputado de la semana: ${totalEmpty ? 'sin datos' : percentLabel(week.total.imputedPercent)}`}
         >
           {percentLabel(week.total.imputedPercent)}
         </strong>
-        <span className="muted">
-          Imputado {hoursMinutes(week.total.imputedSeconds)} · Fichado{' '}
-          {hoursMinutes(week.total.workedSeconds)}
-          {week.targetSeconds > 0 ? ` de ${hoursMinutes(week.targetSeconds)}` : ''}
-        </span>
+        <span className="muted">{summaryDetail}</span>
       </section>
       <Panel className="week-overview__chart">
         <AttendanceChart days={week.days} today={today} compact />
       </Panel>
-      <Panel className="week-overview__days">
+      <Panel className="table-panel week-overview__days">
         <DataTable
           caption="Balance de la semana por día"
           headers={['Día', 'Fichado', 'Imputado', '%', 'Odoo']}
@@ -258,87 +273,199 @@ export default function WeekOverviewPage() {
             const detailId = `week-detail-${day.date}`;
             const requests = requestsByDate.get(day.date) ?? [];
             const toggle = () => setSelectedDay(expanded ? null : day.date);
+            const dayNumber = Number(day.date.slice(-2));
+            const timeline = expanded
+              ? buildDayTimeline({
+                  attendance: day.attendance,
+                  entries: (day.sheetDay?.items ?? []).map((item) => ({
+                    id: item.entry.id,
+                    task: item.title,
+                    start: item.entry.inicio_en,
+                    end: item.entry.fin_en,
+                  })),
+                  zone,
+                  now,
+                })
+              : null;
+            const unimputedSeconds = timeline?.unimputedSeconds ?? 0;
+            const hasGroups = Boolean(day.sheetDay?.groups.length);
             return (
               <Fragment key={day.date}>
                 <tr
                   className={`week-overview__day ${day.isToday ? 'week-overview__day--today' : ''}`}
+                  tabIndex={0}
+                  aria-current={day.isToday ? 'date' : undefined}
+                  aria-expanded={expanded}
+                  aria-controls={expanded ? detailId : undefined}
                   onClick={toggle}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggle();
+                    }
+                  }}
                 >
-                  <td>
+                  <td className="week-overview__cell-day">
                     <div className="week-overview__day-label">
-                      <button
-                        type="button"
-                        className="text-link"
-                        aria-current={day.isToday ? 'date' : undefined}
-                        aria-expanded={expanded}
-                        aria-controls={expanded ? detailId : undefined}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          toggle();
-                        }}
-                      >
-                        {day.name} {day.date.slice(-2)}
-                        <Icon name="chevron" size={13} />
-                      </button>
+                      <span className="week-overview__day-name">
+                        {day.name} {dayNumber}
+                      </span>
                       <HeraDayBadge items={requests} />
                     </div>
                   </td>
-                  <td className="mono">
-                    {hoursMinutes(day.workedSeconds)}
+                  <td className="week-overview__cell-worked mono" data-label="Fichado">
+                    <span>{hoursMinutes(day.workedSeconds)}</span>
                     {day.provisional ? <small className="muted">Provisional</small> : null}
                   </td>
-                  <td className="mono">{hoursMinutes(day.imputedSeconds)}</td>
-                  <td className="mono" data-tone={day.tone ?? undefined}>
-                    {percentLabel(day.imputedPercent)}
+                  <td className="week-overview__cell-imputed mono" data-label="Imputado">
+                    {hoursMinutes(day.imputedSeconds)}
                   </td>
-                  <td>{day.odoo}</td>
+                  <td className="week-overview__cell-percent" data-label="%">
+                    {day.imputedPercent === null ? (
+                      <span className="mono dim">—</span>
+                    ) : (
+                      <span
+                        className="week-overview__pct-pill mono"
+                        data-tone={day.tone ?? undefined}
+                      >
+                        {percentLabel(day.imputedPercent)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="week-overview__cell-odoo" data-label="Odoo">
+                    <div className="week-overview__odoo">
+                      <span className={day.odoo === '—' ? 'dim' : undefined}>{day.odoo}</span>
+                      <Icon name="chevron" size={14} className="week-overview__chevron" />
+                    </div>
+                  </td>
                 </tr>
                 {expanded ? (
                   <tr className="week-overview__detail">
                     <td colSpan={5} id={detailId}>
-                      <section aria-label="Fichajes del día">
-                        <div className="week-overview__detail-header">
-                          <h2>Fichajes</h2>
-                          <ButtonLink
-                            to={`/fichajes?fecha=${day.date}`}
-                            variant="ghost"
-                            icon="edit"
+                      <div className="week-overview__detail-content">
+                        {timeline ? <DayTimeline timeline={timeline} /> : null}
+                        <div className="week-overview__detail-columns">
+                          <section
+                            className="week-overview__detail-block"
+                            aria-labelledby={`week-jornada-${day.date}`}
                           >
-                            Editar en Registros
-                          </ButtonLink>
-                        </div>
-                        {day.attendance.length ? (
-                          <ul className="week-overview__attendance">
-                            {day.attendance.map((record) => (
-                              <li key={record.id}>
-                                <span className="mono">
-                                  {formatTime(record.start, zone)} –{' '}
-                                  {record.end ? formatTime(record.end, zone) : 'En curso'}
-                                </span>
-                                <span className="mono">
-                                  {formatAttendanceDuration(record.seconds)}
-                                </span>
-                                {record.provisional ? (
-                                  <small className="muted">Provisional</small>
+                            <div className="week-overview__detail-header">
+                              <h2 id={`week-jornada-${day.date}`}>Jornada</h2>
+                              <ButtonLink
+                                to={`/fichajes?fecha=${day.date}`}
+                                variant="ghost"
+                                icon="edit"
+                                className="week-overview__detail-action"
+                              >
+                                Corregir
+                              </ButtonLink>
+                            </div>
+                            {day.attendance.length ? (
+                              <>
+                                <ul className="week-overview__attendance">
+                                  {day.attendance.map((record) => (
+                                    <li key={record.id}>
+                                      <span>
+                                        Entrada{' '}
+                                        <span className="mono">
+                                          {formatClockShort(record.start, zone)}
+                                        </span>
+                                        {' → '}
+                                        {record.end ? (
+                                          <>
+                                            Salida{' '}
+                                            <span className="mono">
+                                              {formatClockShort(record.end, zone)}
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <span className="muted">Salida pendiente</span>
+                                        )}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="week-overview__attendance-total">
+                                  <strong>{formatReadableDuration(day.workedSeconds)}</strong>{' '}
+                                  fichadas
+                                  {day.provisional ? (
+                                    <span className="muted"> · provisional</span>
+                                  ) : null}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="muted">Sin fichajes</p>
+                            )}
+                          </section>
+                          <section
+                            className="week-overview__detail-block"
+                            aria-labelledby={`week-partes-${day.date}`}
+                          >
+                            <div className="week-overview__detail-header">
+                              <h2 id={`week-partes-${day.date}`}>Partes</h2>
+                              {hasGroups ? (
+                                <Button
+                                  variant="ghost"
+                                  icon="plus"
+                                  className="week-overview__detail-action"
+                                  disabled={!week.canAdd}
+                                  title={
+                                    !week.canAdd
+                                      ? 'Crea un proyecto y una tarea activos para registrar horas.'
+                                      : undefined
+                                  }
+                                  onClick={() => setEntryDate(day.date)}
+                                >
+                                  Nuevo parte
+                                </Button>
+                              ) : null}
+                            </div>
+                            {hasGroups && day.sheetDay ? (
+                              <>
+                                <TimesheetGroups
+                                  days={[day.sheetDay]}
+                                  today={today}
+                                  embedded
+                                  {...odoo.groupActions}
+                                />
+                                {unimputedSeconds >= 60 ? (
+                                  <p className="week-overview__unimputed">
+                                    Sin imputar:{' '}
+                                    <strong>{formatReadableDuration(unimputedSeconds)}</strong>
+                                  </p>
                                 ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">Sin fichajes</p>
-                        )}
-                      </section>
-                      {day.sheetDay?.groups.length ? (
-                        <TimesheetGroups
-                          days={[day.sheetDay]}
-                          today={today}
-                          embedded
-                          {...odoo.groupActions}
-                        />
-                      ) : (
-                        <p className="muted">Sin partes</p>
-                      )}
-                      <HeraDayDetails items={requests} workedSeconds={day.workedSeconds} />
+                              </>
+                            ) : (
+                              <div className="week-overview__empty-parts">
+                                {unimputedSeconds >= 60 ? (
+                                  <p className="week-overview__unimputed">
+                                    <strong>{formatReadableDuration(unimputedSeconds)}</strong> sin
+                                    imputar
+                                  </p>
+                                ) : (
+                                  <p className="muted">Sin partes</p>
+                                )}
+                                <Button
+                                  variant="secondary"
+                                  icon="plus"
+                                  className="week-overview__detail-action"
+                                  disabled={!week.canAdd}
+                                  title={
+                                    !week.canAdd
+                                      ? 'Crea un proyecto y una tarea activos para registrar horas.'
+                                      : undefined
+                                  }
+                                  onClick={() => setEntryDate(day.date)}
+                                >
+                                  Nuevo parte
+                                </Button>
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                        <HeraDayDetails items={requests} workedSeconds={day.workedSeconds} />
+                      </div>
                     </td>
                   </tr>
                 ) : null}
