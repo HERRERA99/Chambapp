@@ -63,7 +63,6 @@ test('summarizes today via buildWeekOverview with no alerts when all is green an
   );
   const summary = dashboardSummary(data, today, now);
   assert.deepEqual(summary.today, {
-    date: today,
     workedSeconds: 7200,
     imputedSeconds: 7200,
     imputedPercent: 100,
@@ -120,7 +119,6 @@ test('uses singular for one unsent Odoo part and handles an empty weekend day as
   const data = workspace([part('mon', monday, 9500)], [sessionFor(monday, 10_000)]);
   const summary = dashboardSummary(data, sunday, '2026-11-22T12:00:00Z');
   assert.deepEqual(summary.today, {
-    date: sunday,
     workedSeconds: 0,
     imputedSeconds: 0,
     imputedPercent: null,

@@ -21,16 +21,18 @@ El uso real del usuario: ficha, apunta partes (a veces todo el viernes) y quiere
 
 ## Fases
 
-1. **Menú (esta fase).** Navegación nueva y pestañas que agrupan páginas existentes sin cambiarlas:
+1. **Menú · Hecha.** Se estableció la navegación nueva y se agruparon las páginas existentes en pestañas:
    - Hoy → `/resumen`.
    - Semana → pestañas «Mi semana» (`/mi-semana`) y «Partes por tarea» (`/parte-semanal`). `/semana` lleva a la primera.
    - Registros → pestañas «Partes» (`/partes-de-horas`) y «Fichajes» (`/fichajes`). `/registros` lleva a la primera.
    - Tareas → pestañas «Tareas» (`/tareas`) y «Proyectos y clientes» (`/proyectos`).
    - Calendario → `/calendario`. Notas → `/notas`. Contraseñas → `/contrasenas`.
    - Herramientas → pestañas «Porcentajes», «Calculadora de horas», «Datos ficticios», «Utilidades de desarrollo» (sus rutas actuales). `/herramientas` lleva a la primera.
-2. **Semana.** Una página nueva sustituye a las dos pestañas: % y totales de la semana, una fila por día (fichado, imputado, %, estado en Odoo, solicitudes de Hera), detalle del día con fichajes y partes por tarea (lo de Parte semanal), «Enviar a Odoo», exportar en «⋯», un único gráfico, D3–D6.
-3. **Hoy y Registros.** Hoy sin los gráficos semanales; Registros sin el simulador de redondeo; país y región de festivos a Ajustes.
-4. **Limpieza** de componentes que queden sin uso.
+2. **Semana · Hecha.** Una sola página en `/semana` reúne el gráfico, los totales y una fila por día con fichado, imputado, porcentaje, estado en Odoo y solicitudes de Hera. El detalle muestra fichajes y partes por tarea. Desde la cabecera se puede enviar a Odoo, exportar e imprimir. Se aplican D3–D6.
+3. **Hoy y Registros · Hecha.** Hoy muestra el balance del día y los avisos semanales. El simulador de redondeo está disponible en Ajustes y durante la configuración inicial. El país y la región de festivos se eligen en Ajustes.
+4. **Limpieza · Hecha.** Se retiraron las páginas antiguas y el código exclusivo de esas vistas. `/mi-semana`, `/parte-semanal` y `/tablero` llevan a `/semana`.
+
+El menú final muestra **Hoy**, **Semana**, **Registros**, **Tareas**, **Calendario**, **Notas**, **Contraseñas** y **Herramientas**. **Ajustes** aparece al pie, junto al perfil.
 
 ## Criterios de aceptación de la fase 1
 

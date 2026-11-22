@@ -1549,31 +1549,6 @@
 .weekend-note .dim {
   margin-left: auto;
 }
-.principles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
-  border-top: 1px solid var(--border);
-  padding-top: 22px;
-}
-.principles h3 {
-  margin: 9px 0;
-  font-size: 14px;
-}
-.principles p {
-  font-size: 12px;
-}
-.export-progress {
-  font-size: 54px;
-  color: var(--accent-soft);
-  margin: 12px 0;
-}
-.export-progress + .progress {
-  margin-bottom: 14px;
-}
-.export-progress ~ .button {
-  margin-top: 16px;
-}
 .section-nav {
   display: flex;
   overflow: auto;
@@ -1753,15 +1728,6 @@
   .task-workspace {
     grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr);
   }
-  .calendar-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .day-card {
-    border-bottom: 1px solid var(--border);
-  }
-  .day-card:nth-child(3) {
-    border-right: 0;
-  }
   .choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1870,9 +1836,6 @@
   }
   .workspace-content {
     padding: 25px;
-  }
-  .calendar-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .two-columns {
     grid-template-columns: 1fr;
@@ -2095,53 +2058,9 @@
     margin-left: 0;
     flex-basis: 100%;
   }
-  .calendar-panel {
-    padding: 20px 0 0;
-  }
-  .calendar-panel > .panel__header {
-    padding-inline: 18px;
-  }
-  .calendar-grid {
-    grid-template-columns: 1fr;
-  }
-  .day-card {
-    border-right: 0;
-    padding: 20px;
-  }
-  .day-card__heading .badge {
-    max-width: none;
-    font-size: 9px;
-  }
-  .day-card__heading > div {
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
-  }
-  .day-blocks {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .day-block .eyebrow {
-    font-size: 8px;
-  }
-  .day-block .mono {
-    font-size: 9px;
-  }
-  .day-block h3 {
-    font-size: 12px;
-  }
-  .day-card__balance {
-    min-height: 0;
-  }
-  .day-card > .button {
-    font-size: 11px;
-  }
   .weekend-note .dim {
     margin-left: 0;
     flex-basis: 100%;
-  }
-  .principles {
-    grid-template-columns: 1fr;
   }
   .choice-grid,
   .choice-grid--three {
@@ -2210,12 +2129,6 @@
   .notice .button {
     max-width: 100%;
   }
-}
-.week-chart__balance {
-  color: #ff82b1;
-}
-.week-chart__logged-total {
-  color: var(--dim);
 }
 
 /* Search field with live suggestions (combobox). */

@@ -3,7 +3,6 @@ import type { AttendanceDay } from '../../domain/attendance';
 import { BarChart } from '../../shared/ui/BarChart';
 import type { BarSeries } from '../../shared/ui/BarChart';
 import { formatHoursMinutes } from '../extension/protocol';
-import { formatAttendanceDuration } from './attendanceLabels';
 import './attendance.css';
 
 const series: readonly BarSeries[] = [
@@ -11,24 +10,13 @@ const series: readonly BarSeries[] = [
   { key: 'imputed', label: 'Imputado', tone: 'accent' },
 ];
 
-type ChartDay = Pick<
-  AttendanceDay,
-  'date' | 'workedSeconds' | 'imputedSeconds' | 'provisionalSeconds'
-> & {
+type ChartDay = Pick<AttendanceDay, 'date' | 'workedSeconds' | 'provisionalSeconds'> & {
+  imputedSeconds: number;
   tone?: 'success' | 'warning' | 'danger' | null;
 };
 
-export function AttendanceChart({
-  days,
-  today,
-  compact = false,
-}: {
-  days: readonly ChartDay[];
-  today?: string;
-  compact?: boolean;
-}) {
-  const fmt = (seconds: number) =>
-    compact ? formatHoursMinutes(Math.floor(seconds / 60)) : formatAttendanceDuration(seconds);
+export function AttendanceChart({ days, today }: { days: readonly ChartDay[]; today: string }) {
+  const fmt = (seconds: number) => formatHoursMinutes(Math.floor(seconds / 60));
   const description = days
     .map(
       (day) =>
@@ -40,8 +28,8 @@ export function AttendanceChart({
       series={series}
       ariaLabel={`Horas fichadas e imputadas por día. ${description}`}
       showProvisionalLegend={days.some((day) => day.provisionalSeconds > 0)}
-      minColumnWidth={compact ? 32 : 92}
-      height={compact ? 104 : 170}
+      minColumnWidth={32}
+      height={104}
       columns={days.map((day) => ({
         key: day.date,
         label: DateTime.fromISO(day.date, { zone: 'UTC' }).setLocale('es').toFormat('ccc dd'),
@@ -51,19 +39,6 @@ export function AttendanceChart({
         active: day.date === today,
         badge: day.date === today ? 'Hoy' : undefined,
         title: `${day.date}: fichado exacto ${fmt(day.workedSeconds)}, imputado ${fmt(day.imputedSeconds)}${day.provisionalSeconds ? `; fichaje provisional ${fmt(day.provisionalSeconds)}` : ''}`,
-        header: compact ? undefined : (
-          <>
-            <span className="attendance-chart__value--worked" title="Fichado exacto">
-              F {formatAttendanceDuration(day.workedSeconds)}
-            </span>
-            <span
-              className="attendance-chart__value--imputed"
-              title="Imputado en partes finalizados"
-            >
-              I {formatAttendanceDuration(day.imputedSeconds)}
-            </span>
-          </>
-        ),
       }))}
     />
   );

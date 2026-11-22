@@ -261,7 +261,7 @@ export default function WeekOverviewPage() {
         <span className="muted">{summaryDetail}</span>
       </section>
       <Panel className="week-overview__chart">
-        <AttendanceChart days={week.days} today={today} compact />
+        <AttendanceChart days={week.days} today={today} />
       </Panel>
       <Panel className="table-panel week-overview__days">
         <DataTable
@@ -423,12 +423,7 @@ export default function WeekOverviewPage() {
                             </div>
                             {hasGroups && day.sheetDay ? (
                               <>
-                                <TimesheetGroups
-                                  days={[day.sheetDay]}
-                                  today={today}
-                                  embedded
-                                  {...odoo.groupActions}
-                                />
+                                <TimesheetGroups days={[day.sheetDay]} {...odoo.groupActions} />
                                 {unimputedSeconds >= 60 ? (
                                   <p className="week-overview__unimputed">
                                     Sin imputar:{' '}

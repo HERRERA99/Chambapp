@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { TimeEntry } from '../../../domain/models';
-import { formatDuration } from '../../../domain/time';
 import { Button } from '../../../shared/ui/Button';
 import { Icon } from '../../../shared/ui/Icon';
 import type { IconName } from '../../../shared/ui/Icon';
@@ -9,7 +8,7 @@ import { OdooSendButton } from '../../time-entries/components/OdooSendButton';
 import { useExtension } from '../../extension/useExtension';
 import { formatHoursMinutes, odooMinutes, sameOrigin } from '../../extension/protocol';
 import type { QueueAction, QueueSummaryItem } from '../../extension/protocol';
-import { formatReadableDuration } from '../../week/components/dayTimeline.model';
+import { formatReadableDuration as fmt } from '../../week/components/dayTimeline.model';
 import {
   formatRange,
   groupRounding,
@@ -17,7 +16,6 @@ import {
   reconcileSelection,
 } from '../timesheet.model';
 import type { TimesheetDay, TimesheetGroup } from '../timesheet.model';
-import { TimesheetDayHeader } from './TimesheetDayHeader';
 
 type Actions = {
   busy: boolean;
@@ -46,49 +44,17 @@ const status: Record<TimesheetGroup['status'], { label: string; icon: IconName }
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** Secondary header text: pending and running are told apart; "all done" only when it is. */
-function summary(days: TimesheetDay[]) {
-  const groups = days.flatMap((day) => day.groups);
-  const pending = groups.reduce((total, group) => total + group.pending.length, 0);
-  const running = groups.reduce((total, group) => total + group.running.length, 0);
-  if (!groups.length) return 'Sin partes esta semana';
-  if (pending)
-    return `${plural(pending, 'parte pendiente', 'partes pendientes')}${running ? ` · ${running} en curso` : ''}`;
-  if (running) return `${running} en curso`;
-  return groups.every((group) => group.status === 'imputed') ? 'Todo imputado' : '';
-}
-
-export function TimesheetGroups({
-  days,
-  today,
-  embedded = false,
-  ...actions
-}: { days: TimesheetDay[]; today: string; embedded?: boolean } & Actions) {
-  const titleId = useId();
-  const grid = (
+export function TimesheetGroups({ days, ...actions }: { days: TimesheetDay[] } & Actions) {
+  return (
     <div
-      className={`timesheet__grid ${embedded ? 'timesheet__grid--embedded' : ''}`}
+      className="timesheet__grid timesheet__grid--embedded"
       style={{ '--timesheet-days': days.length } as CSSProperties}
     >
       {days.map((day) => (
-        <section
-          key={day.date}
-          className={`timesheet__day ${!embedded && day.date === today ? 'timesheet__day--today' : ''}`}
-          aria-labelledby={embedded ? undefined : `timesheet-groups-${day.date}`}
-        >
-          {!embedded ? (
-            <TimesheetDayHeader
-              id={`timesheet-groups-${day.date}`}
-              date={day.date}
-              seconds={day.loggedSeconds}
-              totalLabel="Total imputable del día"
-            />
-          ) : null}
+        <section key={day.date} className="timesheet__day">
           <ul className="timesheet__items">
             {day.groups.length ? (
-              day.groups.map((group) => (
-                <GroupCard key={group.key} group={group} embedded={embedded} {...actions} />
-              ))
+              day.groups.map((group) => <GroupCard key={group.key} group={group} {...actions} />)
             ) : (
               <li className="timesheet__empty dim">—</li>
             )}
@@ -97,29 +63,16 @@ export function TimesheetGroups({
       ))}
     </div>
   );
-  if (embedded) return grid;
-  return (
-    <section className="timesheet__section" aria-labelledby={titleId}>
-      <header className="timesheet__section-header">
-        <h2 id={titleId}>Partes por tarea</h2>
-        <span className="dim">{summary(days)}</span>
-      </header>
-      {grid}
-    </section>
-  );
 }
 
 function GroupCard({
   group,
-  embedded,
   busy,
   onImpute,
   onUndo,
   onSend,
   onQueueAction,
-}: { group: TimesheetGroup; embedded: boolean } & Actions) {
-  const fmt = (seconds: number) =>
-    embedded ? formatReadableDuration(seconds) : formatDuration(seconds);
+}: { group: TimesheetGroup } & Actions) {
   const detailId = useId();
   const extension = useExtension();
   const entryIds = new Set(group.entries.map((entry) => entry.id));
@@ -426,9 +379,7 @@ function GroupCard({
                       onClick={() => void send(group.pending)}
                     >
                       Enviar todos (
-                      {embedded
-                        ? formatHoursMinutes(odooMinutes(group.pendingLoggedSeconds))
-                        : formatDuration(group.pendingLoggedSeconds)}
+                      {formatHoursMinutes(odooMinutes(group.pendingLoggedSeconds))}
                       )
                     </OdooSendButton>
                   </>

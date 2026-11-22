@@ -4,18 +4,15 @@ import { buildWeekOverview } from '../week/weekOverview.model.ts';
 
 const percentFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 2 });
 
-export type DashboardTone = 'success' | 'warning' | 'danger';
-
-export type DashboardToday = {
-  date: string;
+type DashboardToday = {
   workedSeconds: number;
   imputedSeconds: number;
   imputedPercent: number | null;
-  tone: DashboardTone | null;
+  tone: 'success' | 'warning' | 'danger' | null;
   provisional: boolean;
 };
 
-export type DashboardAlert = {
+type DashboardAlert = {
   id: string;
   kind: 'day' | 'odoo';
   tone: 'warning' | 'danger';
@@ -37,7 +34,6 @@ export function dashboardSummary(
   const overview = buildWeekOverview(data, mondayForDate(today), today, now);
   const current = overview.days.find((day) => day.isToday);
   const todaySummary: DashboardToday = {
-    date: today,
     workedSeconds: current?.workedSeconds ?? 0,
     imputedSeconds: current?.imputedSeconds ?? 0,
     imputedPercent: current?.imputedPercent ?? null,

@@ -42,12 +42,6 @@
   margin-top: 7px;
   line-height: 1.7;
 }
-
-.day-block__interval {
-  display: block;
-  margin-top: 7px;
-  line-height: 1.8;
-}
 /* Send to Odoo through the browser extension; disabled with its reason in the title. */
 .odoo-send-button--text.button {
   min-height: 30px;

@@ -1,34 +1,3 @@
-/* Weekly timesheet: two aligned day grids (by task, timeline). Columns grow with their
-   content and the page has a single scroll: no nested scroll areas hide entries. */
-.timesheet {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-.timesheet__toolbar {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.timesheet__toolbar .eyebrow {
-  margin-bottom: 6px;
-}
-.timesheet__title {
-  font-size: 22px;
-  line-height: 1.1;
-}
-.timesheet__total {
-  font-size: 13px;
-  color: var(--accent-soft);
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-.timesheet__send-week.button {
-  min-height: 34px;
-  padding: 6px 12px;
-}
 .timesheet__batch-progress {
   display: inline-flex;
   align-items: center;
@@ -40,15 +9,6 @@
   color: var(--accent-soft);
   font-size: 12px;
   font-weight: 500;
-}
-.timesheet__nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
-.timesheet > .form-error {
-  margin: 0;
 }
 .timesheet__grid {
   display: grid;
@@ -69,32 +29,6 @@
 .timesheet__day:first-child {
   border-left: 0;
 }
-.timesheet__day--today {
-  background: radial-gradient(ellipse at top, #ff2e560a, transparent 70%);
-}
-.timesheet__day-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.timesheet__day-header h3 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 400;
-}
-.timesheet__weekday {
-  color: var(--muted);
-  text-transform: capitalize;
-}
-.timesheet__day--today .timesheet__day-header strong {
-  color: var(--accent);
-}
-.timesheet__day-header .mono {
-  font-size: 11px;
-}
 .timesheet__items {
   list-style: none;
   margin: 0;
@@ -106,27 +40,6 @@
 .timesheet__empty {
   text-align: center;
   padding: 12px 0;
-}
-.timesheet__item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'head actions'
-    'meta actions';
-  column-gap: 8px;
-  row-gap: 4px;
-  padding: 7px 6px 7px 8px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-left: 2px solid var(--warning);
-  border-radius: 4px;
-  font-size: 12px;
-}
-.timesheet__item--imputed {
-  border-left-color: var(--success);
-}
-.timesheet__item--open {
-  border-left-color: var(--accent);
 }
 .timesheet__item-head {
   grid-area: head;
@@ -157,77 +70,6 @@
   border-radius: 3px;
   padding: 1px 5px;
 }
-.timesheet__item-meta {
-  grid-area: meta;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-.timesheet__item-actions {
-  grid-area: actions;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-.timesheet__item-meta > * {
-  font-size: inherit;
-}
-.timesheet__logged {
-  font-weight: 500;
-}
-.timesheet__check {
-  display: inline-flex;
-  cursor: pointer;
-}
-.timesheet__check input {
-  margin: 0;
-  accent-color: var(--success);
-}
-.timesheet__check input:disabled {
-  cursor: not-allowed;
-}
-.timesheet__item-status {
-  display: inline-flex;
-  color: var(--warning);
-}
-.timesheet__item--open .timesheet__item-status {
-  color: var(--accent-soft);
-}
-.timesheet__item-status--imputed {
-  color: var(--success);
-}
-/* Narrow day columns (six or seven days): controls move below the times. */
-@container (max-width: 200px) {
-  .timesheet__item {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'head'
-      'meta'
-      'actions';
-  }
-  .timesheet__item-actions {
-    flex-direction: row;
-    justify-content: flex-end;
-  }
-  .timesheet__item-meta {
-    flex-wrap: wrap;
-    font-size: 10px;
-  }
-}
-@media (max-width: 1366px) {
-  .timesheet__item-meta {
-    font-size: 10px;
-    gap: 4px;
-  }
-  .timesheet__item {
-    padding-left: 6px;
-  }
-}
 @media (max-width: 900px) {
   .timesheet__grid {
     grid-template-columns: 1fr;
@@ -237,44 +79,8 @@
     border-top: 1px solid var(--border-subtle);
   }
 }
-.timesheet__item-title--link {
-  color: var(--text);
-  text-decoration: none;
-}
-.timesheet__item-title--link:hover,
-.timesheet__item-title--link:focus-visible {
-  color: var(--accent-soft);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.timesheet__item-title--link .icon {
-  margin-left: 4px;
-  vertical-align: -1px;
-  opacity: 0.7;
-}
 
-/* Section headings above each grid. */
-.timesheet__section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-.timesheet__section-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 11px;
-}
-.timesheet__section-header h2 {
-  margin: 0;
-  font-family: var(--font-heading);
-  font-size: 15px;
-  font-weight: 500;
-}
-
-/* Task card: all entries of one task on one day. Same box, spacing and status colours
-   as the timeline cards; the whole head is the expand button. */
+/* All entries of one task on one day share an expandable card. */
 .timesheet-group {
   background: var(--surface);
   border: 1px solid var(--border-subtle);
@@ -514,8 +320,7 @@
   font-size: 11px;
   white-space: normal;
 }
-/* Narrow day columns: the title takes the full width; status and chevron go next to
-   the totals, like the timeline moves its controls below the times. */
+/* In narrow columns, the title takes the full width and the status moves next to the totals. */
 @container (max-width: 200px) {
   .timesheet-group__toggle {
     grid-template-areas:
