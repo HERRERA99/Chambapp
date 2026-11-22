@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DateTime } from 'luxon';
 import type { CalendarAbsence } from '../../domain/models';
 import { absencesOn } from '../../domain/calendar';
+import { readHolidayPreference } from '../../domain/holidayPreference';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { Badge, Notice, Panel } from '../../shared/ui/Panel';
 import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
@@ -111,7 +112,13 @@ export default function CalendarPage() {
           <span className="muted">Selecciona un día para añadir un registro.</span>
         </div>
       </Panel>
-      {syncOpen ? <HolidaySync key={month.year} year={month.year} /> : null}
+      {syncOpen ? (
+        <HolidaySync
+          key={month.year}
+          year={month.year}
+          preference={readHolidayPreference(data.profile.preferencias)}
+        />
+      ) : null}
       <Panel
         title="Días libres de este mes"
         action={<ButtonLink to="/semana">Ver semana laboral</ButtonLink>}

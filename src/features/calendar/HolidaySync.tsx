@@ -1,48 +1,30 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { paths } from '../../app/paths';
+import type { HolidayPreference } from '../../domain/holidayPreference';
 import { InputField, SelectField } from '../../shared/ui/FormField';
 import { Button } from '../../shared/ui/Button';
 import { Panel } from '../../shared/ui/Panel';
 import { useCommand } from '../workspace/useCommand';
-import { fetchHolidays, selectedHolidays } from './holidayApi';
+import { selectedHolidays } from './holidayApi';
+import { holidayRegionName, usePublicHolidays } from './usePublicHolidays';
 
-const spanishRegions: Record<string, string> = {
-  'ES-AN': 'Andalucía',
-  'ES-AR': 'Aragón',
-  'ES-AS': 'Asturias',
-  'ES-CB': 'Cantabria',
-  'ES-CL': 'Castilla y León',
-  'ES-CM': 'Castilla-La Mancha',
-  'ES-CN': 'Canarias',
-  'ES-CT': 'Cataluña',
-  'ES-EX': 'Extremadura',
-  'ES-GA': 'Galicia',
-  'ES-IB': 'Illes Balears',
-  'ES-MC': 'Región de Murcia',
-  'ES-MD': 'Comunidad de Madrid',
-  'ES-NC': 'Navarra',
-  'ES-PV': 'País Vasco',
-  'ES-RI': 'La Rioja',
-  'ES-VC': 'Comunitat Valenciana',
-  'ES-CE': 'Ceuta',
-  'ES-ML': 'Melilla',
-};
+const countryNames = new Intl.DisplayNames('es', { type: 'region' });
 
-export function HolidaySync({ year }: { year: number }) {
-  const [country, setCountry] = useState('ES');
-  const [region, setRegion] = useState('');
+export function HolidaySync({
+  year,
+  preference,
+}: {
+  year: number;
+  preference: HolidayPreference | null;
+}) {
+  const [manualCountry, setManualCountry] = useState('ES');
+  const [manualRegion, setManualRegion] = useState('');
+  const country = preference?.pais ?? manualCountry;
+  const region = preference?.region ?? manualRegion;
   const [message, setMessage] = useState('');
   const { run, pending } = useCommand();
-  const holidays = useQuery({
-    queryKey: ['public-holidays', year, country],
-    queryFn: ({ signal }) => fetchHolidays(year, country, signal),
-    enabled: /^[A-Z]{2}$/.test(country),
-    retry: false,
-    staleTime: 3600_000,
-  });
-  const regions = [
-    ...new Set(holidays.data?.flatMap((holiday) => holiday.counties ?? []) ?? []),
-  ].sort();
+  const { holidays, regions } = usePublicHolidays(year, country);
   const selected = selectedHolidays(holidays.data ?? [], region);
   async function sync() {
     setMessage('');
@@ -66,34 +48,47 @@ export function HolidaySync({ year }: { year: number }) {
         Añade manualmente los locales que falten. Los ámbitos importados anteriormente se conservan;
         puedes eliminar sus fechas desde el calendario.
       </p>
+      {preference ? (
+        <p className="muted">
+          Festivos de {countryNames.of(country) ?? country}
+          {region ? ` / ${holidayRegionName(region)}` : ''} ·{' '}
+          <Link className="text-button" to={`${paths.settings}#perfil`}>
+            Cambiar en Ajustes
+          </Link>
+        </p>
+      ) : null}
       <div className="toolbar">
-        <InputField
-          label="País (código ISO, p. ej. ES, PT, FR)"
-          maxLength={2}
-          value={country}
-          disabled={pending}
-          onChange={(e) => {
-            setCountry(e.target.value.toUpperCase());
-            setRegion('');
-            setMessage('');
-          }}
-        />
-        <SelectField
-          label="Región"
-          value={region}
-          disabled={pending || holidays.isFetching}
-          onChange={(e) => {
-            setRegion(e.target.value);
-            setMessage('');
-          }}
-        >
-          <option value="">Solo nacionales</option>
-          {regions.map((code) => (
-            <option key={code} value={code}>
-              {spanishRegions[code] ?? code}
-            </option>
-          ))}
-        </SelectField>
+        {!preference ? (
+          <>
+            <InputField
+              label="País (código ISO, p. ej. ES, PT, FR)"
+              maxLength={2}
+              value={country}
+              disabled={pending}
+              onChange={(e) => {
+                setManualCountry(e.target.value.toUpperCase());
+                setManualRegion('');
+                setMessage('');
+              }}
+            />
+            <SelectField
+              label="Región"
+              value={region}
+              disabled={pending || holidays.isFetching}
+              onChange={(e) => {
+                setManualRegion(e.target.value);
+                setMessage('');
+              }}
+            >
+              <option value="">Solo nacionales</option>
+              {regions.map((code) => (
+                <option key={code} value={code}>
+                  {holidayRegionName(code)}
+                </option>
+              ))}
+            </SelectField>
+          </>
+        ) : null}
         <Button
           icon="activity"
           disabled={pending || holidays.isFetching}

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDuration } from '../../domain/time';
+import { validHolidayPreference } from '../../domain/holidayPreference';
 import { validImputationThresholds } from '../../domain/imputationThresholds';
 import { Icon } from '../../shared/ui/Icon';
 import type { IconName } from '../../shared/ui/Icon';
@@ -67,7 +68,9 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     profile.nombre !== baseline.nombre ||
     profile.workspace !== baseline.workspace ||
     profile.especialidad !== baseline.especialidad ||
-    profile.zonaHoraria !== baseline.zonaHoraria;
+    profile.zonaHoraria !== baseline.zonaHoraria ||
+    profile.holidays.pais !== baseline.holidays.pais ||
+    profile.holidays.region !== baseline.holidays.region;
   const storageDirty =
     profile.almacenamiento !== baseline.almacenamiento ||
     profile.avisoCopiaDias !== baseline.avisoCopiaDias;
@@ -155,6 +158,11 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
       setError('Completa tu nombre y el nombre del Workspace.');
       return;
     }
+    const holidays = profile.holidays.pais || profile.holidays.region ? profile.holidays : null;
+    if (holidays && !validHolidayPreference(holidays)) {
+      setError('Introduce un código de país de dos letras. La región es opcional.');
+      return;
+    }
 
     const weeklyMinutes = schedule.minutes.reduce((sum, value) => sum + value, 0);
     const existing = data.configurations.find(
@@ -214,6 +222,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
             almacenamiento: profile.almacenamiento,
             aviso_copia_dias: profile.avisoCopiaDias,
             umbrales_imputacion: profile.imputationThresholds,
+            festivos: holidays,
           },
         });
         const saved = {
@@ -350,6 +359,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           </div>
           <div hidden={active !== 'perfil'}>
             <RegionalSettings
+              active={active === 'perfil'}
               value={profile}
               onChange={(next) => {
                 setProfile(next);

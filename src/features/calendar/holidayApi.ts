@@ -1,4 +1,5 @@
 import { validDateRange } from '../../domain/calendar.ts';
+import { validHolidayCountry } from '../../domain/holidayPreference.ts';
 
 export type PublicHoliday = {
   date: string;
@@ -52,7 +53,7 @@ export function selectedHolidays(holidays: readonly PublicHoliday[], region: str
 }
 
 export async function fetchHolidays(year: number, country: string, signal: AbortSignal) {
-  if (!Number.isInteger(year) || year < 1900 || year > 2100 || !/^[A-Z]{2}$/.test(country)) {
+  if (!Number.isInteger(year) || year < 1900 || year > 2100 || !validHolidayCountry(country)) {
     throw new Error('Selecciona un año y un país válidos.');
   }
   const response = await fetch(

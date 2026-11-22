@@ -4,6 +4,8 @@ import { mondayForDate, todayInZone } from '../../domain/time.ts';
 import { backupReminderDays, storageMode } from '../../lib/local/preferences.ts';
 import { readImputationThresholds } from '../../domain/imputationThresholds.ts';
 import type { ImputationThresholds } from '../../domain/imputationThresholds.ts';
+import { readHolidayPreference } from '../../domain/holidayPreference.ts';
+import type { HolidayPreference } from '../../domain/holidayPreference.ts';
 
 export type ProfileDraft = {
   nombre: string;
@@ -16,6 +18,7 @@ export type ProfileDraft = {
   /** Days without a backup before the reminder (preferencias.aviso_copia_dias). */
   avisoCopiaDias: number;
   imputationThresholds: ImputationThresholds;
+  holidays: HolidayPreference;
 };
 
 export type ScheduleDraft = {
@@ -50,6 +53,7 @@ export function profileDraft(data: WorkspaceData): ProfileDraft {
     almacenamiento: storageMode(data.profile),
     avisoCopiaDias: backupReminderDays(data.profile),
     imputationThresholds: readImputationThresholds(data.profile.preferencias),
+    holidays: readHolidayPreference(data.profile.preferencias) ?? { pais: '', region: '' },
   };
 }
 
