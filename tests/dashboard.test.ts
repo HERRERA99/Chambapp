@@ -3,7 +3,10 @@ import test from 'node:test';
 import type { Attendance, TimeEntry, WorkspaceData } from '../src/domain/models.ts';
 import {
   dashboardSummary,
+  formatDashboardDayTitle,
   formatDashboardPercent,
+  parseDashboardDate,
+  shiftDashboardDate,
 } from '../src/features/dashboard/dashboardSelectors.ts';
 
 const monday = '2026-11-16';
@@ -128,4 +131,75 @@ test('uses singular for one unsent Odoo part and handles an empty weekend day as
   assert.deepEqual(summary.alerts, [
     { id: 'odoo-unsent', kind: 'odoo', tone: 'warning', label: '1 parte sin enviar a Odoo' },
   ]);
+});
+
+test('uses selected past date for day summary and hides alerts outside today', () => {
+  const previousWeekDay = '2026-11-10';
+  const data = workspace(
+    [
+      part('prev', previousWeekDay, 8750),
+      part('tue', tuesday, 8400),
+      part('fri', today, 7200, { imputado_en_odoo: true, imputacion_odoo_id: 'imp-1' }),
+    ],
+    [sessionFor(previousWeekDay, 10_000), sessionFor(tuesday, 10_000), sessionFor(today, 7200)],
+  );
+
+  const sameWeekPast = dashboardSummary(data, today, now, tuesday);
+  assert.deepEqual(sameWeekPast.today, {
+    workedSeconds: 10_000,
+    imputedSeconds: 8400,
+    imputedPercent: 84,
+    tone: 'danger',
+    provisional: false,
+  });
+  assert.deepEqual(sameWeekPast.alerts, []);
+
+  const otherWeekPast = dashboardSummary(data, today, now, previousWeekDay);
+  assert.deepEqual(otherWeekPast.today, {
+    workedSeconds: 10_000,
+    imputedSeconds: 8750,
+    imputedPercent: 87.5,
+    tone: 'warning',
+    provisional: false,
+  });
+  assert.deepEqual(otherWeekPast.alerts, []);
+
+  const futureDay = dashboardSummary(data, today, now, '2026-11-21');
+  assert.deepEqual(futureDay.today, {
+    workedSeconds: 0,
+    imputedSeconds: 0,
+    imputedPercent: null,
+    tone: null,
+    provisional: false,
+  });
+  assert.deepEqual(futureDay.alerts, []);
+});
+
+test('falls back to today on invalid dates and formats or shifts valid dates', () => {
+  assert.equal(parseDashboardDate(null, today), today);
+  assert.equal(parseDashboardDate('', today), today);
+  assert.equal(parseDashboardDate('ayer', today), today);
+  assert.equal(parseDashboardDate('2026-02-30', today), today);
+  assert.equal(parseDashboardDate('2026-11-17T08:00:00Z', today), today);
+  assert.equal(parseDashboardDate(tuesday, today), tuesday);
+
+  assert.equal(shiftDashboardDate(today, -1), thursday);
+  assert.equal(shiftDashboardDate(today, 1), '2026-11-21');
+  assert.equal(shiftDashboardDate('2026-11-30', 1), '2026-12-01');
+  assert.equal(formatDashboardDayTitle(tuesday, today), 'Martes 17 de noviembre');
+  assert.equal(formatDashboardDayTitle('2025-11-17', today), 'Lunes 17 de noviembre de 2025');
+
+  const data = workspace(
+    [part('tue', tuesday, 8400), part('fri', today, 7200)],
+    [sessionFor(tuesday, 10_000), sessionFor(today, 7200)],
+  );
+  const invalidSummary = dashboardSummary(data, today, now, '2026-02-30');
+  assert.deepEqual(invalidSummary.today, {
+    workedSeconds: 7200,
+    imputedSeconds: 7200,
+    imputedPercent: 100,
+    tone: 'success',
+    provisional: false,
+  });
+  assert.equal(invalidSummary.alerts.length, 2);
 });
