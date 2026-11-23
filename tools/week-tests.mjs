@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildWeek, describeBalance } from '../src/features/week/week.model.ts';
+import { buildWeek } from '../src/features/week/week.model.ts';
 
 const monday = '2026-09-28';
 const data = {
@@ -93,22 +93,13 @@ assert.deepEqual(
   week.days[0].blocks.map((block) => block.entry.id),
   ['early', 'late', 'active'],
 );
-assert.equal(week.days[0].realSeconds, 15360);
-assert.equal(week.days[0].loggedSeconds, 16200);
-assert.equal(week.realSeconds, 18960);
-assert.equal(week.loggedSeconds, 19800);
 assert.equal(week.targetSeconds, 24000);
 assert.equal(week.entries.length, 4);
-assert.equal(week.workdays, 1);
-assert.equal(week.completedDays, 0);
 assert.equal(week.workedSeconds, 0);
 assert.equal(week.canAdd, true);
 assert.equal(week.days[0].blocks[0].project.nombre, 'Cliente A');
-assert.equal(describeBalance(0), 'Objetivo cumplido');
-assert.equal(describeBalance(-60), '00h 01m pendientes');
-assert.equal(describeBalance(60), '00h 01m a favor');
 console.log(
-  'PASS: real week selection, seven dates, current configuration, historical overrides, exact ordering, finalized totals and active separation.',
+  'PASS: real week selection, seven dates, current configuration, historical overrides and exact ordering.',
 );
 
 const previous = buildWeek(data, '2026-09-21', '2026-10-01');
@@ -158,12 +149,9 @@ const attendedWeek = buildWeek(
   '2026-10-01T09:00:00Z',
 );
 assert.equal(attendedWeek.workedSeconds, 8 * 3600);
-assert.equal(attendedWeek.provisionalSeconds, 3600);
+assert.equal(attendedWeek.days[3].provisionalSeconds, 3600);
 assert.equal(attendedWeek.days[0].workedSeconds, 7 * 3600);
 assert.equal(attendedWeek.days[3].workedSeconds, 3600);
-assert.equal(attendedWeek.completedAttendanceDays, 1);
-assert.equal(attendedWeek.loggedSeconds, week.loggedSeconds);
-assert.equal(attendedWeek.completedDays, 0);
 console.log(
   'PASS: attendance drives weekly and daily balances, including open attendance independently of task time.',
 );
@@ -188,11 +176,8 @@ const daysOff = [
 const excluded = buildWeek({ ...data, absences: daysOff }, monday, '2026-10-01');
 assert.equal(excluded.targetSeconds, 0);
 assert.equal(excluded.missingDays, 0);
-assert.equal(excluded.workdays, 0);
 assert.equal(excluded.days[1].absences.length, 2);
 assert.equal(excluded.days[0].plannedTargetSeconds, 0);
-assert.equal(excluded.loggedSeconds, week.loggedSeconds);
-assert.equal(excluded.realSeconds, week.realSeconds);
 assert.equal(excluded.entries.length, week.entries.length);
 assert.equal(data.jornadas[0].minutos_objetivo, 400);
 const restored = buildWeek({ ...data, absences: [] }, monday, '2026-10-01');

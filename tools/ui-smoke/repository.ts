@@ -162,7 +162,7 @@ export let data: WorkspaceData = {
   serverTime: now,
   receivedAt: Date.now(),
 };
-// Extra tasks and a full current week of entries for /tareas and /parte-semanal.
+// Extra tasks and entries in the fixture's week for /tareas and /semana.
 const extraTasks: WorkspaceData['tasks'] = [
   [
     'ccccccc3',
@@ -198,7 +198,7 @@ const extraTasks: WorkspaceData['tasks'] = [
   eliminado_en: null,
 }));
 function weekEntries(): WorkspaceData['entries'] {
-  const today = new Date();
+  const today = new Date(now);
   const monday = new Date(
     Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
   );

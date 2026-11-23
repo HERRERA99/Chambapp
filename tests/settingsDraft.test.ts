@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { WorkspaceData, Workday, WeeklyConfiguration } from '../src/domain/models.ts';
+import { readHolidayPreference, validHolidayPreference } from '../src/domain/holidayPreference.ts';
 import {
   initialSchedule,
   minimumScheduleMonday,
@@ -144,6 +145,8 @@ test('profile drafts retain valid saved preferences and safely default incompati
     intervaloRedondeo: 15,
     almacenamiento: 'nube',
     avisoCopiaDias: 7,
+    imputationThresholds: { verdeDesde: 90, ambarDesde: 85, maximo: 100 },
+    holidays: { pais: '', region: '' },
   });
   data.profile.preferencias = { workspace: { nested: true }, especialidad: 42 };
   assert.equal(profileDraft(data).workspace, 'Mi Workspace');
@@ -155,6 +158,54 @@ test('profile drafts retain valid saved preferences and safely default incompati
   data.profile.preferencias = { almacenamiento: 'disco', aviso_copia_dias: -3 };
   assert.equal(profileDraft(data).almacenamiento, 'nube');
   assert.equal(profileDraft(data).avisoCopiaDias, 7);
+});
+
+test('reads national and regional holiday preferences saved in the profile', () => {
+  const data = workspace();
+  for (const preference of [
+    { pais: 'PT', region: '' },
+    { pais: 'ES', region: 'ES-MD' },
+    { pais: 'GB', region: 'GB-ENG' },
+  ]) {
+    data.profile.preferencias = { festivos: preference };
+    assert.deepEqual(readHolidayPreference(data.profile.preferencias), preference);
+    assert.deepEqual(profileDraft(data).holidays, preference);
+  }
+});
+
+test('defaults to manual holiday selection for missing or incompatible preferences', () => {
+  const data = workspace();
+  for (const value of [
+    undefined,
+    null,
+    [],
+    'ES',
+    { pais: 'ES' },
+    { pais: 42, region: '' },
+    { pais: 'ES', region: null },
+    { pais: 'FR', region: 'ES-MD' },
+  ]) {
+    data.profile.preferencias = { festivos: value };
+    assert.equal(readHolidayPreference(data.profile.preferencias), null);
+    assert.deepEqual(profileDraft(data).holidays, { pais: '', region: '' });
+  }
+});
+
+test('validates alpha-2 country codes and optional subdivisions of the same country', () => {
+  assert.equal(validHolidayPreference({ pais: 'ES', region: '' }), true);
+  assert.equal(validHolidayPreference({ pais: 'ES', region: 'ES-MD' }), true);
+  assert.equal(validHolidayPreference({ pais: 'NO', region: 'NO-21' }), true);
+  for (const value of [
+    { pais: '', region: '' },
+    { pais: 'es', region: '' },
+    { pais: 'ESP', region: '' },
+    { pais: 'E1', region: '' },
+    { pais: 'ES', region: 'PT-20' },
+    { pais: 'ES', region: 'ES-' },
+    { pais: 'ES', region: 'ES-MD ' },
+  ]) {
+    assert.equal(validHolidayPreference(value), false);
+  }
 });
 
 test('weekly hours are spread evenly over the chosen days, the remainder on the first ones', async () => {

@@ -8,7 +8,7 @@ import type {
   WorkspaceData,
 } from '../../domain/models';
 import { absencesOn } from '../../domain/calendar.ts';
-import { formatDuration, weekDates } from '../../domain/time.ts';
+import { weekDates } from '../../domain/time.ts';
 import { attendanceDays } from '../../domain/attendance.ts';
 
 export type WeekBlock = {
@@ -20,25 +20,16 @@ export type WeekBlock = {
 export type CalendarDay = {
   date: string;
   name: string;
-  label: string;
-  dayNumber: string;
   isToday: boolean;
   isFuture: boolean;
   jornada: Workday | undefined;
   absences: CalendarAbsence[];
   plannedTargetSeconds: number;
   targetSeconds: number;
-  realSeconds: number;
-  loggedSeconds: number;
   workedSeconds: number;
   provisionalSeconds: number;
   blocks: WeekBlock[];
 };
-
-export function describeBalance(seconds: number) {
-  if (seconds === 0) return 'Objetivo cumplido';
-  return `${formatDuration(Math.abs(seconds))} ${seconds > 0 ? 'a favor' : 'pendientes'}`;
-}
 
 export function buildWeek(
   data: WorkspaceData,
@@ -47,7 +38,7 @@ export function buildWeek(
   now = new Date().toISOString(),
 ) {
   const dates = weekDates(monday);
-  const attendance = attendanceDays(data.fichajes, [], dates, data.profile.zona_horaria, now);
+  const attendance = attendanceDays(data.fichajes, dates, data.profile.zona_horaria, now);
   const selectedDates = new Set(dates);
   const configuration = data.configurations.reduce<
     (typeof data.configurations)[number] | undefined
@@ -87,12 +78,9 @@ export function buildWeek(
     const dayBlocks = (blocks.get(date) ?? []).sort(
       (a, b) => Date.parse(a.entry.inicio_en) - Date.parse(b.entry.inicio_en),
     );
-    const completed = dayBlocks.filter((block) => block.entry.fin_en !== null);
     return {
       date,
       name: local.toFormat('cccc'),
-      label: local.toFormat('ccc dd'),
-      dayNumber: local.toFormat('dd'),
       isToday: date === today,
       isFuture: date > today,
       jornada,
@@ -101,14 +89,6 @@ export function buildWeek(
       targetSeconds: absences.length ? 0 : (jornada?.minutos_objetivo ?? 0) * 60,
       workedSeconds: attendance[index]!.workedSeconds,
       provisionalSeconds: attendance[index]!.provisionalSeconds,
-      realSeconds: completed.reduce(
-        (sum, block) => sum + (block.entry.duracion_real_segundos ?? 0),
-        0,
-      ),
-      loggedSeconds: completed.reduce(
-        (sum, block) => sum + (block.entry.duracion_imputada_segundos ?? 0),
-        0,
-      ),
       blocks: dayBlocks,
     };
   });
@@ -124,16 +104,6 @@ export function buildWeek(
     entries: days.flatMap((day) => day.blocks),
     missingDays: days.filter((day) => day.plannedTargetSeconds > 0 && !day.jornada).length,
     targetSeconds: days.reduce((sum, day) => sum + day.targetSeconds, 0),
-    realSeconds: days.reduce((sum, day) => sum + day.realSeconds, 0),
-    loggedSeconds: days.reduce((sum, day) => sum + day.loggedSeconds, 0),
     workedSeconds: days.reduce((sum, day) => sum + day.workedSeconds, 0),
-    provisionalSeconds: days.reduce((sum, day) => sum + day.provisionalSeconds, 0),
-    completedAttendanceDays: days.filter(
-      (day) => day.jornada && day.targetSeconds > 0 && day.workedSeconds >= day.targetSeconds,
-    ).length,
-    completedDays: days.filter(
-      (day) => day.jornada && day.targetSeconds > 0 && day.loggedSeconds >= day.targetSeconds,
-    ).length,
-    workdays: days.filter((day) => day.targetSeconds > 0).length,
   };
 }

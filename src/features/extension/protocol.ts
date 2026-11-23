@@ -5,6 +5,8 @@
  * origin as target; the extension's bridge script relays to the service worker.
  * Both sides validate every message with the functions below.
  */
+import { isHeraRequestsSnapshot } from './heraRequests.ts';
+import type { HeraRequestsSnapshot } from './heraRequests.ts';
 
 export const APP_SOURCE = 'chambapp-app';
 export const EXTENSION_SOURCE = 'chambapp-extension';
@@ -73,6 +75,12 @@ export type AppMessage =
   | { source: typeof APP_SOURCE; type: 'ping' }
   | {
       source: typeof APP_SOURCE;
+      type: 'hera-requests-get';
+      userId: string;
+      generation: string | null;
+    }
+  | {
+      source: typeof APP_SOURCE;
       type: 'local-reply';
       requestId: string;
       ok: boolean;
@@ -91,6 +99,11 @@ export type ExtensionHello = {
 export type ExtensionMessage =
   | ({ source: typeof EXTENSION_SOURCE; type: 'hello' } & ExtensionHello)
   | { source: typeof EXTENSION_SOURCE; type: 'queue'; items: QueueSummaryItem[] }
+  | ({ source: typeof EXTENSION_SOURCE; type: 'hera-requests' } & HeraRequestsSnapshot & {
+        userId: string;
+        generation: string | null;
+      })
+  | { source: typeof EXTENSION_SOURCE; type: 'hera-requests-changed' }
   | { source: typeof EXTENSION_SOURCE; type: 'workspace-changed' }
   | {
       source: typeof EXTENSION_SOURCE;
@@ -276,6 +289,8 @@ export function isLocalOperation(value: unknown): value is LocalOperation {
 export function isAppMessage(value: unknown): value is AppMessage {
   if (!isRecord(value) || value.source !== APP_SOURCE) return false;
   if (value.type === 'ping') return true;
+  if (value.type === 'hera-requests-get')
+    return isUuid(value.userId) && isNullableText(value.generation, 128);
   if (value.type === 'local-reply')
     return (
       isUuid(value.requestId) && typeof value.ok === 'boolean' && typeof value.error === 'string'
@@ -314,6 +329,13 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
       );
     case 'queue':
       return Array.isArray(value.items) && value.items.every(isQueueSummaryItem);
+    case 'hera-requests':
+      return (
+        isUuid(value.userId) &&
+        isNullableText(value.generation, 128) &&
+        isHeraRequestsSnapshot(value)
+      );
+    case 'hera-requests-changed':
     case 'workspace-changed':
       return true;
     case 'local-request':

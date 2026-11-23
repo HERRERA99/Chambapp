@@ -6,8 +6,13 @@ import { AuthContext } from '../../src/features/auth/AuthContext';
 import { WorkspaceContext } from '../../src/features/workspace/useWorkspace';
 import { TrackerContext } from '../../src/features/tracker/useTracker';
 import { AttendanceContext } from '../../src/features/attendance/useAttendance';
+import { ExtensionContext, useExtension } from '../../src/features/extension/useExtension';
+import type { OdooRequest, QueueSummaryItem } from '../../src/features/extension/protocol';
 import { FeedbackProvider } from '../../src/shared/feedback/FeedbackProvider';
 import { WorkspaceLayout } from '../../src/app/layouts/WorkspaceLayout';
+import { navigationRedirects } from '../../src/app/navigation';
+import { NavigationRedirect } from '../../src/app/NavigationRedirect';
+import { paths } from '../../src/app/paths';
 import EntriesPage from '../../src/features/time-entries/EntriesPage';
 import DashboardPage from '../../src/features/dashboard/DashboardPage';
 import { data as current, operations, uid, now, bumpProfileElsewhere } from './repository';
@@ -29,7 +34,109 @@ const NotesPage = lazy(() => import('../../src/features/notes/NotesPage'));
 const TasksPage = lazy(() => import('../../src/features/tasks/TasksPage'));
 const ProjectsPage = lazy(() => import('../../src/features/projects/ProjectsPage'));
 const SettingsPage = lazy(() => import('../../src/features/settings/SettingsPage'));
-const TimesheetPage = lazy(() => import('../../src/features/timesheet/TimesheetPage'));
+const AttendancePage = lazy(() => import('../../src/features/attendance/AttendancePage'));
+const WeekOverviewPage = lazy(() => import('../../src/features/week/WeekOverviewPage'));
+/**
+ * `?ext=hera`: a connected extension with Hera change requests for the fixture
+ * attendance day (2026-10-02): one granted and one pending.
+ */
+const extensionStatus = (() => {
+  if (new URLSearchParams(window.location.search).get('ext') !== 'hera') return null;
+  const items = [
+    {
+      date: '2026-10-02',
+      original: { kind: 'salida' as const, time: '15:57' },
+      operation: 'Actualizar',
+      change: { kind: 'salida' as const, time: '14:20' },
+      reason: 'Olvido de fichaje',
+      status: 'concedida' as const,
+      statusText: 'Solicitud Concedida',
+    },
+    {
+      date: '2026-10-02',
+      original: null,
+      operation: 'Añadir',
+      change: { kind: 'salida' as const, time: '17:30' },
+      reason: 'Se me olvidó fichar la salida',
+      status: 'pendiente' as const,
+      statusText: 'Solicitud Pendiente',
+    },
+  ];
+  return { connected: true, available: true, heraRequests: { readAt: Date.now(), items } };
+})();
+
+function AttendanceWithExtension() {
+  const base = useExtension();
+  if (!extensionStatus) return <AttendancePage />;
+  return (
+    <ExtensionContext.Provider value={{ ...base, ...extensionStatus }}>
+      <AttendancePage />
+    </ExtensionContext.Provider>
+  );
+}
+/**
+ * `?ext=odoo`: a connected extension for https://example.com whose queue takes each
+ * request through pending → processing → success (one at a time, 1.5 s each).
+ * `?ext=odoo&rechazar=1` rejects every second request. Sent requests: window.__sent.
+ */
+function WeekWithExtension() {
+  const base = useExtension();
+  const params = new URLSearchParams(window.location.search);
+  const [queue, setQueue] = useState<QueueSummaryItem[]>([]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setQueue((items) => {
+        const index = items.findIndex(
+          (item) => item.status === 'pending' || item.status === 'processing',
+        );
+        if (index < 0) return items;
+        const next = [...items];
+        next[index] = {
+          ...next[index]!,
+          status: next[index]!.status === 'pending' ? 'processing' : 'success',
+        };
+        return next;
+      });
+    }, 1500);
+    return () => clearInterval(timer);
+  }, []);
+  if (params.get('ext') !== 'odoo') {
+    return (
+      <ExtensionContext.Provider value={{ ...base, ...extensionStatus }}>
+        <WeekOverviewPage />
+      </ExtensionContext.Provider>
+    );
+  }
+  const sent = ((window as unknown as { __sent?: OdooRequest[] }).__sent ??= []);
+  const status = {
+    ...base,
+    available: true,
+    connected: true,
+    odooOrigin: 'https://example.com',
+    queue,
+    send: async (request: OdooRequest) => {
+      sent.push(request);
+      if (params.get('rechazar') && sent.length % 2 === 0)
+        return { ok: false, error: 'Rechazado por la prueba.' };
+      setQueue((items) => [
+        ...items,
+        {
+          requestId: request.requestId,
+          taskId: request.taskId,
+          entryIds: request.partes.map((part) => part.id),
+          status: 'pending',
+          error: '',
+        },
+      ]);
+      return { ok: true, error: '' };
+    },
+  };
+  return (
+    <ExtensionContext.Provider value={status}>
+      <WeekOverviewPage />
+    </ExtensionContext.Provider>
+  );
+}
 const noop = async () => {};
 /**
  * `?local=abierto|bloqueado|sin-datos|error`: data kept in this browser (Plan 11). With
@@ -193,6 +300,10 @@ function Smoke() {
                   <Suspense fallback={<p>Cargando vista de prueba…</p>}>
                     <Routes>
                       <Route element={<WorkspaceLayout />}>
+                        {navigationRedirects.map(({ from, to }) => (
+                          <Route key={from} path={from} element={<NavigationRedirect to={to} />} />
+                        ))}
+                        <Route path={paths.weekOverview} element={<WeekWithExtension />} />
                         <Route path="/partes-de-horas" element={<EntriesPage />} />
                         <Route path="/resumen" element={<DashboardPage />} />
                         <Route path="/porcentajes" element={<PercentagesPage />} />
@@ -203,7 +314,7 @@ function Smoke() {
                         <Route path="/proyectos" element={<ProjectsPage />} />
                         <Route path="/ajustes" element={<SettingsPage />} />
                         <Route path="/tareas" element={<TasksPage />} />
-                        <Route path="/parte-semanal" element={<TimesheetPage />} />
+                        <Route path="/fichajes" element={<AttendanceWithExtension />} />
                       </Route>
                     </Routes>
                   </Suspense>

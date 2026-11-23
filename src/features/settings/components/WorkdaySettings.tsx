@@ -2,6 +2,7 @@ import { Panel, Badge, Notice } from '../../../shared/ui/Panel';
 import { InputField } from '../../../shared/ui/FormField';
 import { formatDate, formatDuration } from '../../../domain/time';
 import type { WorkspaceData } from '../../../domain/models';
+import type { ImputationThresholds } from '../../../domain/imputationThresholds';
 import {
   distributeWeekly,
   presetMinutes,
@@ -18,9 +19,16 @@ type Props = {
   dirty: boolean;
   disabled: boolean;
   data: WorkspaceData;
+  thresholds: ImputationThresholds;
+  onThresholdsChange: (thresholds: ImputationThresholds) => void;
 };
 
 const DAY_MAX = 24 * 60;
+const thresholdFields = [
+  { key: 'verdeDesde', label: 'Verde desde (%)' },
+  { key: 'ambarDesde', label: 'Ámbar desde (%)' },
+  { key: 'maximo', label: 'Máximo (%)' },
+] as const;
 
 /** A duration typed as hours and minutes; the value is in minutes. */
 function HoursMinutesField({
@@ -79,7 +87,16 @@ function HoursMinutesField({
   );
 }
 
-export function WorkdaySettings({ value, onChange, minimumDate, dirty, disabled, data }: Props) {
+export function WorkdaySettings({
+  value,
+  onChange,
+  minimumDate,
+  dirty,
+  disabled,
+  data,
+  thresholds,
+  onThresholdsChange,
+}: Props) {
   const totalMinutes = value.minutes.reduce((total, minutes) => total + minutes, 0);
   const days = workedDays(value.minutes);
   const choices = [
@@ -233,6 +250,26 @@ export function WorkdaySettings({ value, onChange, minimumDate, dirty, disabled,
           Define tu reparto para poder crear semanas de trabajo.
         </Notice>
       ) : null}
+      <fieldset className="choice-fieldset" disabled={disabled}>
+        <legend>Umbrales de imputación</legend>
+        <div className="form-grid form-grid--three">
+          {thresholdFields.map(({ key, label }) => (
+            <InputField
+              key={key}
+              label={label}
+              type="number"
+              min={0}
+              max={200}
+              step="any"
+              value={Number.isNaN(thresholds[key]) ? '' : thresholds[key]}
+              disabled={disabled}
+              onChange={(event) =>
+                onThresholdsChange({ ...thresholds, [key]: event.target.valueAsNumber })
+              }
+            />
+          ))}
+        </div>
+      </fieldset>
     </Panel>
   );
 }

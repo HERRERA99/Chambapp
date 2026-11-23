@@ -56,8 +56,8 @@ export function MoveProjectDialog({
         {toLocal ? (
           <p className="muted">
             Se guardará cifrado en este navegador y se borrará de Supabase. Solo estará en este
-            navegador: descarga copias de seguridad desde Ajustes → Datos. Supabase puede conservar
-            sus propias copias de seguridad internas durante su periodo de retención.
+            navegador: descarga copias de seguridad desde Ajustes, apartado Datos. Supabase puede
+            conservar sus propias copias de seguridad internas durante su periodo de retención.
           </p>
         ) : (
           <p className="muted">

@@ -44,7 +44,7 @@ export function RoundingLab() {
         <div>
           <span>Tiempo real del parte</span>
           <strong className="mono">{formatClock(exactSeconds)}</strong>
-          <small>09:07:14 → 13:15:31</small>
+          <small>09:07:14 – 13:15:31</small>
         </div>
         <Icon name="arrow" size={20} />
         <div className="landing-rounding-equation__result">

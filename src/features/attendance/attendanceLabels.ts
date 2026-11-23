@@ -1,9 +1,3 @@
-export function formatImputedPercent(percent: number | null) {
-  return percent === null
-    ? 'Sin fichajes'
-    : `${new Intl.NumberFormat('es', { maximumFractionDigits: 1 }).format(percent)}%`;
-}
-
 /** Display actual attendance at second/millisecond precision, without a work-time rounding rule. */
 export function formatAttendanceDuration(seconds: number) {
   if (!Number.isFinite(seconds)) return '—';

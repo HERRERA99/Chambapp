@@ -8,18 +8,13 @@ import {
   MAX_ODOO_DESCRIPTION,
   MAX_ODOO_MINUTES,
   odooMinutes,
+  sameOrigin,
 } from '../extension/protocol.ts';
 import type { OdooRequest } from '../extension/protocol.ts';
 
-export type TimesheetItem = {
+type TimesheetItem = {
   entry: TimeEntry;
   title: string;
-  odooId: string | null;
-  /** Safe Odoo link of the task, if any. */
-  odooUrl: string | null;
-  range: string;
-  /** Real duration of this entry; null while it is still running. */
-  realSeconds: number | null;
 };
 
 /** Entries logged together: their summed real time is rounded once. */
@@ -114,12 +109,8 @@ export function formatRange(entry: Pick<TimeEntry, 'inicio_en' | 'fin_en' | 'zon
   return `${start.toFormat('HH:mm')}–${end.toFormat('HH:mm')}${days > 0 ? ` (+${days})` : ''}`;
 }
 
-function taskInfo(entry: TimeEntry, task: Task | undefined) {
-  return {
-    title: task && !task.eliminado_en ? task.titulo : 'Tarea no disponible',
-    odooId: entry.odoo_id ?? task?.odoo_id ?? null,
-    odooUrl: [task?.odoo_url, entry.odoo_url].find(isOdooUrl) ?? null,
-  };
+function taskTitle(task: Task | undefined) {
+  return task && !task.eliminado_en ? task.titulo : 'Tarea no disponible';
 }
 
 function buildGroups(entries: readonly TimeEntry[], taskById: Map<string, Task>, date: string) {
@@ -147,11 +138,15 @@ function buildGroups(entries: readonly TimeEntry[], taskById: Map<string, Task>,
     const running = list.filter((entry) => !entry.fin_en);
     const pendingLoggedSeconds = groupRounding(pending).loggedSeconds;
     const open = pending.length > 0 || running.length > 0;
+    const task = taskById.get(taskId);
+    const firstEntry = list[0]!;
     return {
       key: `${date}:${taskId}`,
       date,
       taskId,
-      ...taskInfo(list[0]!, taskById.get(taskId)),
+      title: taskTitle(task),
+      odooId: firstEntry.odoo_id ?? task?.odoo_id ?? null,
+      odooUrl: [task?.odoo_url, firstEntry.odoo_url].find(isOdooUrl) ?? null,
       entries: list,
       pending,
       running,
@@ -181,9 +176,7 @@ export function buildTimesheetWeek({
       .sort((a, b) => a.inicio_en.localeCompare(b.inicio_en) || a.id.localeCompare(b.id));
     const items = dayEntries.map((entry): TimesheetItem => ({
       entry,
-      ...taskInfo(entry, taskById.get(entry.tarea_id)),
-      range: formatRange(entry),
-      realSeconds: entry.fin_en ? (entry.duracion_real_segundos ?? 0) : null,
+      title: taskTitle(taskById.get(entry.tarea_id)),
     }));
     const groups = buildGroups(dayEntries, taskById, date);
     return {
@@ -305,4 +298,130 @@ export function buildOdooRequest({
       origen: task.origen === 'local' ? 'local' : 'nube',
     },
   };
+}
+
+export type WeekOdooSendRow = {
+  group: TimesheetGroup;
+  request: OdooRequest | null;
+  choices: string[];
+  needsDescription: boolean;
+  isLong: boolean;
+  /** Reason why this group cannot be sent right now; null when it can. */
+  exclusionReason: string | null;
+};
+
+/**
+ * Plans the Odoo requests for every group of the visible week that still has pending
+ * entries, in day and group order. Reuses `buildOdooRequest` for time rounding and
+ * validation, and flags groups that cannot be sent right now with their reason.
+ */
+export function planWeekOdooSend({
+  days,
+  tasks,
+  userId,
+  locked,
+  nextId,
+  odooOrigin,
+}: {
+  days: readonly TimesheetDay[];
+  tasks: readonly Task[];
+  userId: string;
+  locked: { entries: ReadonlySet<string>; tasks?: ReadonlySet<string> };
+  nextId: () => string;
+  /** Configured Odoo origin, when known; tasks from another origin are excluded. */
+  odooOrigin?: string | null;
+}): WeekOdooSendRow[] {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const rows: WeekOdooSendRow[] = [];
+  for (const day of days) {
+    for (const group of day.groups) {
+      if (!group.pending.length) continue;
+      const choices = odooDescriptionChoices(group.pending);
+      const needsDescription = choices.length !== 1;
+      const task = taskById.get(group.taskId);
+      const odooUrl = [task?.odoo_url, group.odooUrl].find(isOdooUrl) ?? null;
+      if (!task || task.id !== group.taskId) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: 'La tarea ya no está disponible.',
+        });
+        continue;
+      }
+      if (!odooUrl) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: 'La tarea no tiene un enlace de Odoo válido.',
+        });
+        continue;
+      }
+      if (odooOrigin && !sameOrigin(odooUrl, odooOrigin)) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: `La tarea no es del Odoo configurado (${odooOrigin}).`,
+        });
+        continue;
+      }
+      if (group.running.length > 0) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: 'Hay un cronómetro en marcha en este grupo.',
+        });
+        continue;
+      }
+      if (group.pending.some((entry) => locked.entries.has(entry.id))) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: 'Algún parte ya está en cola para Odoo.',
+        });
+        continue;
+      }
+      const built = buildOdooRequest({
+        group,
+        entries: group.pending,
+        task,
+        userId,
+        requestId: nextId(),
+      });
+      if ('problem' in built) {
+        rows.push({
+          group,
+          request: null,
+          choices,
+          needsDescription,
+          isLong: false,
+          exclusionReason: built.problem,
+        });
+        continue;
+      }
+      rows.push({
+        group,
+        request: built.request,
+        choices,
+        needsDescription,
+        isLong: built.request.minutos > LONG_ODOO_MINUTES,
+        exclusionReason: null,
+      });
+    }
+  }
+  return rows;
 }

@@ -1,17 +1,18 @@
 import { paths } from '../../app/paths.ts';
+import { weekRedirects } from '../../app/navigation.ts';
 
 const protectedPaths: readonly string[] = [
   paths.dashboard,
   paths.projects,
   paths.tasks,
-  paths.timesheet,
-  paths.board,
   paths.notes,
   paths.passwords,
   paths.calendar,
+  paths.records,
   paths.entries,
   paths.attendance,
-  paths.week,
+  paths.weekOverview,
+  paths.tools,
   paths.percentages,
   paths.timeCalculator,
   paths.fakeData,
@@ -28,8 +29,9 @@ export function safeReturnTo(
     return paths.dashboard;
   try {
     const url = new URL(value, origin);
-    return url.origin === origin && protectedPaths.includes(url.pathname)
-      ? `${url.pathname}${url.search}${url.hash}`
+    const pathname = weekRedirects.find(({ from }) => from === url.pathname)?.to ?? url.pathname;
+    return url.origin === origin && protectedPaths.includes(pathname)
+      ? `${pathname}${url.search}${url.hash}`
       : paths.dashboard;
   } catch {
     return paths.dashboard;

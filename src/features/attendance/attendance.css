@@ -44,25 +44,28 @@
 .attendance-period-controls .field {
   max-width: 220px;
 }
-.attendance-page .stat,
-.attendance-comparison .stat {
-  container-type: inline-size;
-}
-.attendance-page .stat__value,
-.attendance-comparison .stat__value {
-  font-size: clamp(12px, 12cqi, 29px);
-}
 .attendance-comparison__hint {
   margin-top: 18px;
   display: block;
   line-height: 1.6;
 }
-.attendance-day-link {
-  cursor: pointer;
-  background: none;
-  border: 0;
+.attendance-hera {
+  margin-top: 16px;
+}
+.attendance-hera__list {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0;
   padding: 0;
-  font: inherit;
+  list-style: none;
+}
+.attendance-hera__list p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.attendance-hera__warning {
+  color: var(--warning);
+  margin: 10px 0 0;
 }
 @media (max-width: 1100px) {
   .attendance-controls--compact .attendance-controls__status {
@@ -76,16 +79,6 @@
   .attendance-controls--compact .button .icon {
     display: none;
   }
-}
-.attendance-chart__value--worked {
-  color: #c3b2c8;
-}
-.attendance-chart__value--imputed {
-  color: #ff82b1;
-}
-.attendance-comparison .bar-chart,
-.attendance-page .bar-chart {
-  margin-top: 20px;
 }
 .quick-attendance {
   display: grid;

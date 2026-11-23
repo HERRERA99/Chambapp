@@ -1,4 +1,5 @@
 import { validDateRange } from '../../domain/calendar.ts';
+import { validHolidayCountry } from '../../domain/holidayPreference.ts';
 
 export type PublicHoliday = {
   date: string;
@@ -51,14 +52,22 @@ export function selectedHolidays(holidays: readonly PublicHoliday[], region: str
   return [...dates].map(([fecha, titles]) => ({ fecha, titulo: titles.join(' / ').slice(0, 200) }));
 }
 
+const HOLIDAYS_TIMEOUT_MS = 10_000;
+
 export async function fetchHolidays(year: number, country: string, signal: AbortSignal) {
-  if (!Number.isInteger(year) || year < 1900 || year > 2100 || !/^[A-Z]{2}$/.test(country)) {
+  if (!Number.isInteger(year) || year < 1900 || year > 2100 || !validHolidayCountry(country)) {
     throw new Error('Selecciona un año y un país válidos.');
   }
+  // Without a time limit an unreachable service leaves the form «Consultando…» forever.
   const response = await fetch(
     `https://nagerholidays.com/api/v3/PublicHolidays/${year}/${country}`,
-    { signal },
-  );
+    { signal: AbortSignal.any([signal, AbortSignal.timeout(HOLIDAYS_TIMEOUT_MS)]) },
+  ).catch((cause: unknown) => {
+    if (signal.aborted) throw cause;
+    throw new Error(
+      'El servicio de festivos no responde. Inténtalo más tarde o regístralos manualmente.',
+    );
+  });
   if (!response.ok)
     throw new Error('No se pudieron consultar los festivos. Puedes registrarlos manualmente.');
   return parseHolidays(await response.json(), year, country);

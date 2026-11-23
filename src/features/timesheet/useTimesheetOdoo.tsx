@@ -1,47 +1,42 @@
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
-import { DateTime } from 'luxon';
 import type { TimeEntry, WorkspaceData } from '../../domain/models';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/useAuth';
-import { formatDuration, mondayForDate, todayInZone } from '../../domain/time';
-import { Button, IconButton } from '../../shared/ui/Button';
-import { Icon } from '../../shared/ui/Icon';
-import { Notice } from '../../shared/ui/Panel';
 import { useFeedback } from '../../shared/feedback/FeedbackContext';
-import { useWorkspace } from '../workspace/useWorkspace';
 import { useCommand } from '../workspace/useCommand';
 import { useTracker } from '../tracker/useTracker';
 import {
   applyImputationResult,
   buildOdooRequest,
-  buildTimesheetWeek,
   odooDescriptionChoices,
+  planWeekOdooSend,
 } from './timesheet.model';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useExtension } from '../extension/useExtension';
-import { LONG_ODOO_MINUTES } from '../extension/protocol';
+import { lockedIds, LONG_ODOO_MINUTES } from '../extension/protocol';
 import type { OdooRequest, QueueAction } from '../extension/protocol';
-import type { ImputationResultEntry, TimesheetGroup, TimesheetItem } from './timesheet.model';
-import { TimesheetGroups } from './components/TimesheetGroups';
-import { TimesheetDayHeader } from './components/TimesheetDayHeader';
+import type {
+  ImputationResultEntry,
+  TimesheetDay,
+  TimesheetGroup,
+  WeekOdooSendRow,
+} from './timesheet.model';
 import { OdooDescriptionDialog } from './components/OdooDescriptionDialog';
-import './timesheet.css';
+import { WeekOdooSendDialog } from './components/WeekOdooSendDialog';
+import type { WeekOdooSendSelection } from './components/WeekOdooSendDialog';
 
-function weekLabel(monday: string, lastDay: string) {
-  const start = DateTime.fromISO(monday, { zone: 'UTC' }).setLocale('es');
-  const end = DateTime.fromISO(lastDay, { zone: 'UTC' }).setLocale('es');
-  return `Semana del ${start.toFormat(start.month === end.month ? 'd' : 'd LLL')} – ${end.toFormat('d LLL yyyy')}`;
-}
-
-export default function TimesheetPage() {
-  const { data, isLoading, error, reload } = useWorkspace();
+export function useTimesheetOdoo(
+  data: WorkspaceData | null,
+  days: TimesheetDay[],
+  weekLabel: string,
+) {
   const { run, pending } = useCommand();
   const tracker = useTracker();
   const notify = useFeedback();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [selectedMonday, setSelectedMonday] = useState<string | null>(null);
+  const extension = useExtension();
+  const busy = pending || tracker.busy || tracker.pending;
   const [actionError, setActionError] = useState('');
   const [longSend, setLongSend] = useState<{ group: TimesheetGroup; request: OdooRequest } | null>(
     null,
@@ -53,23 +48,41 @@ export default function TimesheetPage() {
     request: OdooRequest;
     choices: string[];
   } | null>(null);
-  const extension = useExtension();
-  const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
-  const today = todayInZone(zone);
-  const currentMonday = mondayForDate(today);
-  const monday = selectedMonday ?? currentMonday;
-  const week = buildTimesheetWeek({
-    entries: data?.entries ?? [],
+  const [weekSendRows, setWeekSendRows] = useState<WeekOdooSendRow[] | null>(null);
+  const [sendingWeek, setSendingWeek] = useState(false);
+  const [weekBatchIds, setWeekBatchIds] = useState<string[]>([]);
+  const locked = lockedIds(extension.queue);
+  const weekPlan = planWeekOdooSend({
+    days,
     tasks: data?.tasks ?? [],
-    monday,
+    userId: user?.id ?? '',
+    locked,
+    nextId: () => '00000000-0000-4000-8000-000000000000',
+    odooOrigin: extension.connected ? extension.odooOrigin : null,
   });
-  const busy = pending || tracker.busy || tracker.pending;
-  const lastDay = week.days.at(-1)?.date ?? monday;
-  const timelineCount = week.days.reduce((total, day) => total + day.items.length, 0);
-
-  function moveWeek(weeks: number) {
-    setSelectedMonday(DateTime.fromISO(monday, { zone: 'UTC' }).plus({ weeks }).toISODate()!);
-  }
+  const sendableRows = weekPlan.filter(
+    (row) => row.exclusionReason === null && row.request !== null,
+  );
+  const sendableMinutes = sendableRows.reduce((sum, row) => sum + (row.request?.minutos ?? 0), 0);
+  const batchQueueById = new Map(extension.queue.map((item) => [item.requestId, item]));
+  const batchInFlight = weekBatchIds.filter((id) => {
+    const status = batchQueueById.get(id)?.status;
+    return status === 'pending' || status === 'processing';
+  }).length;
+  const batchDone = weekBatchIds.length - batchInFlight;
+  const weekSendDisabledReason = !extension.available
+    ? 'Instala la extensión de Chambapp para enviar a Odoo.'
+    : !extension.connected
+      ? 'Conecta la extensión con esta cuenta para enviar a Odoo.'
+      : !extension.odooOrigin
+        ? 'Configura tu Odoo en los ajustes de la extensión.'
+        : busy || sendingWeek
+          ? 'Espera a que terminen los cambios actuales.'
+          : sendableRows.length === 0
+            ? weekPlan.length > 0
+              ? 'No hay partes enviables esta semana (revisa el estado de cada grupo).'
+              : 'No hay partes pendientes esta semana.'
+            : null;
 
   /** Keeps the confirmed result even if the follow-up refresh fails (newer versions win). */
   function applyResult(partes: ImputationResultEntry[]) {
@@ -184,8 +197,80 @@ export default function TimesheetPage() {
       notify(`Marcando como imputados los partes de ${group.title}…`);
   }
 
-  return (
-    <div className="timesheet">
+  async function sendWeek(items: WeekOdooSendSelection[]) {
+    if (!user || !items.length) return;
+    setActionError('');
+    setSendingWeek(true);
+    const queuedIds: string[] = [];
+    const errors: string[] = [];
+    try {
+      for (const item of items) {
+        const built = buildOdooRequest({
+          group: item.row.group,
+          entries: item.row.group.pending,
+          task: data?.tasks.find((task) => task.id === item.row.group.taskId),
+          userId: user.id,
+          requestId: crypto.randomUUID(),
+          descripcion: item.descripcion,
+          confirmLong: item.row.isLong,
+        });
+        if ('problem' in built) {
+          errors.push(`${item.row.group.title}: ${built.problem}`);
+          continue;
+        }
+        const result = await extension.send(built.request);
+        if (result.ok) {
+          queuedIds.push(built.request.requestId);
+        } else {
+          errors.push(result.error || `${item.row.group.title}: no se pudo enviar a Odoo.`);
+        }
+      }
+    } finally {
+      setSendingWeek(false);
+    }
+    if (queuedIds.length > 0) {
+      setWeekBatchIds((prev) => {
+        const stillInFlight = prev.filter((id) => {
+          const status = batchQueueById.get(id)?.status;
+          return status === 'pending' || status === 'processing';
+        });
+        return [...stillInFlight, ...queuedIds];
+      });
+    }
+    setWeekSendRows(null);
+    if (errors.length === 0) {
+      notify(
+        queuedIds.length === 1
+          ? '1 línea en cola para Odoo'
+          : `${queuedIds.length} líneas en cola para Odoo`,
+      );
+    } else if (queuedIds.length > 0) {
+      notify(
+        errors.length === 1
+          ? `${queuedIds.length} en cola, 1 rechazada: ${errors[0]}`
+          : `${queuedIds.length} en cola, ${errors.length} rechazadas: ${errors.join(' · ')}`,
+      );
+    } else {
+      const message =
+        errors.length === 1
+          ? `No se pudo enviar a Odoo: ${errors[0]}`
+          : `${errors.length} líneas rechazadas: ${errors.join(' · ')}`;
+      setActionError(message);
+      notify(message);
+    }
+  }
+
+  const dialogs = (
+    <>
+      {weekSendRows ? (
+        <WeekOdooSendDialog
+          open
+          weekLabel={weekLabel}
+          rows={weekSendRows}
+          onClose={() => setWeekSendRows(null)}
+          onConfirm={sendWeek}
+        />
+      ) : null}
       {describe ? (
         <OdooDescriptionDialog
           key={describe.key}
@@ -230,136 +315,22 @@ export default function TimesheetPage() {
           if (!ok) throw new Error('No se pudo enviar a Odoo.');
         }}
       />
-      <header className="timesheet__toolbar">
-        <div>
-          <p className="eyebrow">Parte semanal</p>
-          <h1 className="timesheet__title">{weekLabel(monday, lastDay)}</h1>
-        </div>
-        <span className="timesheet__total mono" aria-label="Total imputable de la semana">
-          {formatDuration(week.loggedSeconds)}
-        </span>
-        <div className="timesheet__nav">
-          <IconButton icon="left" label="Semana anterior" onClick={() => moveWeek(-1)} />
-          <Button
-            variant="ghost"
-            disabled={monday === currentMonday}
-            onClick={() => setSelectedMonday(null)}
-          >
-            Hoy
-          </Button>
-          <IconButton icon="right" label="Semana siguiente" onClick={() => moveWeek(1)} />
-        </div>
-      </header>
-      {error ? (
-        <Notice title="No se pudieron cargar los partes">
-          <p role="alert">{error.message}</p>
-          <Button onClick={() => void reload()}>Reintentar</Button>
-        </Notice>
-      ) : null}
-      {actionError ? (
-        <p role="alert" className="form-error">
-          {actionError}
-        </p>
-      ) : null}
-      {isLoading && !data ? (
-        <p role="status">Cargando partes…</p>
-      ) : (
-        <>
-          <TimesheetGroups
-            days={week.days}
-            today={today}
-            busy={busy}
-            onImpute={impute}
-            onUndo={undo}
-            onSend={send}
-            onQueueAction={queueAction}
-          />
-          <section className="timesheet__section" aria-labelledby="timesheet-timeline-title">
-            <header className="timesheet__section-header">
-              <h2 id="timesheet-timeline-title">Timeline</h2>
-              <span className="dim">
-                {timelineCount} {timelineCount === 1 ? 'parte' : 'partes'}
-              </span>
-            </header>
-            <div
-              className="timesheet__grid"
-              style={{ '--timesheet-days': week.days.length } as CSSProperties}
-            >
-              {week.days.map((day) => (
-                <section
-                  key={day.date}
-                  className={`timesheet__day ${day.date === today ? 'timesheet__day--today' : ''}`}
-                  aria-labelledby={`timesheet-${day.date}`}
-                >
-                  <TimesheetDayHeader
-                    id={`timesheet-${day.date}`}
-                    date={day.date}
-                    seconds={day.items.reduce((total, item) => total + (item.realSeconds ?? 0), 0)}
-                    totalLabel="Tiempo real del día"
-                  />
-                  <ul className="timesheet__items">
-                    {day.items.length ? (
-                      day.items.map((item) => <TimesheetRow key={item.entry.id} item={item} />)
-                    ) : (
-                      <li className="timesheet__empty dim">—</li>
-                    )}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-    </div>
+    </>
   );
-}
 
-function TimesheetRow({ item }: { item: TimesheetItem }) {
-  const { entry } = item;
-  const imputed = entry.imputado_en_odoo;
-  const open = !entry.fin_en;
-  const status = open ? 'En curso' : imputed ? 'Imputado en Odoo' : 'Pendiente de imputar en Odoo';
-  return (
-    <li
-      className={`timesheet__item ${imputed ? 'timesheet__item--imputed' : ''} ${open ? 'timesheet__item--open' : ''}`}
-    >
-      <div className="timesheet__item-head">
-        {item.odooUrl ? (
-          <a
-            className="timesheet__item-title timesheet__item-title--link"
-            href={item.odooUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abrir en Odoo"
-          >
-            {item.title}
-            <Icon name="external" size={11} />
-          </a>
-        ) : (
-          <strong className="timesheet__item-title">{item.title}</strong>
-        )}
-        {item.odooId ? (
-          <span className="timesheet__odoo-id mono" title={item.odooId}>
-            {item.odooId}
-          </span>
-        ) : null}
-      </div>
-      <div className="timesheet__item-meta">
-        <span className="mono dim">{item.range}</span>
-        <strong className="mono timesheet__logged" title="Tiempo real">
-          {item.realSeconds === null ? '—' : formatDuration(item.realSeconds)}
-        </strong>
-      </div>
-      <div className="timesheet__item-actions">
-        <span
-          className={`timesheet__item-status ${imputed ? 'timesheet__item-status--imputed' : ''}`}
-          role="img"
-          aria-label={status}
-          title={status}
-        >
-          <Icon name={open ? 'timer' : imputed ? 'check' : 'clock'} size={13} />
-        </span>
-      </div>
-    </li>
-  );
+  return {
+    dialogs,
+    actionError,
+    groupActions: {
+      busy,
+      onImpute: impute,
+      onUndo: undo,
+      onSend: send,
+      onQueueAction: queueAction,
+    },
+    weekSendDisabledReason,
+    sendableMinutes,
+    openWeekSend: () => setWeekSendRows(weekPlan),
+    batchProgress: batchInFlight > 0 ? { done: batchDone, total: weekBatchIds.length } : null,
+  };
 }

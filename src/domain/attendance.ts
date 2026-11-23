@@ -1,26 +1,16 @@
 import { DateTime } from 'luxon';
-import type { Attendance, TimeEntry } from './models.ts';
+import type { Attendance } from './models.ts';
 
 export type AttendanceDay = {
   date: string;
   closedSeconds: number;
   provisionalSeconds: number;
   workedSeconds: number;
-  imputedSeconds: number;
-  imputedPercent: number | null;
 };
-
-export function imputedPercent(imputedSeconds: number, workedSeconds: number) {
-  return workedSeconds > 0 ? Math.round((imputedSeconds / workedSeconds) * 1000) / 10 : null;
-}
 
 /** Uses actual instants and each local midnight, including 23/25-hour DST days. */
 export function attendanceDays(
   attendance: readonly Pick<Attendance, 'inicio_en' | 'fin_en' | 'eliminado_en'>[],
-  entries: readonly Pick<
-    TimeEntry,
-    'inicio_en' | 'fin_en' | 'duracion_imputada_segundos' | 'eliminado_en'
-  >[],
   dates: readonly string[],
   zone: string,
   now: string,
@@ -35,8 +25,6 @@ export function attendanceDays(
     closedSeconds: 0,
     provisionalSeconds: 0,
     workedSeconds: 0,
-    imputedSeconds: 0,
-    imputedPercent: null as number | null,
   }));
   const nowMs = Date.parse(now);
   for (const record of attendance) {
@@ -51,38 +39,10 @@ export function attendanceDays(
       else day.provisionalSeconds += overlap;
     });
   }
-  for (const entry of entries) {
-    if (entry.eliminado_en || !entry.fin_en || entry.duracion_imputada_segundos === null) continue;
-    const start = Date.parse(entry.inicio_en);
-    const end = Date.parse(entry.fin_en);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
-    // Distribute rounding proportionally; every second is counted once across days.
-    bounds.forEach((bound, index) => {
-      const overlap = Math.max(0, Math.min(end, bound.end) - Math.max(start, bound.start));
-      days[index]!.imputedSeconds += (entry.duracion_imputada_segundos! * overlap) / (end - start);
-    });
-  }
-  return days.map((day) => {
-    const workedSeconds = day.closedSeconds + day.provisionalSeconds;
-    return {
-      ...day,
-      workedSeconds,
-      imputedPercent: imputedPercent(day.imputedSeconds, workedSeconds),
-    };
-  });
-}
-
-export function attendanceTotal(days: readonly AttendanceDay[]) {
-  const total = days.reduce(
-    (result, day) => ({
-      closedSeconds: result.closedSeconds + day.closedSeconds,
-      provisionalSeconds: result.provisionalSeconds + day.provisionalSeconds,
-      workedSeconds: result.workedSeconds + day.workedSeconds,
-      imputedSeconds: result.imputedSeconds + day.imputedSeconds,
-    }),
-    { closedSeconds: 0, provisionalSeconds: 0, workedSeconds: 0, imputedSeconds: 0 },
-  );
-  return { ...total, imputedPercent: imputedPercent(total.imputedSeconds, total.workedSeconds) };
+  return days.map((day) => ({
+    ...day,
+    workedSeconds: day.closedSeconds + day.provisionalSeconds,
+  }));
 }
 
 export function attendanceInPeriod(

@@ -1,47 +1,56 @@
-import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
-import { Link } from 'react-router-dom';
-import { PageHeader } from '../../shared/ui/PageHeader';
-import { StatGrid } from '../../shared/ui/StatGrid';
-import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
-import { Panel, Badge } from '../../shared/ui/Panel';
-import { Icon } from '../../shared/ui/Icon';
-import { TimerDisplay } from '../tracker/TimerDisplay';
-import { AttendanceControls } from '../attendance/AttendanceControls';
-import { AttendanceComparison } from '../attendance/AttendanceComparison';
-import { useAttendance } from '../attendance/useAttendance';
-import { OdooLink } from '../tasks/components/OdooLink';
-import { useTracker } from '../tracker/useTracker';
-import { WeekChart } from '../week/components/WeekChart';
-import { EntryModal } from '../time-entries/components/EntryModal';
-import { useWorkspace } from '../workspace/useWorkspace';
-import { useFeedback } from '../../shared/feedback/FeedbackContext';
-import { dashboardSummary } from './dashboardSelectors';
-import { formatDate, formatDuration, formatTime, mondayForDate } from '../../domain/time';
-import { readableError } from '../../lib/supabase/errors';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { TimeEntry } from '../../domain/models';
-import { attendanceDays, attendanceTotal } from '../../domain/attendance';
+import { formatDate, formatDuration, formatTime } from '../../domain/time';
+import { readableError } from '../../lib/supabase/errors';
+import { useFeedback } from '../../shared/feedback/FeedbackContext';
+import { Button, ButtonLink, IconButton } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
+import { Badge, Panel } from '../../shared/ui/Panel';
+import { AttendanceControls } from '../attendance/AttendanceControls';
+import { useAttendance } from '../attendance/useAttendance';
+import { formatHoursMinutes } from '../extension/protocol';
+import { OdooLink } from '../tasks/components/OdooLink';
+import { EntryModal } from '../time-entries/components/EntryModal';
+import { OdooEntryStatus } from '../time-entries/components/OdooEntryStatus';
+import { TimerDisplay } from '../tracker/TimerDisplay';
+import { useTracker } from '../tracker/useTracker';
+import { useWorkspace } from '../workspace/useWorkspace';
+import {
+  dashboardSummary,
+  formatDashboardDayTitle,
+  formatDashboardPercent,
+  isValidIsoDate,
+  parseDashboardDate,
+  shiftDashboardDate,
+} from './dashboardSelectors';
+import './dashboard.css';
+
+function hoursMinutes(seconds: number) {
+  return formatHoursMinutes(Math.floor(seconds / 60));
+}
 
 export default function DashboardPage() {
   const { data } = useWorkspace();
   const tracker = useTracker();
   const attendance = useAttendance();
   const notify = useFeedback();
+  const [search, setSearch] = useSearchParams();
   const [editor, setEditor] = useState<TimeEntry | 'new' | null>(null);
-  if (!data) return null;
-  const { profile, entries, tasks, projects } = data;
-  const today = DateTime.fromISO(attendance.now, { zone: profile.zona_horaria }).toISODate()!;
-  const { week, day, total, missingDays } = dashboardSummary(data, today);
-  const workedDays = attendanceDays(
-    data.fichajes,
-    [],
-    week.map((item) => item.date),
-    profile.zona_horaria,
-    attendance.now,
+  const zone = data?.profile.zona_horaria ?? 'Europe/Madrid';
+  const today = DateTime.fromISO(attendance.now, { zone }).toISODate()!;
+  const selectedDate = parseDashboardDate(search.get('fecha'), today);
+  const isToday = selectedDate === today;
+  const summary = useMemo(
+    () => (data ? dashboardSummary(data, today, attendance.now, selectedDate) : null),
+    [data, today, attendance.now, selectedDate],
   );
-  const workedTotal = attendanceTotal(workedDays);
-  const workedByDate = new Map(workedDays.map((item) => [item.date, item.workedSeconds]));
+  if (!data || !summary) return null;
+
+  const { profile, entries, tasks, projects } = data;
+  const { today: daySummary, alerts } = summary;
+  const dayTitle = formatDashboardDayTitle(selectedDate, today);
   const activeTask = tasks.find((task) => task.id === tracker.active?.tarea_id);
   const activeProject = projects.find((project) => project.id === activeTask?.proyecto_id);
   const available = tasks.filter(
@@ -55,15 +64,28 @@ export default function DashboardPage() {
     .slice(0, 4);
   const taskTotals = new Map<string, number>();
   for (const entry of entries)
-    if (entry.fin_en)
+    if (!entry.eliminado_en && entry.fin_en)
       taskTotals.set(
         entry.tarea_id,
         (taskTotals.get(entry.tarea_id) ?? 0) + (entry.duracion_imputada_segundos ?? 0),
       );
-  const todayEntries = entries.filter((entry) => entry.fecha === today && entry.fin_en);
-  const balance =
-    workedDays.reduce((sum, item) => sum + (item.date <= today ? item.workedSeconds : 0), 0) -
-    total.due;
+  const dayEntries = entries.filter(
+    (entry) => !entry.eliminado_en && entry.fecha === selectedDate && entry.fin_en,
+  );
+
+  function selectDate(value: string) {
+    if (!isValidIsoDate(value)) return;
+    const next = new URLSearchParams(search);
+    if (value === today) next.delete('fecha');
+    else next.set('fecha', value);
+    if (next.toString() === search.toString()) return;
+    setSearch(next);
+  }
+
+  function moveDay(days: number) {
+    selectDate(shiftDashboardDate(selectedDate, days));
+  }
+
   async function toggleTask(id: string) {
     try {
       if (tracker.active?.tarea_id === id) await tracker.stop();
@@ -72,66 +94,97 @@ export default function DashboardPage() {
       notify(readableError(cause));
     }
   }
+
   return (
     <div className="page-stack">
-      <PageHeader
-        eyebrow="Tu jornada"
-        title={`Hola, ${profile.nombre.split(' ')[0] || 'de nuevo'}`}
-        description={formatDate(today, profile.zona_horaria)}
-        actions={
-          <>
-            <ButtonLink to="/ajustes#redondeo" icon="settings">
-              {profile.intervalo_redondeo_minutos
-                ? `Redondeo R${profile.intervalo_redondeo_minutos}`
-                : 'Tiempo exacto'}
-            </ButtonLink>
-            <Button icon="plus" onClick={() => setEditor('new')}>
-              Nuevo registro
-            </Button>
-          </>
+      <header className="page-header dashboard-header">
+        <div>
+          <p className="eyebrow">Tu jornada</p>
+          <h1>{isToday ? `Hola, ${profile.nombre.split(' ')[0] || 'de nuevo'}` : dayTitle}</h1>
+          <div className="dashboard-header__meta">
+            {isToday ? (
+              <p className="page-description">{formatDate(selectedDate, profile.zona_horaria)}</p>
+            ) : null}
+            <div className="dashboard-day-nav" role="group" aria-label="Cambiar de día">
+              <IconButton icon="left" label="Día anterior" onClick={() => moveDay(-1)} />
+              <Button variant="ghost" disabled={isToday} onClick={() => selectDate(today)}>
+                Hoy
+              </Button>
+              <IconButton icon="right" label="Día siguiente" onClick={() => moveDay(1)} />
+              <input
+                type="date"
+                className="dashboard-day-nav__input mono"
+                aria-label="Ir a fecha"
+                value={selectedDate}
+                onChange={(event) => selectDate(event.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="page-actions">
+          <Button icon="plus" onClick={() => setEditor('new')}>
+            Nuevo registro
+          </Button>
+        </div>
+      </header>
+      <Panel
+        title="Entrada y salida de jornada"
+        icon="clock"
+        className="dashboard-attendance"
+        action={
+          !isToday ? (
+            <span className="dashboard-live-note muted">
+              Fichar y el cronómetro usan la hora actual
+            </span>
+          ) : undefined
         }
-      />
-      <Panel title="Entrada y salida de jornada" icon="clock">
+      >
         <AttendanceControls />
       </Panel>
-      <StatGrid
-        stats={[
-          {
-            label: 'Objetivo de hoy',
-            value: formatDuration(day.targetSeconds),
-            detail: 'Según tu jornada planificada',
-            icon: 'calendar',
-          },
-          {
-            label: 'Tiempo imputado hoy',
-            value: formatDuration(day.logged),
-            detail: `Real: ${formatDuration(day.real)} · ${day.count} partes cerrados`,
-            icon: 'timer',
-            accent: true,
-            progress: day.targetSeconds ? (day.logged / day.targetSeconds) * 100 : 0,
-          },
-          {
-            label: 'Saldo hasta hoy',
-            value: `${balance >= 0 ? '+' : '−'}${formatDuration(Math.abs(balance))}`,
-            detail: 'Tiempo fichado frente al objetivo acumulado',
-            icon: 'gauge',
-            accent: balance >= 0,
-          },
-          {
-            label: 'Tareas pendientes',
-            value: String(available.length),
-            detail: `${projects.filter((project) => !project.archivado_en).length} proyectos activos`,
-            icon: 'tasks',
-          },
-        ]}
-      />
-      {missingDays ? (
-        <p className="muted">
-          Hay jornadas pendientes de generar esta semana.{' '}
-          <Link className="text-link" to="/mi-semana">
-            Abrir calendario
-          </Link>
-        </p>
+      <section
+        className="panel today-strip"
+        aria-label={isToday ? 'Resumen de hoy' : `Resumen del ${dayTitle}`}
+      >
+        <div className="today-strip__metrics">
+          <div className="today-strip__item">
+            <span className="eyebrow">Fichado</span>
+            <span className="mono today-strip__value">
+              {hoursMinutes(daySummary.workedSeconds)}
+              {daySummary.provisional ? <small className="muted"> provisional</small> : null}
+            </span>
+          </div>
+          <div className="today-strip__item">
+            <span className="eyebrow">Imputado</span>
+            <span className="mono today-strip__value">
+              {hoursMinutes(daySummary.imputedSeconds)}
+            </span>
+          </div>
+          <div className="today-strip__item">
+            <span className="eyebrow">% del día</span>
+            <strong
+              className="mono today-strip__value today-strip__percent"
+              data-tone={daySummary.tone ?? undefined}
+            >
+              {formatDashboardPercent(daySummary.imputedPercent)}
+            </strong>
+          </div>
+        </div>
+        <Link className="text-link" to="/semana">
+          Ver semana <Icon name="arrow" size={14} />
+        </Link>
+      </section>
+      {alerts.length ? (
+        <ul className="dashboard-alerts" aria-label="Avisos de la semana">
+          {alerts.map((alert) => (
+            <li key={alert.id}>
+              <Link to="/semana" className="dashboard-alert" data-tone={alert.tone}>
+                <Icon name={alert.kind === 'odoo' ? 'send' : 'gauge'} size={15} />
+                <span>{alert.label}</span>
+                <Icon name="arrow" size={14} className="dashboard-alert__arrow" />
+              </Link>
+            </li>
+          ))}
+        </ul>
       ) : null}
       <section className="tracker-hero">
         <div className="tracker-hero__details">
@@ -158,27 +211,6 @@ export default function DashboardPage() {
         </div>
         <TimerDisplay />
       </section>
-      <AttendanceComparison monday={mondayForDate(today)} today={today} compact />
-      <Panel eyebrow="Comparativa semanal" title="Horas fichadas y objetivo">
-        <WeekChart
-          hoursLabel="fichadas"
-          legendAside={
-            <>
-              {formatDuration(workedTotal.workedSeconds)} / {formatDuration(total.target)}
-            </>
-          }
-          days={week.map((item) => ({
-            date: item.date,
-            label: DateTime.fromISO(item.date).setLocale('es').toFormat('ccc dd'),
-            loggedSeconds: workedByDate.get(item.date) ?? 0,
-            targetSeconds: item.targetSeconds,
-            isToday: item.date === today,
-          }))}
-        />
-        {workedTotal.provisionalSeconds > 0 ? (
-          <p className="field__hint">Incluye el fichaje en curso como tiempo provisional.</p>
-        ) : null}
-      </Panel>
       <div className="two-columns">
         <Panel
           title="Tareas pendientes"
@@ -228,12 +260,14 @@ export default function DashboardPage() {
           </Link>
         </Panel>
         <Panel
-          title="Partes registrados hoy"
+          title={isToday ? 'Partes registrados hoy' : 'Partes del día'}
           icon="clock"
-          action={<span className="mono accent">Total: {formatDuration(day.logged)}</span>}
+          action={
+            <span className="mono accent">Total: {formatDuration(daySummary.imputedSeconds)}</span>
+          }
         >
-          {todayEntries.length ? (
-            todayEntries.slice(0, 4).map((entry) => (
+          {dayEntries.length ? (
+            dayEntries.slice(0, 4).map((entry) => (
               <div className="entry-summary" key={entry.id}>
                 <div>
                   <strong className="mono">
@@ -249,7 +283,7 @@ export default function DashboardPage() {
                   <span className="mono dim entry-summary__duration">
                     Real: {formatDuration(entry.duracion_real_segundos ?? 0)}{' '}
                     <span className="accent">
-                      → Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
+                      · Imputado: {formatDuration(entry.duracion_imputada_segundos ?? 0)}
                     </span>
                   </span>
                 </div>
@@ -257,9 +291,11 @@ export default function DashboardPage() {
               </div>
             ))
           ) : (
-            <p className="muted section-intro">Todavía no hay partes cerrados hoy.</p>
+            <p className="muted section-intro">
+              {isToday ? 'Todavía no hay partes cerrados hoy.' : 'No hay partes cerrados este día.'}
+            </p>
           )}
-          {tracker.active ? (
+          {tracker.active && tracker.active.fecha === selectedDate ? (
             <div className="entry-summary entry-summary--live">
               <span className="status-dot" />
               <div>
@@ -278,6 +314,7 @@ export default function DashboardPage() {
       <EntryModal
         open={editor !== null}
         entry={editor && editor !== 'new' ? editor : null}
+        date={editor === 'new' ? selectedDate : undefined}
         onClose={() => setEditor(null)}
       />
     </div>

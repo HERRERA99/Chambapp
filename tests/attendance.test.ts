@@ -4,9 +4,7 @@ import type { Attendance } from '../src/domain/models.ts';
 import {
   attendanceDays,
   attendanceInPeriod,
-  attendanceTotal,
   estimateServerTime,
-  imputedPercent,
 } from '../src/domain/attendance.ts';
 import {
   attendanceStorageKey,
@@ -24,40 +22,25 @@ const session = (inicio_en: string, fin_en: string | null, eliminado_en: string 
   fin_en,
   eliminado_en,
 });
-const entry = (
-  inicio_en: string,
-  fin_en: string | null,
-  duracion_imputada_segundos: number | null,
-  eliminado_en: string | null = null,
-) => ({ inicio_en, fin_en, duracion_imputada_segundos, eliminado_en });
-
-test('sums multiple sessions without breaks and compares only closed imputed parts', () => {
+test('sums multiple sessions without counting breaks or deleted records', () => {
   const [day] = attendanceDays(
     [
       session('2026-10-02T07:00:00Z', '2026-10-02T11:00:00Z'),
       session('2026-10-02T12:00:00Z', '2026-10-02T15:00:00Z'),
       session('2026-10-02T05:00:00Z', '2026-10-02T06:00:00Z', now),
     ],
-    [
-      entry('2026-10-02T07:00:00Z', '2026-10-02T10:45:00Z', 4 * 3600),
-      entry('2026-10-02T12:00:00Z', null, null),
-      entry('2026-10-02T12:00:00Z', '2026-10-02T15:00:00Z', 3 * 3600, now),
-    ],
     ['2026-10-02'],
     zone,
     now,
   );
   assert.equal(day!.workedSeconds, 7 * 3600);
-  assert.equal(day!.imputedSeconds, 4 * 3600);
-  assert.equal(day!.imputedPercent, 57.1);
 });
 
-test('keeps exact seconds and fractions when rounded task time is compared with manual attendance', () => {
+test('keeps exact seconds and fractions for manual attendance', () => {
   const start = '2026-09-01T09:07:12.125+02:00';
   const end = '2026-09-01T10:08:13.375+02:00';
   const [day] = attendanceDays(
     [session(start, end)],
-    [entry(start, end, 7200)],
     ['2026-09-01'],
     zone,
     '2026-09-01T12:00:00+02:00',
@@ -65,25 +48,17 @@ test('keeps exact seconds and fractions when rounded task time is compared with 
   assert.equal(day!.closedSeconds, 3661.25);
   assert.equal(day!.provisionalSeconds, 0);
   assert.equal(day!.workedSeconds, 3661.25);
-  assert.equal(day!.imputedSeconds, 7200);
-  assert.equal(attendanceTotal([day!]).workedSeconds, 3661.25);
 });
 
-test('allocates overnight sessions and rounded imputation by actual overlap, conserving totals', () => {
+test('allocates overnight sessions by actual overlap', () => {
   const days = attendanceDays(
     [session('2026-10-01T21:00:00Z', '2026-10-02T01:00:00Z')],
-    [entry('2026-10-01T21:00:00Z', '2026-10-02T01:00:00Z', 5 * 3600)],
     ['2026-10-01', '2026-10-02'],
     zone,
     now,
   );
   assert.equal(days[0]!.workedSeconds, 3600);
   assert.equal(days[1]!.workedSeconds, 3 * 3600);
-  assert.equal(days[0]!.imputedSeconds, 1.25 * 3600);
-  assert.equal(days[1]!.imputedSeconds, 3.75 * 3600);
-  assert.equal(attendanceTotal(days).workedSeconds, 4 * 3600);
-  assert.equal(attendanceTotal(days).imputedSeconds, 5 * 3600);
-  assert.equal(attendanceTotal(days).imputedPercent, 125);
 });
 
 test('local-midnight allocation respects the 23-hour and 25-hour DST days', () => {
@@ -91,7 +66,7 @@ test('local-midnight allocation respects the 23-hour and 25-hour DST days', () =
     ['2026-03-29', '2026-03-28T23:00:00Z', '2026-03-29T22:00:00Z', 23],
     ['2026-10-25', '2026-10-24T22:00:00Z', '2026-10-25T23:00:00Z', 25],
   ] as const) {
-    const [day] = attendanceDays([session(start, end)], [], [date], zone, end);
+    const [day] = attendanceDays([session(start, end)], [date], zone, end);
     assert.equal(day!.workedSeconds, expected * 3600);
   }
 });
@@ -100,24 +75,34 @@ test('open attendance remains provisional and does not double count closed porti
   const dates = ['2026-10-01', '2026-10-02'];
   const days = attendanceDays(
     [session('2026-10-01T21:00:00Z', null)],
-    [],
     dates,
     zone,
     '2026-10-02T00:00:00Z',
   );
   assert.equal(days[0]!.provisionalSeconds, 3600);
   assert.equal(days[1]!.provisionalSeconds, 2 * 3600);
-  assert.equal(attendanceTotal(days).workedSeconds, 3 * 3600);
-  assert.equal(attendanceTotal(days).closedSeconds, 0);
+  assert.deepEqual(
+    days.map((day) => day.workedSeconds),
+    [3600, 2 * 3600],
+  );
+  assert.deepEqual(
+    days.map((day) => day.closedSeconds),
+    [0, 0],
+  );
   const closed = attendanceDays(
     [session('2026-10-01T21:00:00Z', '2026-10-02T00:00:00Z')],
-    [],
     dates,
     zone,
     now,
   );
-  assert.equal(attendanceTotal(closed).workedSeconds, 3 * 3600);
-  assert.equal(attendanceTotal(closed).provisionalSeconds, 0);
+  assert.deepEqual(
+    closed.map((day) => day.workedSeconds),
+    [3600, 2 * 3600],
+  );
+  assert.deepEqual(
+    closed.map((day) => day.provisionalSeconds),
+    [0, 0],
+  );
 });
 
 test('clips sessions to selected dates, keeps totals at exact midnight and avoids future negative durations', () => {
@@ -127,15 +112,12 @@ test('clips sessions to selected dates, keeps totals at exact midnight and avoid
       session('2026-10-01T22:00:00Z', '2026-10-02T00:00:00Z'),
       session('2026-10-02T17:00:00Z', null),
     ],
-    [],
     ['2026-10-02'],
     zone,
     now,
   );
   assert.equal(day!.workedSeconds, 2 * 3600);
   assert.equal(day!.provisionalSeconds, 0);
-  assert.equal(imputedPercent(3600, 0), null);
-  assert.equal(imputedPercent(0, 3600), 0);
 });
 
 test('period history includes a session starting earlier and excludes boundary-adjacent/deleted sessions', () => {

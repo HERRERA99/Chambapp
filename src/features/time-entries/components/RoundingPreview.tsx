@@ -23,7 +23,7 @@ export function RoundingPreview({
         <div>
           <span className="eyebrow">Inicio y fin exactos</span>
           <strong className="mono">
-            09:07:14 <span className="dim">→</span> 13:15:14
+            09:07:14 <span className="dim">–</span> 13:15:14
           </strong>
           <span className="muted">Tiempo real: {formatDuration(realSeconds)}</span>
         </div>

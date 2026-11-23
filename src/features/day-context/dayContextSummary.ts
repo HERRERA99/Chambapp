@@ -1,10 +1,10 @@
 import { DateTime } from 'luxon';
 import type { WorkspaceData } from '../../domain/models';
 import { dayContext } from '../../domain/dayContext';
-import { formatDuration } from '../../domain/time';
+import { formatReadableDuration } from '../week/components/dayTimeline.model';
 
 /**
- * "Entrada 08:02 · 3 partes (5h 10m)": what the user clocked and recorded on `date`,
+ * "Entrada 08:02 · 3 partes (5 h 10 min)": what the user clocked and recorded on `date`,
  * for the toggle while the panel is closed. null for an invalid date.
  */
 export function dayContextSummary(
@@ -22,7 +22,7 @@ export function dayContextSummary(
     const parts = [
       context.firstIn ? `Entrada ${context.firstIn}` : 'Sin fichajes',
       context.entries.length
-        ? `${context.entries.length} ${context.entries.length === 1 ? 'parte' : 'partes'} (${formatDuration(context.entrySeconds)})`
+        ? `${context.entries.length} ${context.entries.length === 1 ? 'parte' : 'partes'} (${formatReadableDuration(context.entrySeconds)})`
         : 'sin partes',
     ];
     return parts.join(' · ');

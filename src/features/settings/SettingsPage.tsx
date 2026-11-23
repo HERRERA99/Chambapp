@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { DateTime } from 'luxon';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDuration } from '../../domain/time';
+import { validHolidayPreference } from '../../domain/holidayPreference';
+import { validImputationThresholds } from '../../domain/imputationThresholds';
 import { Icon } from '../../shared/ui/Icon';
 import type { IconName } from '../../shared/ui/Icon';
 import { PageHeader } from '../../shared/ui/PageHeader';
@@ -52,6 +54,8 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const profileDirty = JSON.stringify(profile) !== JSON.stringify(baseline);
+  const thresholdsDirty =
+    JSON.stringify(profile.imputationThresholds) !== JSON.stringify(baseline.imputationThresholds);
   const dirty = profileDirty || scheduleDirty;
   const changedElsewhere = data.profile.version !== version;
   const minimumDate = minimumScheduleMonday(data);
@@ -64,7 +68,9 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     profile.nombre !== baseline.nombre ||
     profile.workspace !== baseline.workspace ||
     profile.especialidad !== baseline.especialidad ||
-    profile.zonaHoraria !== baseline.zonaHoraria;
+    profile.zonaHoraria !== baseline.zonaHoraria ||
+    profile.holidays.pais !== baseline.holidays.pais ||
+    profile.holidays.region !== baseline.holidays.region;
   const storageDirty =
     profile.almacenamiento !== baseline.almacenamiento ||
     profile.avisoCopiaDias !== baseline.avisoCopiaDias;
@@ -88,7 +94,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
       label: 'Jornada semanal',
       icon: 'calendar',
       summary: `${formatDuration(weeklyMinutesDraft * 60)} por semana`,
-      dirty: scheduleDirty,
+      dirty: scheduleDirty || thresholdsDirty,
     },
     {
       id: 'redondeo',
@@ -144,8 +150,17 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
     if (saving || !dirty) return;
     setError(null);
     setMessage(null);
+    if (!validImputationThresholds(profile.imputationThresholds)) {
+      setError('Los umbrales deben cumplir 0 < ámbar < verde ≤ máximo ≤ 200.');
+      return;
+    }
     if (!profile.nombre.trim() || !profile.workspace.trim()) {
       setError('Completa tu nombre y el nombre del Workspace.');
+      return;
+    }
+    const holidays = profile.holidays.pais || profile.holidays.region ? profile.holidays : null;
+    if (holidays && !validHolidayPreference(holidays)) {
+      setError('Introduce un código de país de dos letras. La región es opcional.');
       return;
     }
 
@@ -206,6 +221,8 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
             especialidad: profile.especialidad.trim(),
             almacenamiento: profile.almacenamiento,
             aviso_copia_dias: profile.avisoCopiaDias,
+            umbrales_imputacion: profile.imputationThresholds,
+            festivos: holidays,
           },
         });
         const saved = {
@@ -314,13 +331,18 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           <div hidden={active !== 'jornada'}>
             <WorkdaySettings
               value={schedule}
+              thresholds={profile.imputationThresholds}
+              onThresholdsChange={(imputationThresholds) => {
+                setProfile((current) => ({ ...current, imputationThresholds }));
+                setMessage(null);
+              }}
               onChange={(next) => {
                 setSchedule(next);
                 setScheduleDirty(true);
                 setMessage(null);
               }}
               minimumDate={minimumDate}
-              dirty={scheduleDirty}
+              dirty={scheduleDirty || thresholdsDirty}
               disabled={saving}
               data={data}
             />
@@ -337,6 +359,7 @@ function SettingsEditor({ data }: { data: WorkspaceData }) {
           </div>
           <div hidden={active !== 'perfil'}>
             <RegionalSettings
+              active={active === 'perfil'}
               value={profile}
               onChange={(next) => {
                 setProfile(next);

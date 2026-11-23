@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Task, TimeEntry } from '../src/domain/models.ts';
+import { lockedIds } from '../src/features/extension/protocol.ts';
 import {
   applyImputationResult,
   buildOdooRequest,
@@ -8,6 +9,7 @@ import {
   buildTimesheetWeek,
   formatRange,
   groupRounding,
+  planWeekOdooSend,
   reconcileSelection,
 } from '../src/features/timesheet/timesheet.model.ts';
 
@@ -126,16 +128,10 @@ test('lists one item per entry, sorted, excluding deleted entries and other week
     ['early', 'late', 'orphan', 'open'],
   );
   assert.equal(first.items[0]!.title, 'Tarea a');
-  assert.equal(first.items[0]!.odooId, 'T1');
-  assert.equal(first.items[0]!.odooUrl, 'https://odoo.example/tasks/1');
-  // Unsafe links are never exposed.
-  assert.equal(first.items[2]!.odooUrl, null);
-  assert.equal(first.items[1]!.odooUrl, 'https://odoo.example/tasks/1');
   assert.equal(first.items[2]!.title, 'Tarea no disponible');
-  assert.equal(first.items[2]!.odooId, 'T9');
-  assert.equal(first.items[3]!.realSeconds, null);
-  assert.equal(first.items[1]!.realSeconds, 1200);
-  assert.equal(first.items[3]!.range, '16:00–en curso');
+  assert.equal(first.groups[0]!.odooUrl, 'https://odoo.example/tasks/1');
+  // Unsafe links are never exposed.
+  assert.equal(first.groups[1]!.odooUrl, null);
   // Totals round each task/day group on its summed real time; open entries do not count.
   // Task a: 60 + 20 min -> 80 -> 90 min (R15). Orphan task b: 60 min.
   assert.equal(first.loggedSeconds, 5400 + 3600);
@@ -442,4 +438,221 @@ test('buildOdooRequest uses the description chosen by the user', () => {
   const joined = buildOdooRequest(base);
   assert.ok('request' in joined);
   assert.equal(joined.request.descripcion, 'Análisis · Revisión');
+});
+
+test('planWeekOdooSend excludes groups without Odoo URL, with running timer, queued, or invalid', () => {
+  const owner = '00000000-0000-4000-8000-000000000001';
+  const tasks = [
+    task('ok', { version: 2, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/1' }),
+    task('no-url', { version: 1, odoo_url: null }),
+    task('running', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/2' }),
+    task('queued', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/3' }),
+    task('zero', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/4' }),
+    task('over24', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/5' }),
+    task('other-origin', {
+      version: 1,
+      odoo_url: 'https://otro.odoo.com/odoo/project/1/tasks/6',
+    }),
+  ];
+  const week = buildTimesheetWeek({
+    monday,
+    tasks,
+    entries: [
+      at('ok-1', 0, 30, { tarea_id: 'ok', descripcion: 'Desarrollo' }),
+      at('no-url-1', 30, 30, { tarea_id: 'no-url', descripcion: 'Sin enlace' }),
+      at('run-1', 60, 30, { tarea_id: 'running', descripcion: 'Terminado' }),
+      entry('run-open', {
+        tarea_id: 'running',
+        inicio_en: `${monday}T09:00:00Z`,
+        fin_en: null,
+        duracion_real_segundos: null,
+      }),
+      at('q-1', 90, 30, { tarea_id: 'queued', descripcion: 'En cola' }),
+      at('zero-1', 120, 0, {
+        tarea_id: 'zero',
+        intervalo_redondeo_minutos: 0,
+        duracion_real_segundos: 0,
+        descripcion: 'Cero',
+      }),
+      at('over-1', 150, 25 * 60, {
+        tarea_id: 'over24',
+        duracion_real_segundos: 25 * 3600,
+        descripcion: 'Demasiado largo',
+      }),
+      at('other-1', 180, 30, { tarea_id: 'other-origin', descripcion: 'Otro Odoo' }),
+      // Missing task (deleted from task list)
+      at('missing-1', 210, 30, {
+        tarea_id: 'deleted-task',
+        odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/99',
+        descripcion: 'Huérfana',
+      }),
+    ],
+  });
+  const locked = lockedIds([
+    {
+      requestId: '00000000-0000-4000-8000-000000000099',
+      taskId: 'queued',
+      entryIds: ['q-1'],
+      status: 'pending',
+      error: '',
+    },
+    {
+      // Completed/failed queue items must not lock entries.
+      requestId: '00000000-0000-4000-8000-000000000098',
+      taskId: 'ok',
+      entryIds: ['ok-1'],
+      status: 'error',
+      error: 'Error previo',
+    },
+  ]);
+  let seq = 0;
+  const rows = planWeekOdooSend({
+    days: week.days,
+    tasks,
+    userId: owner,
+    locked,
+    nextId: () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`,
+    odooOrigin: 'https://empresa.odoo.com',
+  });
+  const byTask = new Map(rows.map((row) => [row.group.taskId, row]));
+  assert.equal(byTask.get('ok')!.exclusionReason, null);
+  assert.equal(byTask.get('ok')!.request?.minutos, 30);
+
+  assert.equal(byTask.get('no-url')!.request, null);
+  assert.match(byTask.get('no-url')!.exclusionReason!, /enlace de Odoo/i);
+
+  assert.equal(byTask.get('running')!.request, null);
+  assert.match(byTask.get('running')!.exclusionReason!, /cronómetro/i);
+
+  assert.equal(byTask.get('queued')!.request, null);
+  assert.match(byTask.get('queued')!.exclusionReason!, /en cola/i);
+
+  assert.equal(byTask.get('zero')!.request, null);
+  assert.match(byTask.get('zero')!.exclusionReason!, /0/);
+
+  assert.equal(byTask.get('over24')!.request, null);
+  assert.match(byTask.get('over24')!.exclusionReason!, /24 horas/);
+
+  assert.equal(byTask.get('other-origin')!.request, null);
+  assert.match(byTask.get('other-origin')!.exclusionReason!, /empresa\.odoo\.com/);
+
+  assert.equal(byTask.get('deleted-task')!.request, null);
+  assert.match(byTask.get('deleted-task')!.exclusionReason!, /no está disponible/i);
+});
+
+test('planWeekOdooSend classifies descriptions (1, >1, 0) and >5h groups', () => {
+  const owner = '00000000-0000-4000-8000-000000000001';
+  const tasks = [
+    task('one', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/1' }),
+    task('multi', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/2' }),
+    task('none', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/3' }),
+    task('exact5', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/4' }),
+    task('over5', { version: 1, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/5' }),
+  ];
+  const week = buildTimesheetWeek({
+    monday,
+    tasks,
+    entries: [
+      at('o1', 0, 20, { tarea_id: 'one', descripcion: 'Misma' }),
+      at('o2', 30, 20, { tarea_id: 'one', descripcion: ' Misma ' }),
+      at('m1', 60, 15, { tarea_id: 'multi', descripcion: 'Análisis' }),
+      at('m2', 90, 15, { tarea_id: 'multi', descripcion: 'Revisión' }),
+      at('n1', 120, 30, { tarea_id: 'none', descripcion: null }),
+      at('n2', 160, 15, { tarea_id: 'none', descripcion: '   ' }),
+      at('e5', 200, 300, { tarea_id: 'exact5', descripcion: 'Cinco horas exactas' }),
+      at('o5', 520, 315, { tarea_id: 'over5', descripcion: 'Más de cinco horas' }),
+    ],
+  });
+  let seq = 0;
+  const rows = planWeekOdooSend({
+    days: week.days,
+    tasks,
+    userId: owner,
+    locked: lockedIds([]),
+    nextId: () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`,
+  });
+  const byTask = new Map(rows.map((row) => [row.group.taskId, row]));
+
+  assert.equal(byTask.get('one')!.needsDescription, false);
+  assert.deepEqual(byTask.get('one')!.choices, ['Misma']);
+  assert.equal(byTask.get('one')!.request?.descripcion, 'Misma');
+
+  assert.equal(byTask.get('multi')!.needsDescription, true);
+  assert.deepEqual(byTask.get('multi')!.choices, ['Análisis', 'Revisión']);
+  assert.notEqual(byTask.get('multi')!.request, null);
+
+  assert.equal(byTask.get('none')!.needsDescription, true);
+  assert.deepEqual(byTask.get('none')!.choices, []);
+  assert.notEqual(byTask.get('none')!.request, null);
+
+  assert.equal(byTask.get('exact5')!.isLong, false);
+  assert.equal(byTask.get('over5')!.isLong, true);
+  assert.equal(byTask.get('over5')!.request?.confirmLong, false);
+});
+
+test('planWeekOdooSend orders by day then group, skips non-pending groups, and sends only pending parts of partial groups', () => {
+  const owner = '00000000-0000-4000-8000-000000000001';
+  const tasks = [
+    task('a', { version: 3, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/1' }),
+    task('b', { version: 4, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/2' }),
+    task('c', { version: 5, odoo_url: 'https://empresa.odoo.com/odoo/project/1/tasks/3' }),
+  ];
+  const week = buildTimesheetWeek({
+    monday,
+    tasks,
+    entries: [
+      // Monday: task b starts before task a, plus task c already imputed (should be skipped).
+      at('mon-b', 0, 45, { tarea_id: 'b', descripcion: 'Lunes B' }),
+      at('mon-a-imp', 30, 60, {
+        tarea_id: 'a',
+        imputacion_odoo_id: 'imp-1',
+        descripcion: 'Ya imputado',
+      }),
+      at('mon-a-pend', 120, 20, { tarea_id: 'a', descripcion: 'Pendiente A' }),
+      at('mon-c-imp', 150, 30, {
+        tarea_id: 'c',
+        imputacion_odoo_id: 'imp-2',
+        descripcion: 'Todo imputado',
+      }),
+      // Tuesday: only running entry on task c (should be skipped), pending on task a and b.
+      entry('tue-c-run', {
+        tarea_id: 'c',
+        fecha: '2026-10-20',
+        inicio_en: '2026-10-20T07:00:00Z',
+        fin_en: null,
+        duracion_real_segundos: null,
+      }),
+      at('tue-a', 0, 30, { tarea_id: 'a', fecha: '2026-10-20', descripcion: 'Martes A' }),
+      at('tue-b', 60, 15, { tarea_id: 'b', fecha: '2026-10-20', descripcion: 'Martes B' }),
+    ],
+  });
+  let seq = 0;
+  const rows = planWeekOdooSend({
+    days: week.days,
+    tasks,
+    userId: owner,
+    locked: lockedIds([]),
+    nextId: () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`,
+  });
+
+  assert.deepEqual(
+    rows.map((row) => [row.group.date, row.group.taskId]),
+    [
+      ['2026-10-19', 'b'],
+      ['2026-10-19', 'a'],
+      ['2026-10-20', 'a'],
+      ['2026-10-20', 'b'],
+    ],
+  );
+  // Partial group on Monday task a: only the 20-minute pending part (rounded to 30 min) is sent.
+  const partial = rows[1]!;
+  assert.equal(partial.exclusionReason, null);
+  assert.deepEqual(
+    partial.request?.partes.map((part) => part.id),
+    ['mon-a-pend'],
+  );
+  assert.equal(partial.request?.minutos, 30);
+  assert.equal(partial.request?.horasFormato, '00:30');
+  assert.deepEqual(partial.choices, ['Pendiente A']);
+  assert.equal(partial.needsDescription, false);
 });
