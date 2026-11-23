@@ -394,7 +394,7 @@ export async function previewHeraWeek(): Promise<HeraWeekPreview> {
     readHeraWeek(dates, session.account),
     readWeekRows(session, dates, zone),
   ]);
-  const plan = heraWeekPlan(hera, rows, zone);
+  const plan = heraWeekPlan(hera, rows, zone, dates.at(-1));
   const id = crypto.randomUUID();
   const preview: StoredPreview = {
     id,
@@ -427,7 +427,12 @@ export async function applyHeraWeek(id: string): Promise<HeraWeekResult> {
     )
       throw new Error(`Ha cambiado el periodo que se puede recuperar. ${REPEAT_PREVIEW}`);
 
-    const plan = heraWeekPlan(preview.hera, await readWeekRows(session, dates, zone), zone);
+    const plan = heraWeekPlan(
+      preview.hera,
+      await readWeekRows(session, dates, zone),
+      zone,
+      dates.at(-1),
+    );
     if (preview.signature !== heraWeekPlanSignature(plan))
       throw new Error(`Han cambiado los fichajes de Chambapp. ${REPEAT_PREVIEW}`);
 
@@ -452,7 +457,13 @@ export async function applyHeraWeek(id: string): Promise<HeraWeekResult> {
           result.remaining--;
         }
         for (const segment of day.create) {
-          await command('crear_fichaje', { id: crypto.randomUUID(), ...segment }, session.account);
+          // An open segment (today, no exit yet) is created like a clock-in: no fin_en.
+          const { inicio_en, fin_en } = segment;
+          await command(
+            'crear_fichaje',
+            { id: crypto.randomUUID(), inicio_en, ...(fin_en === null ? {} : { fin_en }) },
+            session.account,
+          );
           result.created++;
           result.remaining--;
         }

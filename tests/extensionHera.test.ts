@@ -120,7 +120,7 @@ const shift = (start: string, end: string) => ({ inicio_en: at(start), fin_en: a
 const planDay = (rows: AttendanceRow[], accesses = first) =>
   heraWeekPlan([day(accesses)], rows, zone).days[0]!;
 
-test('Hera week ends yesterday in the profile zone, using the previous week on Monday', () => {
+test('Hera week ends today in the profile zone, adding the previous week on Monday', () => {
   const sundayUtc = DateTime.fromISO('2026-11-08T23:30Z', { zone });
   assert.deepEqual(heraWeekDates(sundayUtc), [
     '2026-11-02',
@@ -130,12 +130,38 @@ test('Hera week ends yesterday in the profile zone, using the previous week on M
     '2026-11-06',
     '2026-11-07',
     '2026-11-08',
+    monday,
   ]);
   assert.deepEqual(heraWeekDates(DateTime.fromISO('2026-11-12', { zone })), [
     monday,
     '2026-11-10',
     '2026-11-11',
+    '2026-11-12',
   ]);
+});
+
+test('today, a last entry without exit is an open segment that opens or keeps a clock-in', () => {
+  const accesses = [...first, entrada('13:00')];
+  const open = { inicio_en: at('13:00'), fin_en: null };
+  const today = (rows: AttendanceRow[]) =>
+    heraWeekPlan([day(accesses)], rows, zone, monday).days[0]!;
+
+  const fresh = today([]);
+  assert.equal(fresh.status, 'ok');
+  assert.deepEqual(fresh.create, [shift('08:00', '12:00'), open]);
+
+  const morning = { id: 'a', version: 1, ...shift('08:00', '12:00') };
+  const running = { id: 'b', version: 1, inicio_en: at('13:00'), fin_en: null };
+  const kept = today([morning, running]);
+  assert.deepEqual(kept.create, []);
+  assert.deepEqual(kept.update, []);
+  assert.equal(kept.same.length, 2);
+
+  const late = { id: 'c', version: 1, inicio_en: at('13:05'), fin_en: null };
+  assert.deepEqual(today([morning, late]).update, [{ row: late, segment: open }]);
+
+  // Other days still require the exit.
+  assert.equal(heraWeekPlan([day(accesses)], [], zone).days[0]!.status, 'incomplete');
 });
 
 test('pairs one or two registered shifts in the order received', () => {

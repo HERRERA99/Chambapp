@@ -67,6 +67,8 @@ La pestaña **Fichaje** del popup añade tu último fichaje de Hera (`https://ne
 - Una **ENTRADA** abre un fichaje a esa hora (en tu zona horaria).
 - Una **SALIDA** cierra el fichaje abierto a esa hora.
 
+**Recuperar fichajes de la semana** compara los accesos de Hera con Chambapp y aplica los cambios: de martes a domingo, desde el lunes de esta semana hasta hoy; los lunes, la semana anterior entera y hoy. En el día de hoy, una última entrada sin salida abre (o mantiene) un fichaje abierto; en los días anteriores, ese día se marca como incompleto y no se toca.
+
 Si ya está registrado, no lo duplica. Si no encaja (por ejemplo, una salida sin entrada abierta, una entrada con otra abierta o anterior a fichajes ya guardados), lo explica y no cambia nada. Necesita el permiso de host para Hera, incluido en el manifiesto; en Firefox, si falta, la sección ofrece «Conceder permiso».
 
 ### Conexión: nube o Chambapp local

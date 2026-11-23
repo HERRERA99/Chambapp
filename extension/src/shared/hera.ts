@@ -118,7 +118,8 @@ type HeraDay = {
   pendingRequests: number;
   outOfRange?: true;
 };
-type HeraSegment = { inicio_en: string; fin_en: string };
+/** A segment still open (fin_en null) is only possible today: Hera shows no exit yet. */
+type HeraSegment = { inicio_en: string; fin_en: string | null };
 type HeraMatch = { row: AttendanceRow; segment: HeraSegment };
 
 export type HeraDayPlan = {
@@ -133,11 +134,14 @@ export type HeraDayPlan = {
   message?: string;
 };
 
-/** Dates in the user's zone. On Mondays, recover the whole previous week. */
+/**
+ * Dates in the user's zone, ending today. On Mondays, the whole previous week and today;
+ * on other days, from this week's Monday to today.
+ */
 export function heraWeekDates(today: DateTime): string[] {
   const day = today.startOf('day');
   const count = day.weekday === 1 ? 7 : day.weekday - 1;
-  return Array.from({ length: count }, (_, index) =>
+  return Array.from({ length: count + 1 }, (_, index) =>
     day.minus({ days: count - index }).toISODate()!,
   );
 }
@@ -184,9 +188,11 @@ export function normalizeHeraWeek(value: unknown, dates: readonly string[]): Her
   });
 }
 
+/** With allowOpen (today), a last entry without exit is an open segment, not an error. */
 export function pairHeraAccesses(
   { date, accesses }: HeraDay,
   zone: string,
+  allowOpen = false,
 ): { segments: HeraSegment[]; message?: string } {
   const segments: HeraSegment[] = [];
   let start: string | null = null;
@@ -197,7 +203,7 @@ export function pairHeraAccesses(
     if (access.kind === 'entrada') {
       if (start) return { segments, message: 'Hay dos entradas seguidas.' };
       const previous = segments.at(-1);
-      if (previous && ms(instant) < ms(previous.fin_en))
+      if (previous && ms(instant) < ms(previous.fin_en!))
         return { segments, message: 'Los accesos de Hera están fuera de orden.' };
       start = instant;
     } else {
@@ -208,12 +214,14 @@ export function pairHeraAccesses(
       start = null;
     }
   }
-  return start ? { segments, message: 'La última entrada no tiene salida.' } : { segments };
+  if (start && allowOpen) segments.push({ inicio_en: start, fin_en: null });
+  else if (start) return { segments, message: 'La última entrada no tiene salida.' };
+  return { segments };
 }
 
 function overlaps(row: AttendanceRow, segment: HeraSegment): boolean {
   return (
-    ms(row.inicio_en) < ms(segment.fin_en) &&
+    (segment.fin_en === null || ms(row.inicio_en) < ms(segment.fin_en)) &&
     (row.fin_en === null || ms(segment.inicio_en) < ms(row.fin_en))
   );
 }
@@ -232,7 +240,12 @@ function matchesSegment(
   return segments.find((candidate) => overlaps(row, candidate)) === segment;
 }
 
-function planHeraDay(day: HeraDay, rows: readonly AttendanceRow[], zone: string): HeraDayPlan {
+function planHeraDay(
+  day: HeraDay,
+  rows: readonly AttendanceRow[],
+  zone: string,
+  allowOpen: boolean,
+): HeraDayPlan {
   const plan: HeraDayPlan = {
     date: day.date,
     status: 'ok',
@@ -249,7 +262,7 @@ function planHeraDay(day: HeraDay, rows: readonly AttendanceRow[], zone: string)
       status: 'out-of-range',
       message: 'Fecha fuera del rango consultable en Hera.',
     };
-  const { segments, message } = pairHeraAccesses(day, zone);
+  const { segments, message } = pairHeraAccesses(day, zone, allowOpen);
   plan.segments = segments;
   if (message) return { ...plan, status: 'incomplete', message };
 
@@ -270,9 +283,10 @@ function planHeraDay(day: HeraDay, rows: readonly AttendanceRow[], zone: string)
     const row = matches[index]?.[0];
     if (!row) plan.create.push(segment);
     else if (
-      row.fin_en !== null &&
       Math.abs(ms(row.inicio_en) - ms(segment.inicio_en)) < SAME_MS &&
-      Math.abs(ms(row.fin_en) - ms(segment.fin_en)) < SAME_MS
+      (row.fin_en === null || segment.fin_en === null
+        ? row.fin_en === segment.fin_en
+        : Math.abs(ms(row.fin_en) - ms(segment.fin_en)) < SAME_MS)
     )
       plan.same.push({ row, segment });
     else plan.update.push({ row, segment });
@@ -280,10 +294,12 @@ function planHeraDay(day: HeraDay, rows: readonly AttendanceRow[], zone: string)
   return plan;
 }
 
+/** today (yyyy-mm-dd): the only day whose last entry may still be open in Hera. */
 export function heraWeekPlan(
   days: readonly HeraDay[],
   rows: readonly AttendanceRow[],
   zone: string,
+  today?: string,
 ) {
   const byDate = new Map(days.map(({ date }) => [date, [] as AttendanceRow[]]));
   for (const { id, version, inicio_en, fin_en } of rows)
@@ -297,7 +313,7 @@ export function heraWeekPlan(
     byDate.get(date)!.sort((a, b) => ms(a.inicio_en) - ms(b.inicio_en) || a.id.localeCompare(b.id)),
   );
   return {
-    days: days.map((day, index) => planHeraDay(day, dayRows[index]!, zone)),
+    days: days.map((day, index) => planHeraDay(day, dayRows[index]!, zone, day.date === today)),
     // Include rows on skipped days so apply also detects changes to those days.
     rows: dayRows.flat(),
   };
